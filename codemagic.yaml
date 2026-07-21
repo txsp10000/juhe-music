@@ -14,13 +14,11 @@ workflows:
         - pattern: main
           include: true
     scripts:
+      - name: Recreate platform files
+        script: flutter create --platforms=ios .
       - name: Get Flutter packages
         script: flutter pub get
       - name: Build iOS without signing
         script: flutter build ios --no-codesign --release
     artifacts:
       - build/ios/iphoneos/Runner.app
-    publishing:
-      email:
-        recipients:
-          - user@example.com
