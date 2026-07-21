@@ -1,4 +1,5 @@
 import 'package:just_audio/just_audio.dart';
+import 'package:audio_service/audio_service.dart';
 import '../models/song.dart';
 import '../models/platform.dart';
 import '../api/music_api.dart';
@@ -89,13 +90,29 @@ class PlayerService {
       } else {
         url = await MusicApi.getMusicUrl(platform, song, quality: _currentQuality);
       }
-      await _player.setUrl(url);
+      await _player.setAudioSource(AudioSource.uri(
+        Uri.parse(url),
+        tag: MediaItem(
+          id: song.id,
+          title: song.name,
+          artist: song.singer,
+          album: song.album,
+          artUri: song.cover.isNotEmpty ? Uri.parse(song.cover) : null,
+        ),
+      ));
       _player.play();
       MusicApi.getLyric(platform, song).then((lyric) => song.lyric = lyric);
     } catch (_) {
       try {
         final url = await MusicApi.qishuiGetUrl(song, quality: _currentQuality);
-        await _player.setUrl(url);
+        await _player.setAudioSource(AudioSource.uri(
+          Uri.parse(url),
+          tag: MediaItem(
+            id: song.id,
+            title: song.name,
+            artist: song.singer,
+          ),
+        ));
         _player.play();
       } catch (_) {}
     }
@@ -116,7 +133,16 @@ class PlayerService {
       } else {
         url = await MusicApi.getMusicUrl(platform, song, quality: quality);
       }
-      await _player.setUrl(url);
+      await _player.setAudioSource(AudioSource.uri(
+        Uri.parse(url),
+        tag: MediaItem(
+          id: song.id,
+          title: song.name,
+          artist: song.singer,
+          album: song.album,
+          artUri: song.cover.isNotEmpty ? Uri.parse(song.cover) : null,
+        ),
+      ));
       await _player.seek(pos);
       if (wasPlaying) _player.play();
     } catch (_) {}

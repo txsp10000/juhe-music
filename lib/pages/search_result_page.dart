@@ -47,33 +47,25 @@ class _SearchResultPageState extends State<SearchResultPage> {
   }
 
   void _showPlatformPicker() {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      backgroundColor: const Color(0xFF1E2030),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2030),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('选择音源 — "${widget.keyword}"',
+            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text('选择音源 — "${widget.keyword}"',
-                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
-            ),
-            ..._results.map((r) {
-              final label = '${r.platform.displayName} (${r.songs.length}首)';
-              return ListTile(
-                title: Text(label, style: const TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  setState(() { _songs = r.songs; _selectedPlatform = r.platform.displayName; });
-                },
-              );
-            }),
-            const SizedBox(height: 8),
-          ],
+          children: _results.map((r) {
+            final label = '${r.platform.displayName} (${r.songs.length}首)';
+            return ListTile(
+              title: Text(label, style: const TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() { _songs = r.songs; _selectedPlatform = r.platform.displayName; });
+              },
+            );
+          }).toList(),
         ),
       ),
     );
@@ -86,7 +78,10 @@ class _SearchResultPageState extends State<SearchResultPage> {
     Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
   }
 
-  String _fmt(int sec) => '${sec ~/ 60}:${(sec % 60).toString().padLeft(2, '0')}';
+  String _platformName(String code) {
+    final p = Platform.fromCode(code);
+    return p?.displayName ?? code;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -134,8 +129,15 @@ class _SearchResultPageState extends State<SearchResultPage> {
                                 ],
                               ),
                             ),
-                            Text(s.duration > 0 ? _fmt(s.duration) : '--:--',
-                                style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0x226890F9),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(_platformName(s.source),
+                                  style: const TextStyle(color: Color(0xFF6890F9), fontSize: 11)),
+                            ),
                           ],
                         ),
                       ),

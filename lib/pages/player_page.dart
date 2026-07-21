@@ -93,20 +93,15 @@ class _PlayerPageState extends State<PlayerPage> {
   void _showQualitySheet() {
     final codes = ['flac', '320k', '192k', '128k'];
     final labels = ['FLAC 无损', '320k 极高', '192k 较高', '128k 标准'];
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      backgroundColor: const Color(0xFF1E2030),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2030),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('选择音质', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('选择音质', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
-            ),
             for (var i = 0; i < labels.length; i++)
               ListTile(
                 title: Text(labels[i], style: const TextStyle(color: Colors.white)),
@@ -119,7 +114,6 @@ class _PlayerPageState extends State<PlayerPage> {
                   setState(() {});
                 },
               ),
-            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -129,20 +123,15 @@ class _PlayerPageState extends State<PlayerPage> {
   void _showSearchSameSheet() {
     final song = _player.currentSong;
     if (song == null) return;
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      backgroundColor: const Color(0xFF1E2030),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2030),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('搜索同名歌曲或歌手', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('搜索同名歌曲或歌手', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
-            ),
             ListTile(
               leading: const Icon(Icons.music_note, color: Color(0xFF6890F9)),
               title: Text('歌曲名: ${song.name}', style: const TextStyle(color: Colors.white)),
@@ -159,7 +148,6 @@ class _PlayerPageState extends State<PlayerPage> {
                 Navigator.push(context, MaterialPageRoute(builder: (_) => SearchResultPage(keyword: song.singer)));
               },
             ),
-            const SizedBox(height: 8),
           ],
         ),
       ),

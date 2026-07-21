@@ -33,6 +33,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     _pulseController.repeat(reverse: true);
+    _bindPlayer();
+    _syncState();
+  }
+
+  void _bindPlayer() {
     _player.onProgress = (pos, dur) {
       if (mounted) setState(() { _position = pos; _duration = dur ?? Duration.zero; });
     };
@@ -40,7 +45,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       if (mounted) setState(() => _currentSong = song);
     };
     _player.onPlayStateChanged = (_) => mounted ? setState(() {}) : null;
-    _syncState();
   }
 
   void _syncState() {
@@ -98,7 +102,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                     const Spacer(),
                     GestureDetector(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SearchPage())),
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SearchPage())).then((_) { _bindPlayer(); _syncState(); if (mounted) setState(() {}); }),
                       child: Container(
                         height: 40,
                         padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -118,7 +122,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     ),
                     const SizedBox(width: 12),
                     GestureDetector(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoritesPage())),
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoritesPage())).then((_) { _bindPlayer(); _syncState(); if (mounted) setState(() {}); }),
                       child: Container(
                         height: 40,
                         padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -167,9 +171,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                   overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
                                 ),
                                 child: Slider(
-                                  value: _duration.inMilliseconds > 0
+                                  value: (_duration.inMilliseconds > 0
                                       ? _position.inMilliseconds / _duration.inMilliseconds
-                                      : 0,
+                                      : 0.0).clamp(0.0, 1.0),
                                   onChanged: (v) {
                                     final ms = (v * _duration.inMilliseconds).toInt();
                                     _player.seekRelative(ms - _position.inMilliseconds);
@@ -246,6 +250,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   void _openPlayer() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage())).then((_) {
+      _bindPlayer();
+      _syncState();
+      if (mounted) setState(() {});
+    });
   }
 }

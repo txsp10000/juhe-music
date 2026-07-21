@@ -18,6 +18,45 @@ workflows:
         script: rm -rf ios
       - name: Recreate iOS project
         script: flutter create --platforms=ios .
+      - name: Set app display name
+        script: |
+          sed -i '' 's/PRODUCT_NAME = .*/PRODUCT_NAME = "苗苗music";/' ios/Runner.xcodeproj/project.pbxproj
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 苗苗music" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleName 苗苗music" ios/Runner/Info.plist
+      - name: Enable background audio
+        script: |
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" ios/Runner/Info.plist
+      - name: Enable CarPlay support
+        script: |
+          /usr/libexec/PlistBuddy -c "Add :com.apple.developer.carplay-audio bool true" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:1 string audio" ios/Runner/Info.plist 2>/dev/null || true
+          cat > ios/Runner/CarPlaySceneDelegate.swift << 'EOF'
+          import UIKit
+          import MediaPlayer
+
+          @available(iOS 14.0, *)
+          class CarPlaySceneDelegate: UIResponder {
+          }
+
+          @available(iOS 14.0, *)
+          extension CarPlaySceneDelegate: CPTemplateApplicationSceneDelegate {
+              func templateApplicationScene(_ templateApplicationScene: CPTemplateApplicationScene, didConnect interfaceController: CPInterfaceController) {
+                  let nowPlaying = CPNowPlayingTemplate.shared
+                  interfaceController.setRootTemplate(nowPlaying, animated: true, completion: nil)
+              }
+
+              func templateApplicationScene(_ templateApplicationScene: CPTemplateApplicationScene, didDisconnect interfaceController: CPInterfaceController) {
+              }
+          }
+          EOF
+          sed -i '' '1s/^/import CarPlay\n/' ios/Runner/CarPlaySceneDelegate.swift
+          /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest dict" ios/Runner/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UISceneConfigurations dict" ios/Runner/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UISceneConfigurations:CPTemplateApplicationSceneSessionRoleApplication array" ios/Runner/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UISceneConfigurations:CPTemplateApplicationSceneSessionRoleApplication:0 dict" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UISceneConfigurations:CPTemplateApplicationSceneSessionRoleApplication:0:UISceneConfigurationName string CarPlay" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UISceneConfigurations:CPTemplateApplicationSceneSessionRoleApplication:0:UISceneDelegateClassName string Runner.CarPlaySceneDelegate" ios/Runner/Info.plist
       - name: Get Flutter packages
         script: flutter pub get
       - name: Build iOS without signing
