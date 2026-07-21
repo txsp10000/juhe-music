@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../api/music_api.dart';
 import '../models/song.dart';
 import '../models/platform.dart';
@@ -48,39 +47,33 @@ class _SearchResultPageState extends State<SearchResultPage> {
   }
 
   void _showPlatformPicker() {
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF171B26),
-        title: Text('选择音源 — "${widget.keyword}"',
-            style: const TextStyle(color: Colors.white)),
-        content: Column(
+      backgroundColor: const Color(0xFF1E2030),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: _results.map((r) {
-            final label = '${r.platform.displayName} (${r.songs.length}首)';
-            return Focus(
-              autofocus: _results.indexOf(r) == 0,
-              child: GestureDetector(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text('选择音源 — "${widget.keyword}"',
+                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+            ),
+            ..._results.map((r) {
+              final label = '${r.platform.displayName} (${r.songs.length}首)';
+              return ListTile(
+                title: Text(label, style: const TextStyle(color: Colors.white)),
                 onTap: () {
                   Navigator.pop(ctx);
-                  setState(() {
-                    _songs = r.songs;
-                    _selectedPlatform = r.platform.displayName;
-                  });
+                  setState(() { _songs = r.songs; _selectedPlatform = r.platform.displayName; });
                 },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  margin: const EdgeInsets.only(bottom: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0x1A6890F9),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0x336890F9)),
-                  ),
-                  child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 16)),
-                ),
-              ),
-            );
-          }).toList(),
+              );
+            }),
+            const SizedBox(height: 8),
+          ],
         ),
       ),
     );
@@ -121,50 +114,30 @@ class _SearchResultPageState extends State<SearchResultPage> {
                   itemCount: _songs.length,
                   itemBuilder: (_, i) {
                     final s = _songs[i];
-                    return Focus(
-                      autofocus: i == 0,
-                      onKeyEvent: (_, event) {
-                        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.enter) {
-                          _playAt(i);
-                          return KeyEventResult.handled;
-                        }
-                        return KeyEventResult.ignored;
-                      },
-                      child: Builder(
-                        builder: (ctx) {
-                          final hasFocus = Focus.of(ctx).hasFocus;
-                          return GestureDetector(
-                            onTap: () => _playAt(i),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                              decoration: BoxDecoration(
-                                color: hasFocus ? const Color(0x1A6890F9) : Colors.transparent,
-                                border: hasFocus
-                                    ? const Border(bottom: BorderSide(color: Color(0xFF6890F9), width: 2))
-                                    : const Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
-                              ),
-                              child: Row(
+                    return InkWell(
+                      onTap: () => _playAt(i),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                        decoration: const BoxDecoration(
+                          border: Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
+                        ),
+                        child: Row(
+                          children: [
+                            Text('${i + 1}', style: const TextStyle(color: Color(0xFF8F919A), fontSize: 14)),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(Icons.music_note,
-                                      color: hasFocus ? const Color(0xFF6890F9) : const Color(0xFF8F919A), size: 22),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(s.name,
-                                            style: TextStyle(color: hasFocus ? Colors.white : const Color(0xFFE0E0E0), fontSize: 16)),
-                                        Text(s.singer, style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
-                                      ],
-                                    ),
-                                  ),
-                                  Text(_fmt(s.duration),
-                                      style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
+                                  Text(s.name, style: const TextStyle(color: Color(0xFFE0E0E0), fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  Text(s.singer, style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
                                 ],
                               ),
                             ),
-                          );
-                        },
+                            Text(s.duration > 0 ? _fmt(s.duration) : '--:--',
+                                style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
+                          ],
+                        ),
                       ),
                     );
                   },

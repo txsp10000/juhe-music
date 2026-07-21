@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../services/player_service.dart';
 import '../services/favorites_service.dart';
 import '../models/song.dart';
@@ -15,22 +14,15 @@ class PlayerPage extends StatefulWidget {
 
 class _PlayerPageState extends State<PlayerPage> {
   final _player = PlayerService();
-  final _focusSeekBar = FocusNode();
-  final _focusLoop = FocusNode();
-  final _focusPrev = FocusNode();
-  final _focusPlayPause = FocusNode();
-  final _focusNext = FocusNode();
-  final _focusFavorite = FocusNode();
-  final _focusPlaylist = FocusNode();
-  final _focusQuality = FocusNode();
-  final _focusSearchSame = FocusNode();
-
   bool _isFavorite = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
 
   static const _qualityLabels = {
-    'flac': 'FLAC 无损', '320k': '320kbps', '192k': '192kbps', '128k': '128kbps',
+    'flac': 'FLAC 无损',
+    '320k': '320kbps',
+    '192k': '192kbps',
+    '128k': '128kbps',
   };
 
   @override
@@ -45,7 +37,6 @@ class _PlayerPageState extends State<PlayerPage> {
     };
     _syncState();
     _checkFavorite();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _focusSeekBar.requestFocus());
   }
 
   void _syncState() {
@@ -91,151 +82,88 @@ class _PlayerPageState extends State<PlayerPage> {
     setState(() {});
   }
 
-  String get _loopLabel => switch (_player.loopMode) {
-    0 => '列表循环', 1 => '单曲循环', _ => '顺序播放',
+  IconData get _loopIcon => switch (_player.loopMode) {
+    1 => Icons.repeat_one,
+    2 => Icons.arrow_forward,
+    _ => Icons.repeat,
   };
 
   String get _currentQualityLabel => _qualityLabels[_player.currentQuality] ?? 'FLAC 无损';
 
-  void _showQualityDialog() {
+  void _showQualitySheet() {
     final codes = ['flac', '320k', '192k', '128k'];
     final labels = ['FLAC 无损', '320k 极高', '192k 较高', '128k 标准'];
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF171B26),
-        title: const Text('选择音质', style: TextStyle(color: Colors.white)),
-        content: Column(
+      backgroundColor: const Color(0xFF1E2030),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            for (var i = 0; i < labels.length; i++)
-              Focus(
-                autofocus: i == 0,
-                child: GestureDetector(
-                  onTap: () { Navigator.pop(ctx); _player.switchQuality(codes[i]); setState(() {}); },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                    margin: const EdgeInsets.only(bottom: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0x1A6890F9),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0x336890F9)),
-                    ),
-                    child: Text(labels[i], style: const TextStyle(color: Colors.white, fontSize: 16)),
-                  ),
-                ),
-              ),
-            const SizedBox(height: 12),
-            Focus(
-              child: GestureDetector(
-                onTap: () => Navigator.pop(ctx),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  margin: const EdgeInsets.only(bottom: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0x1A6890F9),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0x336890F9)),
-                  ),
-                  child: const Text('取消', textAlign: TextAlign.center,
-                      style: TextStyle(color: Color(0xFF8F919A), fontSize: 16)),
-                ),
-              ),
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('选择音质', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
             ),
+            for (var i = 0; i < labels.length; i++)
+              ListTile(
+                title: Text(labels[i], style: const TextStyle(color: Colors.white)),
+                trailing: _player.currentQuality == codes[i]
+                    ? const Icon(Icons.check, color: Color(0xFF6890F9))
+                    : null,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _player.switchQuality(codes[i]);
+                  setState(() {});
+                },
+              ),
+            const SizedBox(height: 8),
           ],
         ),
       ),
     );
   }
 
-  void _showSearchSameDialog() {
+  void _showSearchSameSheet() {
     final song = _player.currentSong;
     if (song == null) return;
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF171B26),
-        title: const Text('搜索同名歌曲或歌手', style: TextStyle(color: Colors.white)),
-        content: Column(
+      backgroundColor: const Color(0xFF1E2030),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Focus(
-              autofocus: true,
-              child: GestureDetector(
-                onTap: () {
-                  Navigator.pop(ctx);
-                  Navigator.push(context, MaterialPageRoute(
-                    builder: (_) => SearchResultPage(keyword: song.name),
-                  ));
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  margin: const EdgeInsets.only(bottom: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0x1A6890F9),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0x336890F9)),
-                  ),
-                  child: Text('歌曲名: ${song.name}',
-                      style: const TextStyle(color: Colors.white, fontSize: 16)),
-                ),
-              ),
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('搜索同名歌曲或歌手', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
             ),
-            Focus(
-              child: GestureDetector(
-                onTap: () {
-                  Navigator.pop(ctx);
-                  Navigator.push(context, MaterialPageRoute(
-                    builder: (_) => SearchResultPage(keyword: song.singer),
-                  ));
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  margin: const EdgeInsets.only(bottom: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0x1A6890F9),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0x336890F9)),
-                  ),
-                  child: Text('歌手: ${song.singer}',
-                      style: const TextStyle(color: Colors.white, fontSize: 16)),
-                ),
-              ),
+            ListTile(
+              leading: const Icon(Icons.music_note, color: Color(0xFF6890F9)),
+              title: Text('歌曲名: ${song.name}', style: const TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => SearchResultPage(keyword: song.name)));
+              },
             ),
-            const SizedBox(height: 12),
-            Focus(
-              child: GestureDetector(
-                onTap: () => Navigator.pop(ctx),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: const Color(0x1A6890F9),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0x336890F9)),
-                  ),
-                  child: const Text('取消', textAlign: TextAlign.center,
-                      style: TextStyle(color: Color(0xFF8F919A), fontSize: 16)),
-                ),
-              ),
+            ListTile(
+              leading: const Icon(Icons.person, color: Color(0xFF6890F9)),
+              title: Text('歌手: ${song.singer}', style: const TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => SearchResultPage(keyword: song.singer)));
+              },
             ),
+            const SizedBox(height: 8),
           ],
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _focusSeekBar.dispose();
-    _focusLoop.dispose();
-    _focusPrev.dispose();
-    _focusPlayPause.dispose();
-    _focusNext.dispose();
-    _focusFavorite.dispose();
-    _focusPlaylist.dispose();
-    _focusQuality.dispose();
-    _focusSearchSame.dispose();
-    super.dispose();
   }
 
   @override
@@ -243,126 +171,208 @@ class _PlayerPageState extends State<PlayerPage> {
     final song = _player.currentSong;
     if (song == null) return const Scaffold(body: SizedBox());
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) Navigator.pop(context);
-      },
-      child: Scaffold(
-        backgroundColor: const Color(0xFF0D0F14),
-        body: SafeArea(
-          child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF1A1D28), Color(0xFF0D0F14)],
-            ),
+    return Scaffold(
+      backgroundColor: const Color(0xFF0D0F14),
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildTopBar(),
+            Expanded(child: _buildCenterContent(song)),
+            _buildSeekBar(),
+            _buildControls(),
+            _buildBottomActions(song),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 30),
           ),
-          child: Column(
+          const Spacer(),
+          Column(
             children: [
-              // Song info + lyrics area
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(52, 24, 52, 0),
-                  child: Row(
-                    children: [
-                      // Left: song info
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(song.name,
-                                style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold),
-                                maxLines: 1, overflow: TextOverflow.ellipsis),
-                            const SizedBox(height: 10),
-                            Text(song.singer,
-                                style: const TextStyle(color: Color(0xFFF4F4F7), fontSize: 17)),
-                            const SizedBox(height: 16),
-                            Text(_currentQualityLabel,
-                                style: const TextStyle(color: Color(0xFF6890F9), fontSize: 14)),
-                            const SizedBox(height: 10),
-                            // Quality button
-                            _textButton(_focusQuality, '切换音质', _showQualityDialog),
-                            const SizedBox(height: 10),
-                            // Search same button
-                            _textButton(_focusSearchSame, '搜索同名歌曲或歌手', _showSearchSameDialog),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 40),
-                      // Right: lyrics
-                      SizedBox(
-                        width: 440,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(_firstLyric(song.lyric),
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: Color(0xFF6C97FF), fontSize: 23, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              // Bottom control area
-              Container(
-                color: const Color(0xEE09090C),
-                padding: const EdgeInsets.fromLTRB(58, 10, 58, 16),
-                child: Column(
-                  children: [
-                    // Seekbar
-                    _seekBarBox(),
-                    // Time
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(_fmt(_position), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
-                          Text(_fmt(_duration), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                    // Controls
-                    SizedBox(
-                      height: 80,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // Loop
-                          _iconButton(_focusLoop, Icons.repeat, 54, _loopToggle,
-                              label: _loopLabel),
-                          const SizedBox(width: 14),
-                          _iconButton(_focusPrev, Icons.skip_previous, 58, () { _player.prev(); }),
-                          const SizedBox(width: 14),
-                          _iconButton(_focusPlayPause,
-                              _player.isPlaying ? Icons.pause : Icons.play_arrow, 64,
-                              () { _player.togglePlayPause(); }),
-                          const SizedBox(width: 14),
-                          _iconButton(_focusNext, Icons.skip_next, 58, () { _player.next(); }),
-                          const SizedBox(width: 14),
-                          _iconButton(_focusFavorite,
-                              _isFavorite ? Icons.favorite : Icons.favorite_border, 54,
-                              _toggleFavorite,
-                              iconColor: _isFavorite ? Colors.red : Colors.white),
-                          const SizedBox(width: 14),
-                          _iconButton(_focusPlaylist, Icons.queue_music, 54, () {
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => const PlaylistPage()));
-                          }),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              const Text('正在播放', style: TextStyle(color: Color(0xFF8F919A), fontSize: 12)),
+              Text(_currentQualityLabel, style: const TextStyle(color: Color(0xFF6890F9), fontSize: 11)),
             ],
           ),
-        ),
-        ),
+          const Spacer(),
+          GestureDetector(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlaylistPage())),
+            child: const Icon(Icons.queue_music, color: Colors.white, size: 26),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCenterContent(Song song) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 220,
+            height: 220,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: const Color(0xFF1E2030),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 30, offset: const Offset(0, 10)),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: song.cover.isNotEmpty
+                  ? Image.network(song.cover, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _defaultCover())
+                  : _defaultCover(),
+            ),
+          ),
+          const SizedBox(height: 32),
+          Text(song.name,
+              style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+              maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
+          const SizedBox(height: 8),
+          Text(song.singer,
+              style: const TextStyle(color: Color(0xFF8F919A), fontSize: 16),
+              maxLines: 1, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 12),
+          Text(
+            _firstLyric(song.lyric),
+            style: const TextStyle(color: Color(0xFF6C97FF), fontSize: 15),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _defaultCover() {
+    return Container(
+      color: const Color(0xFF2A2D3A),
+      child: const Center(child: Icon(Icons.music_note, color: Color(0xFF6890F9), size: 80)),
+    );
+  }
+
+  Widget _buildSeekBar() {
+    final progress = _duration.inMilliseconds > 0
+        ? _position.inMilliseconds / _duration.inMilliseconds
+        : 0.0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: [
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 3,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+              activeTrackColor: const Color(0xFF6890F9),
+              inactiveTrackColor: const Color(0xFF2A2D3A),
+              thumbColor: const Color(0xFF6890F9),
+              overlayColor: const Color(0x226890F9),
+            ),
+            child: Slider(
+              value: progress.clamp(0.0, 1.0),
+              onChanged: (v) {
+                final newPos = Duration(milliseconds: (v * _duration.inMilliseconds).toInt());
+                _player.seekRelative(newPos.inMilliseconds - _position.inMilliseconds);
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(_fmt(_position), style: const TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
+                Text(_fmt(_duration), style: const TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControls() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          IconButton(
+            icon: Icon(_loopIcon, color: Colors.white, size: 24),
+            onPressed: _loopToggle,
+          ),
+          IconButton(
+            icon: const Icon(Icons.skip_previous, color: Colors.white, size: 36),
+            onPressed: () => _player.prev(),
+          ),
+          GestureDetector(
+            onTap: () => _player.togglePlayPause(),
+            child: Container(
+              width: 64,
+              height: 64,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFF6890F9),
+              ),
+              child: Icon(
+                _player.isPlaying ? Icons.pause : Icons.play_arrow,
+                color: Colors.white, size: 36,
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.skip_next, color: Colors.white, size: 36),
+            onPressed: () => _player.next(),
+          ),
+          IconButton(
+            icon: Icon(
+              _isFavorite ? Icons.favorite : Icons.favorite_border,
+              color: _isFavorite ? Colors.red : Colors.white,
+              size: 24,
+            ),
+            onPressed: _toggleFavorite,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomActions(Song song) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _bottomAction(Icons.high_quality_outlined, '音质', _showQualitySheet),
+          _bottomAction(Icons.search, '搜索同名', _showSearchSameSheet),
+        ],
+      ),
+    );
+  }
+
+  Widget _bottomAction(IconData icon, String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: const Color(0xFF8F919A), size: 22),
+          const SizedBox(height: 4),
+          Text(label, style: const TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
+        ],
       ),
     );
   }
@@ -371,98 +381,5 @@ class _PlayerPageState extends State<PlayerPage> {
     if (lyric == null || lyric.isEmpty) return '歌词加载中...';
     return lyric.split('\n').firstWhere((l) => l.trim().isNotEmpty,
         orElse: () => '歌词加载中...').replaceAll(RegExp(r'\[.*?\]'), '').trim();
-  }
-
-  Widget _seekBarBox() {
-    return GestureDetector(
-      child: Focus(
-        focusNode: _focusSeekBar,
-        onKeyEvent: (_, event) {
-          if (event is KeyDownEvent) {
-            if (event.logicalKey == LogicalKeyboardKey.arrowLeft) { _player.seekRelative(-5000); return KeyEventResult.handled; }
-            if (event.logicalKey == LogicalKeyboardKey.arrowRight) { _player.seekRelative(5000); return KeyEventResult.handled; }
-          }
-          return KeyEventResult.ignored;
-        },
-        child: AnimatedBuilder(
-          animation: _focusSeekBar,
-          builder: (_, __) => Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(4),
-              border: _focusSeekBar.hasFocus
-                  ? Border.all(color: const Color(0xFF6890F9), width: 2)
-                  : null,
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            child: LinearProgressIndicator(
-              value: _duration.inMilliseconds > 0 ? _position.inMilliseconds / _duration.inMilliseconds : 0,
-              backgroundColor: const Color(0xFF2A2D3A),
-              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF6890F9)),
-              minHeight: 6,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _iconButton(FocusNode node, IconData icon, double size, VoidCallback onTap,
-      {String? label, Color? iconColor}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Focus(
-        focusNode: node,
-        onKeyEvent: (_, event) {
-          if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.enter) { onTap(); return KeyEventResult.handled; }
-          return KeyEventResult.ignored;
-        },
-        child: AnimatedBuilder(
-          animation: node,
-          builder: (_, __) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: size, height: size,
-                decoration: BoxDecoration(
-                  color: node.hasFocus ? const Color(0x1A6890F9) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                  border: node.hasFocus ? Border.all(color: const Color(0xFF6890F9), width: 2) : null,
-                ),
-                child: Icon(icon, color: iconColor ?? Colors.white, size: size * 0.45),
-              ),
-              if (label != null) ...[
-                const SizedBox(height: 3),
-                Text(label, style: const TextStyle(color: Color(0xFF8F919A), fontSize: 10)),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _textButton(FocusNode node, String text, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Focus(
-        focusNode: node,
-        onKeyEvent: (_, event) {
-          if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.enter) { onTap(); return KeyEventResult.handled; }
-          return KeyEventResult.ignored;
-        },
-        child: AnimatedBuilder(
-          animation: node,
-          builder: (_, __) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: node.hasFocus ? const Color(0x1A6890F9) : const Color(0x226890F9),
-              borderRadius: BorderRadius.circular(8),
-              border: node.hasFocus ? Border.all(color: const Color(0xFF6890F9), width: 2) : null,
-            ),
-            child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 13)),
-          ),
-        ),
-      ),
-    );
   }
 }

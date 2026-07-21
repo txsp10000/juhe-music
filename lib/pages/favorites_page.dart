@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../services/favorites_service.dart';
 import '../services/player_service.dart';
 import '../models/song.dart';
@@ -55,48 +54,30 @@ class _FavoritesPageState extends State<FavoritesPage> {
               itemCount: _songs.length,
               itemBuilder: (_, i) {
                 final s = _songs[i];
-                return Focus(
-                  autofocus: i == 0,
-                  onKeyEvent: (_, event) {
-                    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.enter) {
-                      _playAt(i);
-                      return KeyEventResult.handled;
-                    }
-                    return KeyEventResult.ignored;
-                  },
-                  child: Builder(
-                    builder: (ctx) {
-                      final hasFocus = Focus.of(ctx).hasFocus;
-                      return GestureDetector(
-                        onTap: () => _playAt(i),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                          decoration: BoxDecoration(
-                            color: hasFocus ? const Color(0x1A6890F9) : Colors.transparent,
-                            border: hasFocus
-                                ? const Border(bottom: BorderSide(color: Color(0xFF6890F9), width: 2))
-                                : const Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
-                          ),
-                          child: Row(
+                return InkWell(
+                  onTap: () => _playAt(i),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    decoration: const BoxDecoration(
+                      border: Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.music_note, color: Color(0xFF8F919A), size: 22),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(Icons.music_note, color: hasFocus ? const Color(0xFF6890F9) : const Color(0xFF8F919A), size: 22),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(s.name, style: TextStyle(color: hasFocus ? Colors.white : const Color(0xFFE0E0E0), fontSize: 16)),
-                                    const SizedBox(height: 4),
-                                    Text(s.singer, style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
-                                  ],
-                                ),
-                              ),
-                              Text(_fmt(s.duration), style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
+                              Text(s.name, style: const TextStyle(color: Color(0xFFE0E0E0), fontSize: 16)),
+                              const SizedBox(height: 4),
+                              Text(s.singer, style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
                             ],
                           ),
                         ),
-                      );
-                    },
+                        Text(_fmt(s.duration), style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
+                      ],
+                    ),
                   ),
                 );
               },

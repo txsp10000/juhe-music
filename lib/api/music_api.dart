@@ -199,12 +199,14 @@ class MusicApi {
           } else {
             singer = artistEl.toString();
           }
+          final dur = item['interval'] ?? item['time'] ?? item['duration'] ?? 0;
           return Song(
             id: songId.toString(),
             songmid: songId.toString(),
             name: item['name'] ?? '未知',
             singer: singer,
             album: item['album'] ?? '',
+            duration: dur is int ? dur : int.tryParse(dur.toString()) ?? 0,
             source: platform.code,
           );
         }).whereType<Song>().toList();
