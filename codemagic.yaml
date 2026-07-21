@@ -14,6 +14,8 @@ workflows:
         - pattern: main
           include: true
     scripts:
+      - name: Remove old broken platform files
+        script: rm -rf ios
       - name: Recreate platform files
         script: flutter create --platforms=ios .
       - name: Get Flutter packages
