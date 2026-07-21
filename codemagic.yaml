@@ -18,6 +18,11 @@ workflows:
         script: rm -rf ios
       - name: Recreate iOS project
         script: flutter create --platforms=ios .
+      - name: Disable code signing
+        script: |
+          sed -i '' 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g' ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/CODE_SIGN_IDENTITY = [^;]*;/CODE_SIGN_IDENTITY = "";/g' ios/Runner.xcodeproj/project.pbxproj
       - name: Get Flutter packages
         script: flutter pub get
       - name: Build iOS without signing
