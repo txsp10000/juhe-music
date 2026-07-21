@@ -17,7 +17,7 @@ workflows:
       - name: Remove old broken platform files
         script: rm -rf ios
       - name: Recreate iOS project
-        script: flutter create --org com.tvmusic --project-name ios_music --platforms=ios --force .
+        script: flutter create --platforms=ios .
       - name: Get Flutter packages
         script: flutter pub get
       - name: Build iOS without signing
