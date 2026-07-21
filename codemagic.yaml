@@ -23,9 +23,6 @@ workflows:
       - name: Build with xcodebuild directly
         script: |
           cd ios
-          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" ONLY_ACTIVE_ARCH=NO build
-          cd ..
-          mkdir -p build/ios/iphoneos
-          cp -R ios/build/Release-iphoneos/Runner.app build/ios/iphoneos/Runner.app
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" ONLY_ACTIVE_ARCH=NO CONFIGURATION_BUILD_DIR=../build/ios/iphoneos build
     artifacts:
       - build/ios/iphoneos/Runner.app
