@@ -63,17 +63,16 @@ workflows:
         script: flutter build ios --no-codesign --release
       - name: Package as IPA
         script: |
-          APP_PATH=$(find build -name "Runner.app" -type d | head -1)
+          APP_PATH=$(find build/ios/iphoneos -name "*.app" -type d | head -1)
           echo "Found app at: $APP_PATH"
           if [ -z "$APP_PATH" ]; then
-            echo "ERROR: Runner.app not found!"
-            find build -name "*.app" -type d
+            echo "ERROR: .app not found!"
             exit 1
           fi
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
-          zip -r build/ios/iphoneos/Runner.ipa Payload
-          ls -la build/ios/iphoneos/Runner.ipa
+          zip -r Runner.ipa Payload
+          ls -la Runner.ipa
     artifacts:
-      - build/ios/iphoneos/Runner.ipa
-      - build/**/Runner.app
+      - Runner.ipa
+      - build/ios/iphoneos/*.app
