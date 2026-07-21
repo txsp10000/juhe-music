@@ -22,5 +22,12 @@ workflows:
         script: flutter pub get
       - name: Build iOS without signing
         script: flutter build ios --no-codesign --release
+      - name: Package as IPA
+        script: |
+          cd build/ios/iphoneos
+          mkdir Payload
+          cp -R Runner.app Payload/
+          zip -r Runner.ipa Payload
     artifacts:
+      - build/ios/iphoneos/Runner.ipa
       - build/ios/iphoneos/Runner.app
