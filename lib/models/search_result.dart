@@ -1,4 +1,5 @@
 import 'song.dart';
+import 'platform.dart';
 
 class SearchResult {
   final List<Song> list;

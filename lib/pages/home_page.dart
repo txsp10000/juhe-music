@@ -31,9 +31,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
 
-  StreamSubscription? _posSub;
-  StreamSubscription? _songSub;
-
   @override
   void initState() {
     super.initState();
@@ -45,7 +42,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     _pulseController.repeat(reverse: true);
-    _posSub = _player.onProgress?.call != null ? null : _setupListeners();
     _player.onProgress = (pos, dur) {
       if (mounted) setState(() { _position = pos; _duration = dur ?? Duration.zero; });
     };
@@ -54,12 +50,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     };
     _player.onPlayStateChanged = (_) => mounted ? setState(() {}) : null;
     _syncState();
-  }
-
-  void _setupListeners() {
-    _player.onProgress = (pos, dur) {
-      if (mounted) setState(() { _position = pos; _duration = dur ?? Duration.zero; });
-    };
   }
 
   void _syncState() {
