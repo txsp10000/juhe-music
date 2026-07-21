@@ -20,11 +20,7 @@ workflows:
         script: flutter create --platforms=ios .
       - name: Get Flutter packages
         script: flutter pub get
-      - name: Build iOS (ignore signing error)
-        script: |
-          flutter build ios --no-codesign --release 2>&1 || true
-          APP=$(find /Users/builder/Library/Developer/Xcode/DerivedData -name "Runner.app" -path "*/Release-iphoneos/*" | head -1)
-          mkdir -p build/ios/iphoneos
-          cp -R "$APP" build/ios/iphoneos/Runner.app
+      - name: Build iOS without signing
+        script: flutter build ios --no-codesign --release
     artifacts:
       - build/ios/iphoneos/Runner.app
