@@ -18,14 +18,14 @@ workflows:
         script: rm -rf ios
       - name: Recreate iOS project
         script: flutter create --platforms=ios .
-      - name: Disable code signing
-        script: |
-          sed -i '' 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g' ios/Runner.xcodeproj/project.pbxproj
-          sed -i '' 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' ios/Runner.xcodeproj/project.pbxproj
-          sed -i '' 's/CODE_SIGN_IDENTITY = [^;]*;/CODE_SIGN_IDENTITY = "";/g' ios/Runner.xcodeproj/project.pbxproj
       - name: Get Flutter packages
         script: flutter pub get
-      - name: Build iOS without signing
-        script: flutter build ios --no-codesign --release
+      - name: Build with xcodebuild directly
+        script: |
+          cd ios
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" ONLY_ACTIVE_ARCH=NO build
+          cd ..
+          mkdir -p build/ios/iphoneos
+          cp -R ios/build/Release-iphoneos/Runner.app build/ios/iphoneos/Runner.app
     artifacts:
       - build/ios/iphoneos/Runner.app
