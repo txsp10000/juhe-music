@@ -52,8 +52,7 @@ class PlayerService {
       if (_currentIndex < playlist.length - 1) {
         playAt(_currentIndex + 1);
       } else {
-        _player.pause();
-        _player.seek(Duration.zero);
+        playAt(0);
       }
     }
   }

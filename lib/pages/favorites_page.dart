@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import '../services/favorites_service.dart';
 import '../services/player_service.dart';
 import '../models/song.dart';
-import 'search_page.dart';
 import 'player_page.dart';
 
 class FavoritesPage extends StatefulWidget {

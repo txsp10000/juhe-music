@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'pages/home_page.dart';
 import 'services/player_service.dart';

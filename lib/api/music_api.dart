@@ -321,7 +321,8 @@ class MusicApi {
         ? song.hash
         : (song.songmid.isNotEmpty ? song.songmid : song.id);
     return template
-        .replaceAll('%s', Uri.encodeComponent(songId))
+        .replaceFirst('%s', Uri.encodeComponent(songId))
+        .replaceFirst('%s', Uri.encodeComponent(level))
         .replaceAll('{id}', Uri.encodeComponent(songId))
         .replaceAll('{level}', Uri.encodeComponent(level));
   }

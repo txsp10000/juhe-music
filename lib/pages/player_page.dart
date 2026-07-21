@@ -28,7 +28,6 @@ class _PlayerPageState extends State<PlayerPage> {
   bool _isFavorite = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
-  String _lyric = '';
 
   static const _qualityLabels = {
     'flac': 'FLAC 无损', '320k': '320kbps', '192k': '192kbps', '128k': '128kbps',
@@ -109,7 +108,7 @@ class _PlayerPageState extends State<PlayerPage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            for (var i = 0; i < labels.length; i++) ...{
+            for (var i = 0; i < labels.length; i++)
               Focus(
                 autofocus: i == 0,
                 child: GestureDetector(
@@ -126,7 +125,6 @@ class _PlayerPageState extends State<PlayerPage> {
                   ),
                 ),
               ),
-            },
             const SizedBox(height: 12),
             Focus(
               child: GestureDetector(
@@ -252,7 +250,8 @@ class _PlayerPageState extends State<PlayerPage> {
       },
       child: Scaffold(
         backgroundColor: const Color(0xFF0D0F14),
-        body: Container(
+        body: SafeArea(
+          child: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
@@ -362,6 +361,7 @@ class _PlayerPageState extends State<PlayerPage> {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

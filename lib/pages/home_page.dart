@@ -78,19 +78,20 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final hasSong = _currentSong != null;
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF1A1D28), Color(0xFF0D0F14)],
+      body: SafeArea(
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF1A1D28), Color(0xFF0D0F14)],
+            ),
           ),
-        ),
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(28, 8, 28, 0),
+          child: Column(
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(28, 12, 28, 0),
               child: Row(
                 children: [
                   Container(
@@ -218,6 +219,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           ],
         ),
       ),
+      ),
     );
   }
 
@@ -298,7 +300,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           return KeyEventResult.ignored;
         },
         child: AnimatedBuilder(
-          animation: focusNode ?? FocusNode(),
+          animation: focusNode ?? Listenable.merge([]),
           builder: (_, __) => Container(
             width: size,
             height: size,
