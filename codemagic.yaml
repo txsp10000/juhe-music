@@ -95,10 +95,12 @@ workflows:
           unset FLUTTER_XCODE_DEVELOPMENT_TEAM
           unset XCODE_DEVELOPMENT_TEAM
           unset DEVELOPMENT_TEAM
-          # Generate Flutter config files
-          flutter build ios --config-only 2>/dev/null || true
           cd ios
           pod install
+          cd ..
+          # Generate Flutter config after pod install
+          flutter build ios --config-only 2>/dev/null || true
+          cd ios
           xcodebuild -workspace Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
