@@ -5,6 +5,8 @@ import '../models/platform.dart';
 import '../models/search_result.dart';
 import '../services/player_service.dart';
 import '../services/favorites_service.dart';
+import '../utils/toast.dart';
+import '../widgets/swipe_action_cell.dart';
 import 'player_page.dart';
 
 class SearchResultPage extends StatefulWidget {
@@ -85,36 +87,31 @@ class _SearchResultPageState extends State<SearchResultPage> {
   }
 
   Future<void> _favoriteAll() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2030),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('确认收藏全部 ${_songs.length} 首歌曲？', style: const TextStyle(color: Colors.white, fontSize: 16)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确认', style: TextStyle(color: Color(0xFF6890F9)))),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
     for (final s in _songs) {
       await FavoritesService.save(s);
     }
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('已收藏全部 ${_songs.length} 首', textAlign: TextAlign.center),
-          duration: const Duration(seconds: 2),
-          backgroundColor: const Color(0xCC333333),
-          behavior: SnackBarBehavior.floating,
-          margin: EdgeInsets.symmetric(horizontal: MediaQuery.of(context).size.width * 0.25, vertical: 20),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        ),
-      );
+      Toast.show(context, '已收藏全部 ${_songs.length} 首');
     }
   }
 
   Future<void> _favoriteSong(Song song) async {
     await FavoritesService.save(song);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('已收藏: ${song.name}', textAlign: TextAlign.center),
-          duration: const Duration(seconds: 1),
-          backgroundColor: const Color(0xCC333333),
-          behavior: SnackBarBehavior.floating,
-          margin: EdgeInsets.symmetric(horizontal: MediaQuery.of(context).size.width * 0.25, vertical: 20),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        ),
-      );
+      Toast.show(context, '已收藏: ${song.name}');
     }
   }
 
@@ -152,19 +149,10 @@ class _SearchResultPageState extends State<SearchResultPage> {
                   itemCount: _songs.length,
                   itemBuilder: (_, i) {
                     final s = _songs[i];
-                    return Dismissible(
-                      key: ValueKey('${s.id}_${s.source}_$i'),
-                      direction: DismissDirection.endToStart,
-                      confirmDismiss: (_) async {
-                        await _favoriteSong(s);
-                        return false;
-                      },
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 20),
-                        color: const Color(0xFF6890F9),
-                        child: const Icon(Icons.favorite, color: Colors.white),
-                      ),
+                    return SwipeActionCell(
+                      actionLabel: '收藏',
+                      actionColor: const Color(0xFF6890F9),
+                      onAction: () => _favoriteSong(s),
                       child: InkWell(
                         onTap: () => _playAt(i),
                         child: Container(

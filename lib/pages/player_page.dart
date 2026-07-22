@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/player_service.dart';
 import '../services/favorites_service.dart';
 import '../models/song.dart';
+import '../utils/toast.dart';
 import 'playlist_page.dart';
 import 'search_result_page.dart';
 
@@ -67,19 +68,7 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   void _showToast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg, textAlign: TextAlign.center),
-        duration: const Duration(seconds: 2),
-        backgroundColor: const Color(0xCC333333),
-        behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.symmetric(
-          horizontal: MediaQuery.of(context).size.width * 0.25,
-          vertical: 20,
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      ),
-    );
+    Toast.show(context, msg);
   }
 
   String _fmt(Duration d) {

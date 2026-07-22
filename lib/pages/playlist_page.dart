@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/player_service.dart';
 import '../models/song.dart';
+import '../widgets/swipe_action_cell.dart';
 import 'player_page.dart';
 
 class PlaylistPage extends StatefulWidget {
@@ -51,42 +52,49 @@ class _PlaylistPageState extends State<PlaylistPage> {
               itemBuilder: (_, i) {
                 final s = songs[i];
                 final isCurrent = i == currentIdx;
-                return InkWell(
-                  onTap: () => _playAt(i),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: isCurrent ? const Color(0x1A6890F9) : Colors.transparent,
-                      border: isCurrent
-                          ? const Border(bottom: BorderSide(color: Color(0xFF6890F9), width: 2))
-                          : const Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
-                    ),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 28,
-                          child: isCurrent
-                              ? const Icon(Icons.volume_up, color: Color(0xFF6890F9), size: 22)
-                              : Text('${i + 1}', textAlign: TextAlign.center,
-                                  style: const TextStyle(color: Color(0xFF8F919A), fontSize: 14)),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(s.name,
-                                  style: TextStyle(
-                                      color: isCurrent ? const Color(0xFF6890F9) : Colors.white,
-                                      fontSize: 16)),
-                              Text('${s.singer} | ${_qualityLabel(s.quality)}',
-                                  style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
-                            ],
+                return SwipeActionCell(
+                  actionLabel: '删除',
+                  actionColor: Colors.red,
+                  onAction: () {
+                    setState(() => _player.playlist.removeAt(i));
+                  },
+                  child: InkWell(
+                    onTap: () => _playAt(i),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: isCurrent ? const Color(0x1A6890F9) : Colors.transparent,
+                        border: isCurrent
+                            ? const Border(bottom: BorderSide(color: Color(0xFF6890F9), width: 2))
+                            : const Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
+                      ),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 28,
+                            child: isCurrent
+                                ? const Icon(Icons.volume_up, color: Color(0xFF6890F9), size: 22)
+                                : Text('${i + 1}', textAlign: TextAlign.center,
+                                    style: const TextStyle(color: Color(0xFF8F919A), fontSize: 14)),
                           ),
-                        ),
-                        Text(_fmt(s.duration),
-                            style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
-                      ],
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(s.name,
+                                    style: TextStyle(
+                                        color: isCurrent ? const Color(0xFF6890F9) : Colors.white,
+                                        fontSize: 16)),
+                                Text('${s.singer} | ${_qualityLabel(s.quality)}',
+                                    style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
+                              ],
+                            ),
+                          ),
+                          Text(_fmt(s.duration),
+                              style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
+                        ],
+                      ),
                     ),
                   ),
                 );

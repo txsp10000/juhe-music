@@ -3,6 +3,7 @@ import '../services/favorites_service.dart';
 import '../services/player_service.dart';
 import '../models/song.dart';
 import '../models/platform.dart';
+import '../widgets/swipe_action_cell.dart';
 import 'player_page.dart';
 
 class FavoritesPage extends StatefulWidget {
@@ -64,16 +65,10 @@ class _FavoritesPageState extends State<FavoritesPage> {
               itemCount: _songs.length,
               itemBuilder: (_, i) {
                 final s = _songs[i];
-                return Dismissible(
-                  key: ValueKey('${s.id}_${s.source}'),
-                  direction: DismissDirection.endToStart,
-                  background: Container(
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: 20),
-                    color: Colors.red,
-                    child: const Icon(Icons.delete, color: Colors.white),
-                  ),
-                  onDismissed: (_) => _removeSong(i),
+                return SwipeActionCell(
+                  actionLabel: '删除',
+                  actionColor: Colors.red,
+                  onAction: () => _removeSong(i),
                   child: InkWell(
                     onTap: () => _playAt(i),
                     child: Container(
