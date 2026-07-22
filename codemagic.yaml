@@ -14,14 +14,15 @@ workflows:
         - pattern: main
           include: true
     scripts:
-      - name: Setup iOS project
+      - name: Disable SPM and recreate iOS project
         script: |
+          flutter config --no-enable-swift-package-manager
           rm -rf ios
           flutter create --platforms=ios .
           flutter pub get
-      - name: Configure project
+      - name: Disable code signing
         script: |
-          # Disable code signing in xcconfig (append, preserve Generated.xcconfig include)
+          echo "" >> ios/Flutter/Release.xcconfig
           cat >> ios/Flutter/Release.xcconfig << 'EOF'
           CODE_SIGNING_ALLOWED = NO
           CODE_SIGNING_REQUIRED = NO
@@ -29,6 +30,7 @@ workflows:
           DEVELOPMENT_TEAM =
           PROVISIONING_PROFILE_SPECIFIER =
           EOF
+          echo "" >> ios/Flutter/Debug.xcconfig
           cat >> ios/Flutter/Debug.xcconfig << 'EOF'
           CODE_SIGNING_ALLOWED = NO
           CODE_SIGNING_REQUIRED = NO
@@ -36,7 +38,6 @@ workflows:
           DEVELOPMENT_TEAM =
           PROVISIONING_PROFILE_SPECIFIER =
           EOF
-          # Disable code signing in pbxproj
           python3 -c '
           import re
           with open("ios/Runner.xcodeproj/project.pbxproj","r") as f:
@@ -48,16 +49,18 @@ workflows:
           c = re.sub(r"PROVISIONING_PROFILE_SPECIFIER = \"[^\"]*\";","PROVISIONING_PROFILE_SPECIFIER = \"\";",c)
           with open("ios/Runner.xcodeproj/project.pbxproj","w") as f:
             f.write(c)
+          print("pbxproj signing disabled")
           '
-          # Set app name
+      - name: Configure app
+        script: |
           /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 苗苗music" ios/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleName 苗苗music" ios/Runner/Info.plist
-          # Set app icon
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" ios/Runner/Info.plist 2>/dev/null
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" ios/Runner/Info.plist 2>/dev/null
           ICON_SRC="assets/icon.png"
           ICON_DIR="ios/Runner/Assets.xcassets/AppIcon.appiconset"
           if [ -f "$ICON_SRC" ]; then
-            SIZES="20 29 40 58 60 76 80 87 120 152 167 180 1024"
-            for SIZE in $SIZES; do
+            for SIZE in 20 29 40 58 60 76 80 87 120 152 167 180 1024; do
               sips -z $SIZE $SIZE "$ICON_SRC" --out "$ICON_DIR/Icon-App-${SIZE}x${SIZE}.png" >/dev/null 2>&1
             done
             cat > "$ICON_DIR/Contents.json" << 'ICONJSON'
@@ -86,27 +89,18 @@ workflows:
           }
           ICONJSON
           fi
-          # Enable background audio
-          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" ios/Runner/Info.plist 2>/dev/null
-          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" ios/Runner/Info.plist 2>/dev/null
-      - name: Build iOS (unsigned)
+      - name: Build iOS
         script: |
           cd ios
           pod install
-          xcodebuild -workspace Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination "generic/platform=iOS" \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            DEVELOPMENT_TEAM="" \
-            PROVISIONING_PROFILE_SPECIFIER="" \
-            SYMROOT="../build/ios"
+          flutter build ios --release --no-codesign
       - name: Package IPA
         script: |
-          APP_PATH=$(find build/ios/Release-iphoneos -name "*.app" -type d | head -1)
+          APP_PATH=""
+          for DIR in build/ios/iphoneos build/ios/Release-iphoneos; do
+            FOUND=$(find "$DIR" -name "*.app" -type d 2>/dev/null | head -1)
+            if [ -n "$FOUND" ]; then APP_PATH="$FOUND"; break; fi
+          done
           if [ -z "$APP_PATH" ]; then
             echo "ERROR: .app not found!"
             exit 1
