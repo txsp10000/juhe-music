@@ -27,6 +27,15 @@ workflows:
           CODE_SIGNING_ALLOWED = NO
           CODE_SIGNING_REQUIRED = NO
           CODE_SIGN_IDENTITY =
+          DEVELOPMENT_TEAM =
+          PROVISIONING_PROFILE_SPECIFIER =
+          EOF
+          cat > ios/Flutter/Debug.xcconfig << 'EOF'
+          CODE_SIGNING_ALLOWED = NO
+          CODE_SIGNING_REQUIRED = NO
+          CODE_SIGN_IDENTITY =
+          DEVELOPMENT_TEAM =
+          PROVISIONING_PROFILE_SPECIFIER =
           EOF
       - name: Set app display name
         script: |
@@ -73,14 +82,28 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" ios/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" ios/Runner/Info.plist
       - name: Build iOS without signing
-        script: flutter build ios --release --no-codesign
+        script: |
+          cd ios
+          pod install
+          xcodebuild -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            SYMROOT="../build/ios"
       - name: Package as IPA
         script: |
           echo "=== Finding .app ==="
-          find build/ios/iphoneos -name "*.app" -type d 2>/dev/null
-          APP_PATH=$(find build/ios/iphoneos -name "*.app" -type d | head -1)
+          APP_DIR="build/ios/Release-iphoneos"
+          find "$APP_DIR" -name "*.app" -type d 2>/dev/null
+          APP_PATH=$(find "$APP_DIR" -name "*.app" -type d | head -1)
           if [ -z "$APP_PATH" ]; then
-            echo "ERROR: .app not found!"
+            echo "ERROR: .app not found in $APP_DIR!"
             exit 1
           fi
           echo "Using: $APP_PATH"
