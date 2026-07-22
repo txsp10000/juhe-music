@@ -22,18 +22,36 @@ workflows:
         script: flutter pub get
       - name: Disable code signing
         script: |
-          sed -i '' 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g' ios/Runner.xcodeproj/project.pbxproj
+          python3 -c "
+import re
+path = 'ios/Runner.xcodeproj/project.pbxproj'
+with open(path, 'r') as f:
+    content = f.read()
+content = re.sub(r'DEVELOPMENT_TEAM = \"[^\"]*\";', 'DEVELOPMENT_TEAM = \"\";', content)
+content = re.sub(r'DEVELOPMENT_TEAM = [A-Z0-9]+;', 'DEVELOPMENT_TEAM = \"\";', content)
+content = re.sub(r'CODE_SIGN_STYLE = Automatic;', 'CODE_SIGN_STYLE = Manual;', content)
+content = re.sub(r'CODE_SIGN_IDENTITY = \"[^\"]*\";', 'CODE_SIGN_IDENTITY = \"\";', content)
+content = re.sub(r'PROVISIONING_PROFILE_SPECIFIER = \"[^\"]*\";', 'PROVISIONING_PROFILE_SPECIFIER = \"\";', content)
+content = re.sub(r'PROVISIONING_PROFILE = \"[^\"]*\";', 'PROVISIONING_PROFILE = \"\";', content)
+with open(path, 'w') as f:
+    f.write(content)
+print('pbxproj code signing disabled')
+"
           cat >> ios/Flutter/Release.xcconfig << 'EOF'
 
           CODE_SIGNING_ALLOWED = NO
           CODE_SIGNING_REQUIRED = NO
           CODE_SIGN_IDENTITY =
+          DEVELOPMENT_TEAM =
+          PROVISIONING_PROFILE_SPECIFIER =
           EOF
           cat >> ios/Flutter/Debug.xcconfig << 'EOF'
 
           CODE_SIGNING_ALLOWED = NO
           CODE_SIGNING_REQUIRED = NO
           CODE_SIGN_IDENTITY =
+          DEVELOPMENT_TEAM =
+          PROVISIONING_PROFILE_SPECIFIER =
           EOF
       - name: Set app display name
         script: |
