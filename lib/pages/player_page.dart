@@ -165,9 +165,9 @@ class _PlayerPageState extends State<PlayerPage> {
           children: [
             _buildTopBar(),
             Expanded(child: _buildCenterContent(song)),
+            _buildBottomActions(song),
             _buildSeekBar(),
             _buildControls(),
-            _buildBottomActions(song),
           ],
         ),
       ),
@@ -293,7 +293,7 @@ class _PlayerPageState extends State<PlayerPage> {
 
   Widget _buildControls() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.only(top: 8, bottom: 24),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -339,7 +339,7 @@ class _PlayerPageState extends State<PlayerPage> {
 
   Widget _buildBottomActions(Song song) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(top: 8, bottom: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [

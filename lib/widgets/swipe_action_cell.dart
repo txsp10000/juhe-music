@@ -54,39 +54,44 @@ class _SwipeActionCellState extends State<SwipeActionCell> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              GestureDetector(
-                onTap: () {
-                  _close();
-                  widget.onAction();
-                },
-                child: Container(
-                  width: 80,
-                  alignment: Alignment.center,
-                  color: widget.actionColor,
-                  child: Text(
-                    widget.actionLabel,
-                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+    return ClipRect(
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    _close();
+                    widget.onAction();
+                  },
+                  child: Container(
+                    width: 80,
+                    alignment: Alignment.center,
+                    color: widget.actionColor,
+                    child: Text(
+                      widget.actionLabel,
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
+              ],
+            ),
+          ),
+          SlideTransition(
+            position: _slideAnimation,
+            child: GestureDetector(
+              onHorizontalDragUpdate: _handleDragUpdate,
+              onTap: _isOpen ? _close : null,
+              child: Container(
+                color: const Color(0xFF0D0F14),
+                child: widget.child,
               ),
-            ],
+            ),
           ),
-        ),
-        SlideTransition(
-          position: _slideAnimation,
-          child: GestureDetector(
-            onHorizontalDragUpdate: _handleDragUpdate,
-            onTap: _isOpen ? _close : null,
-            child: widget.child,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
