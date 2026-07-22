@@ -67,42 +67,42 @@ class _SwipeActionCellState extends State<SwipeActionCell> with SingleTickerProv
           },
           child: Stack(
             children: [
-              // 背景按钮
+              // 内容始终可见
+              Container(
+                color: const Color(0xFF0D0F14),
+                width: constraints.maxWidth,
+                child: widget.child,
+              ),
+              // 按钮从右侧滑入
               Positioned(
                 top: 0,
                 bottom: 0,
                 right: 0,
                 width: buttonWidth,
-                child: GestureDetector(
-                  onTap: () {
-                    if (_isOpen) {
-                      widget.onAction();
-                      _close();
-                    }
+                child: AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, child) {
+                    return Transform.translate(
+                      offset: Offset(buttonWidth * (1 - _controller.value), 0),
+                      child: child,
+                    );
                   },
-                  child: Container(
-                    color: widget.actionColor,
-                    alignment: Alignment.center,
-                    child: Text(
-                      widget.actionLabel,
-                      style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                  child: GestureDetector(
+                    onTap: () {
+                      if (_isOpen) {
+                        widget.onAction();
+                        _close();
+                      }
+                    },
+                    child: Container(
+                      color: widget.actionColor,
+                      alignment: Alignment.center,
+                      child: Text(
+                        widget.actionLabel,
+                        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              // 前景内容，只滑动按钮宽度
-              AnimatedBuilder(
-                animation: _controller,
-                builder: (context, child) {
-                  return Transform.translate(
-                    offset: Offset(-_controller.value * buttonWidth, 0),
-                    child: child,
-                  );
-                },
-                child: Container(
-                  color: const Color(0xFF0D0F14),
-                  width: constraints.maxWidth,
-                  child: widget.child,
                 ),
               ),
             ],
