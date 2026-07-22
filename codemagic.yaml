@@ -91,9 +91,25 @@ workflows:
           fi
       - name: Build iOS
         script: |
+          # Strip Codemagic injected signing env vars
+          unset FLUTTER_XCODE_DEVELOPMENT_TEAM
+          unset XCODE_DEVELOPMENT_TEAM
+          unset DEVELOPMENT_TEAM
+          # Generate Flutter config files
+          flutter build ios --config-only 2>/dev/null || true
           cd ios
           pod install
-          flutter build ios --release --no-codesign
+          xcodebuild -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            SYMROOT="../build/ios"
       - name: Package IPA
         script: |
           APP_PATH=""
