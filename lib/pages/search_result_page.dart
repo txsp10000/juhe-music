@@ -188,64 +188,66 @@ class _SearchResultPageState extends State<SearchResultPage> {
         ),
         actions: [
           if (_songs.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.favorite, color: Colors.red, size: 22),
-              tooltip: '全部收藏',
+            TextButton.icon(
               onPressed: _favoriteAll,
+              icon: const Icon(Icons.favorite, color: Colors.red, size: 20),
+              label: const Text('全部收藏', style: TextStyle(color: Colors.red, fontSize: 13)),
             ),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF6890F9)))
-          : _songs.isEmpty
-              ? const Center(child: Text('所有平台均无搜索结果',
-                  style: TextStyle(color: Color(0xFF8F919A), fontSize: 16)))
-              : ListView.builder(
-                  itemCount: _songs.length,
-                  itemBuilder: (_, i) {
-                    final s = _songs[i];
-                    final isFav = _favoritedIds.contains(_songKey(s));
-                    return SwipeActionCell(
-                      key: ValueKey('${s.id}_${s.source}_$isFav'),
-                      actionLabel: isFav ? '取消收藏' : '收藏',
-                      actionColor: isFav ? Colors.red : const Color(0xFF6890F9),
-                      onAction: () => _favoriteSong(s),
-                      child: InkWell(
-                        onTap: () => _playAt(i),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                          decoration: const BoxDecoration(
-                            border: Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
-                          ),
-                          child: Row(
-                            children: [
-                              Text('${i + 1}', style: const TextStyle(color: Color(0xFF8F919A), fontSize: 14)),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(s.name, style: const TextStyle(color: Color(0xFFE0E0E0), fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                    Text(s.singer, style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
-                                  ],
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: _loading
+            ? const Center(child: CircularProgressIndicator(color: Color(0xFF6890F9)))
+            : _songs.isEmpty
+                ? const Center(child: Text('所有平台均无搜索结果',
+                    style: TextStyle(color: Color(0xFF8F919A), fontSize: 16)))
+                : ListView.builder(
+                    itemCount: _songs.length,
+                    itemBuilder: (_, i) {
+                      final s = _songs[i];
+                      final isFav = _favoritedIds.contains(_songKey(s));
+                      return SwipeActionCell(
+                        key: ValueKey('${s.id}_${s.source}_$isFav'),
+                        actionLabel: isFav ? '取消收藏' : '收藏',
+                        actionColor: isFav ? Colors.red : const Color(0xFF6890F9),
+                        onAction: () => _favoriteSong(s),
+                        child: InkWell(
+                          onTap: () => _playAt(i),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                            decoration: const BoxDecoration(
+                              border: Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
+                            ),
+                            child: Row(
+                              children: [
+                                Text('${i + 1}', style: const TextStyle(color: Color(0xFF8F919A), fontSize: 14)),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(s.name, style: const TextStyle(color: Color(0xFFE0E0E0), fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      Text(s.singer, style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0x226890F9),
-                                  borderRadius: BorderRadius.circular(4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0x226890F9),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(_platformName(s.source),
+                                      style: const TextStyle(color: Color(0xFF6890F9), fontSize: 11)),
                                 ),
-                                child: Text(_platformName(s.source),
-                                    style: const TextStyle(color: Color(0xFF6890F9), fontSize: 11)),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-    );
+                      );
+                    },
+                  ),
+      ),
   }
 }

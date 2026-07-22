@@ -18,9 +18,6 @@ class _SearchPageState extends State<SearchPage> {
   void initState() {
     super.initState();
     _loadHistory();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusNode.requestFocus();
-    });
   }
 
   @override
@@ -36,6 +33,7 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   void _doSearch(String keyword) async {
+    _focusNode.unfocus();
     await SearchHistoryService.save(keyword);
     if (!mounted) return;
     Navigator.push(context, MaterialPageRoute(

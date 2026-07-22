@@ -19,75 +19,82 @@ class SwipeActionCell extends StatefulWidget {
 }
 
 class _SwipeActionCellState extends State<SwipeActionCell> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<Offset> _slideAnimation;
+  late final AnimationController _controller;
+  late final Animation<Offset> _slideAnimation;
   bool _isOpen = false;
+
+  static _SwipeActionCellState? _currentOpen;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 200));
-    _slideAnimation = Tween<Offset>(begin: Offset.zero, end: const Offset(-0.2, 0))
-        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    _slideAnimation = Tween<Offset>(begin: Offset.zero, end: const Offset(-1.0, 0.0)).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
   }
 
   @override
   void dispose() {
+    if (_currentOpen == this) _currentOpen = null;
     _controller.dispose();
     super.dispose();
   }
 
-  void _handleDragUpdate(DragUpdateDetails details) {
-    if (details.delta.dx < -2 && !_isOpen) {
-      _controller.forward();
-      setState(() => _isOpen = true);
-    } else if (details.delta.dx > 2 && _isOpen) {
-      _controller.reverse();
-      setState(() => _isOpen = false);
-    }
-  }
-
   void _close() {
     _controller.reverse();
-    setState(() => _isOpen = false);
+    _isOpen = false;
+    if (_currentOpen == this) _currentOpen = null;
+  }
+
+  void _open() {
+    _currentOpen?._close();
+    _currentOpen = this;
+    _controller.forward();
+    _isOpen = true;
   }
 
   @override
   Widget build(BuildContext context) {
-    return ClipRect(
+    final buttonWidth = 80.0 + (widget.actionLabel.length - 2) * 8.0;
+
+    return GestureDetector(
+      onHorizontalDragEnd: (details) {
+        if (details.primaryVelocity == null) return;
+        if (details.primaryVelocity! < -300) {
+          _open();
+        } else if (details.primaryVelocity! > 300) {
+          _close();
+        }
+      },
       child: Stack(
         children: [
+          // 背景按钮
           Positioned.fill(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    _close();
-                    widget.onAction();
-                  },
-                  child: Container(
-                    width: 80,
-                    alignment: Alignment.center,
-                    color: widget.actionColor,
-                    child: Text(
-                      widget.actionLabel,
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                  ),
+            child: GestureDetector(
+              onTap: () {
+                if (_isOpen) {
+                  widget.onAction();
+                  _close();
+                }
+              },
+              child: Container(
+                color: widget.actionColor,
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 16),
+                child: Text(
+                  widget.actionLabel,
+                  style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
                 ),
-              ],
+              ),
             ),
           ),
+          // 前景内容
           SlideTransition(
             position: _slideAnimation,
-            child: GestureDetector(
-              onHorizontalDragUpdate: _handleDragUpdate,
-              onTap: _isOpen ? _close : null,
-              child: Container(
-                color: const Color(0xFF0D0F14),
-                child: widget.child,
-              ),
+            child: Container(
+              color: const Color(0xFF0D0F14),
+              child: widget.child,
             ),
           ),
         ],
