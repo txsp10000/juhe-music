@@ -107,7 +107,7 @@ workflows:
       - name: Package IPA
         script: |
           APP_PATH=""
-          for DIR in build/ios/iphoneos build/ios/Release-iphoneos; do
+          for DIR in build/ios/iphoneos build/ios/Release-iphoneos build/ios/Build/Products/Release-iphoneos; do
             FOUND=$(find "$DIR" -name "*.app" -type d 2>/dev/null | head -1)
             if [ -n "$FOUND" ]; then APP_PATH="$FOUND"; break; fi
           done
