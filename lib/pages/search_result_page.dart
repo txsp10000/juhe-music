@@ -4,6 +4,7 @@ import '../models/song.dart';
 import '../models/platform.dart';
 import '../models/search_result.dart';
 import '../services/player_service.dart';
+import '../services/favorites_service.dart';
 import 'player_page.dart';
 
 class SearchResultPage extends StatefulWidget {
@@ -83,6 +84,40 @@ class _SearchResultPageState extends State<SearchResultPage> {
     return p?.displayName ?? code;
   }
 
+  Future<void> _favoriteAll() async {
+    for (final s in _songs) {
+      await FavoritesService.save(s);
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('已收藏全部 ${_songs.length} 首', textAlign: TextAlign.center),
+          duration: const Duration(seconds: 2),
+          backgroundColor: const Color(0xCC333333),
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.symmetric(horizontal: MediaQuery.of(context).size.width * 0.25, vertical: 20),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        ),
+      );
+    }
+  }
+
+  Future<void> _favoriteSong(Song song) async {
+    await FavoritesService.save(song);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('已收藏: ${song.name}', textAlign: TextAlign.center),
+          duration: const Duration(seconds: 1),
+          backgroundColor: const Color(0xCC333333),
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.symmetric(horizontal: MediaQuery.of(context).size.width * 0.25, vertical: 20),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -99,6 +134,14 @@ class _SearchResultPageState extends State<SearchResultPage> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          if (_songs.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.favorite, color: Colors.red, size: 22),
+              tooltip: '全部收藏',
+              onPressed: _favoriteAll,
+            ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF6890F9)))
@@ -109,36 +152,50 @@ class _SearchResultPageState extends State<SearchResultPage> {
                   itemCount: _songs.length,
                   itemBuilder: (_, i) {
                     final s = _songs[i];
-                    return InkWell(
-                      onTap: () => _playAt(i),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                        decoration: const BoxDecoration(
-                          border: Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
-                        ),
-                        child: Row(
-                          children: [
-                            Text('${i + 1}', style: const TextStyle(color: Color(0xFF8F919A), fontSize: 14)),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(s.name, style: const TextStyle(color: Color(0xFFE0E0E0), fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                  Text(s.singer, style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
-                                ],
+                    return Dismissible(
+                      key: ValueKey('${s.id}_${s.source}_$i'),
+                      direction: DismissDirection.endToStart,
+                      confirmDismiss: (_) async {
+                        await _favoriteSong(s);
+                        return false;
+                      },
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 20),
+                        color: const Color(0xFF6890F9),
+                        child: const Icon(Icons.favorite, color: Colors.white),
+                      ),
+                      child: InkWell(
+                        onTap: () => _playAt(i),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                          decoration: const BoxDecoration(
+                            border: Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
+                          ),
+                          child: Row(
+                            children: [
+                              Text('${i + 1}', style: const TextStyle(color: Color(0xFF8F919A), fontSize: 14)),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(s.name, style: const TextStyle(color: Color(0xFFE0E0E0), fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                    Text(s.singer, style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
+                                  ],
+                                ),
                               ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0x226890F9),
-                                borderRadius: BorderRadius.circular(4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0x226890F9),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(_platformName(s.source),
+                                    style: const TextStyle(color: Color(0xFF6890F9), fontSize: 11)),
                               ),
-                              child: Text(_platformName(s.source),
-                                  style: const TextStyle(color: Color(0xFF6890F9), fontSize: 11)),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     );

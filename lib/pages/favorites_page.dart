@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/favorites_service.dart';
 import '../services/player_service.dart';
 import '../models/song.dart';
+import '../models/platform.dart';
 import 'player_page.dart';
 
 class FavoritesPage extends StatefulWidget {
@@ -33,7 +34,16 @@ class _FavoritesPageState extends State<FavoritesPage> {
     Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
   }
 
-  String _fmt(int sec) => '${sec ~/ 60}:${(sec % 60).toString().padLeft(2, '0')}';
+  String _platformName(String code) {
+    final p = Platform.fromCode(code);
+    return p?.displayName ?? code;
+  }
+
+  Future<void> _removeSong(int index) async {
+    final song = _songs[index];
+    await FavoritesService.remove(song);
+    setState(() => _songs.removeAt(index));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,29 +64,48 @@ class _FavoritesPageState extends State<FavoritesPage> {
               itemCount: _songs.length,
               itemBuilder: (_, i) {
                 final s = _songs[i];
-                return InkWell(
-                  onTap: () => _playAt(i),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                    decoration: const BoxDecoration(
-                      border: Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.music_note, color: Color(0xFF8F919A), size: 22),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(s.name, style: const TextStyle(color: Color(0xFFE0E0E0), fontSize: 16)),
-                              const SizedBox(height: 4),
-                              Text(s.singer, style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
-                            ],
+                return Dismissible(
+                  key: ValueKey('${s.id}_${s.source}'),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    color: Colors.red,
+                    child: const Icon(Icons.delete, color: Colors.white),
+                  ),
+                  onDismissed: (_) => _removeSong(i),
+                  child: InkWell(
+                    onTap: () => _playAt(i),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      decoration: const BoxDecoration(
+                        border: Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.music_note, color: Color(0xFF8F919A), size: 22),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(s.name, style: const TextStyle(color: Color(0xFFE0E0E0), fontSize: 16)),
+                                const SizedBox(height: 4),
+                                Text(s.singer, style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
+                              ],
+                            ),
                           ),
-                        ),
-                        Text(_fmt(s.duration), style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
-                      ],
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0x226890F9),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(_platformName(s.source),
+                                style: const TextStyle(color: Color(0xFF6890F9), fontSize: 11)),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );

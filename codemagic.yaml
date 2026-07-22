@@ -23,6 +23,16 @@ workflows:
           sed -i '' 's/PRODUCT_NAME = .*/PRODUCT_NAME = "苗苗music";/' ios/Runner.xcodeproj/project.pbxproj
           /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 苗苗music" ios/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleName 苗苗music" ios/Runner/Info.plist
+      - name: Set app icon
+        script: |
+          ICON_SRC="assets/icon.png"
+          ICON_DIR="ios/Runner/Assets.xcassets/AppIcon.appiconset"
+          if [ -f "$ICON_SRC" ]; then
+            for f in "$ICON_DIR"/*.png; do
+              cp "$ICON_SRC" "$f"
+            done
+            echo "App icon replaced successfully"
+          fi
       - name: Enable background audio
         script: |
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" ios/Runner/Info.plist
