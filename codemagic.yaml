@@ -14,6 +14,12 @@ workflows:
         - pattern: main
           include: true
     scripts:
+      - name: Recreate clean iOS project
+        script: |
+          rm -rf ios
+          flutter create --platforms=ios .
+      - name: Get Flutter packages
+        script: flutter pub get
       - name: Disable code signing
         script: |
           mkdir -p ios/Flutter
@@ -66,8 +72,6 @@ workflows:
         script: |
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" ios/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" ios/Runner/Info.plist
-      - name: Get Flutter packages
-        script: flutter pub get
       - name: Build iOS without signing
         script: flutter build ios --release --no-codesign
       - name: Package as IPA
