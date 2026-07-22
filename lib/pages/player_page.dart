@@ -324,14 +324,6 @@ class _PlayerPageState extends State<PlayerPage> {
             icon: const Icon(Icons.skip_next, color: Colors.white, size: 36),
             onPressed: () => _player.next(),
           ),
-          IconButton(
-            icon: Icon(
-              _isFavorite ? Icons.favorite : Icons.favorite_border,
-              color: _isFavorite ? Colors.red : Colors.white,
-              size: 24,
-            ),
-            onPressed: _toggleFavorite,
-          ),
         ],
       ),
     );
@@ -344,6 +336,21 @@ class _PlayerPageState extends State<PlayerPage> {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _bottomAction(Icons.high_quality_outlined, '音质', _showQualitySheet),
+          GestureDetector(
+            onTap: _toggleFavorite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _isFavorite ? Icons.favorite : Icons.favorite_border,
+                  color: _isFavorite ? Colors.red : const Color(0xFF8F919A),
+                  size: 22,
+                ),
+                const SizedBox(height: 4),
+                Text(_isFavorite ? '已收藏' : '收藏', style: const TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
+              ],
+            ),
+          ),
           _bottomAction(Icons.search, '搜索同名', _showSearchSameSheet),
         ],
       ),

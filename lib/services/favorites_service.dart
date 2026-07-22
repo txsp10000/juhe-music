@@ -14,7 +14,23 @@ class FavoritesService {
   static Future<void> save(Song song) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList(_key) ?? [];
+    final exists = raw.any((s) {
+      final item = Song.fromJson(jsonDecode(s));
+      return item.id == song.id && item.source == song.source;
+    });
+    if (exists) return;
     raw.add(jsonEncode(song.toJson()));
+    await prefs.setStringList(_key, raw);
+  }
+
+  static Future<void> removeAll(List<Song> songs) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getStringList(_key) ?? [];
+    final ids = songs.map((s) => '${s.id}_${s.source}').toSet();
+    raw.removeWhere((s) {
+      final item = Song.fromJson(jsonDecode(s));
+      return ids.contains('${item.id}_${item.source}');
+    });
     await prefs.setStringList(_key, raw);
   }
 
@@ -52,6 +68,13 @@ class SearchHistoryService {
     list.remove(keyword);
     list.insert(0, keyword);
     if (list.length > 20) list.removeLast();
+    await prefs.setStringList(_key, list);
+  }
+
+  static Future<void> removeOne(String keyword) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_key) ?? [];
+    list.remove(keyword);
     await prefs.setStringList(_key, list);
   }
 

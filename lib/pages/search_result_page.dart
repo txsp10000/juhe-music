@@ -20,9 +20,11 @@ class SearchResultPage extends StatefulWidget {
 class _SearchResultPageState extends State<SearchResultPage> {
   final _player = PlayerService();
   bool _loading = true;
+  bool _allFavorited = false;
   List<PlatformResult> _results = [];
   List<Song> _songs = [];
   String _selectedPlatform = '';
+  final Set<String> _favoritedIds = {};
 
   @override
   void initState() {
@@ -66,6 +68,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
               onTap: () {
                 Navigator.pop(ctx);
                 setState(() { _songs = r.songs; _selectedPlatform = r.platform.displayName; });
+                _checkFavoriteStates();
               },
             );
           }).toList(),
@@ -104,14 +107,61 @@ class _SearchResultPageState extends State<SearchResultPage> {
       await FavoritesService.save(s);
     }
     if (mounted) {
+      setState(() => _allFavorited = true);
       Toast.show(context, '已收藏全部 ${_songs.length} 首');
+      _checkFavoriteStates();
     }
   }
 
-  Future<void> _favoriteSong(Song song) async {
-    await FavoritesService.save(song);
+  Future<void> _unfavoriteAll() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2030),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('确认取消收藏全部 ${_songs.length} 首？', style: const TextStyle(color: Colors.white, fontSize: 16)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确认', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await FavoritesService.removeAll(_songs);
     if (mounted) {
-      Toast.show(context, '已收藏: ${song.name}');
+      setState(() => _allFavorited = false);
+      Toast.show(context, '已取消收藏');
+    }
+  }
+
+  Future<void> _checkFavoriteStates() async {
+    _favoritedIds.clear();
+    for (final s in _songs) {
+      if (await FavoritesService.isFavorite(s)) {
+        _favoritedIds.add('${s.id}_${s.source}');
+      }
+    }
+    if (mounted) setState(() {});
+  }
+
+  String _songKey(Song s) => '${s.id}_${s.source}';
+
+  Future<void> _favoriteSong(Song song) async {
+    final key = _songKey(song);
+    if (_favoritedIds.contains(key)) {
+      await FavoritesService.remove(song);
+      _favoritedIds.remove(key);
+      if (mounted) {
+        setState(() {});
+        Toast.show(context, '已取消收藏: ${song.name}');
+      }
+    } else {
+      await FavoritesService.save(song);
+      _favoritedIds.add(key);
+      if (mounted) {
+        setState(() {});
+        Toast.show(context, '已收藏: ${song.name}');
+      }
     }
   }
 
@@ -149,9 +199,11 @@ class _SearchResultPageState extends State<SearchResultPage> {
                   itemCount: _songs.length,
                   itemBuilder: (_, i) {
                     final s = _songs[i];
+                    final isFav = _favoritedIds.contains(_songKey(s));
                     return SwipeActionCell(
-                      actionLabel: '收藏',
-                      actionColor: const Color(0xFF6890F9),
+                      key: ValueKey('${s.id}_${s.source}_$isFav'),
+                      actionLabel: isFav ? '取消收藏' : '收藏',
+                      actionColor: isFav ? Colors.red : const Color(0xFF6890F9),
                       onAction: () => _favoriteSong(s),
                       child: InkWell(
                         onTap: () => _playAt(i),

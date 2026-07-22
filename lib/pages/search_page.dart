@@ -64,13 +64,11 @@ class _SearchPageState extends State<SearchPage> {
           ),
         ),
         actions: [
-          TextButton(
+          IconButton(
+            icon: const Icon(Icons.search, color: Colors.white),
             onPressed: () {
-              _controller.clear();
-              SearchHistoryService.clear();
-              setState(() => _history = []);
+              if (_controller.text.trim().isNotEmpty) _doSearch(_controller.text.trim());
             },
-            child: const Text('清除', style: TextStyle(color: Color(0xFFF4F4F7), fontSize: 14)),
           ),
         ],
       ),
@@ -92,7 +90,16 @@ class _SearchPageState extends State<SearchPage> {
                       children: [
                         const Icon(Icons.history, size: 20, color: Color(0xFF8F919A)),
                         const SizedBox(width: 14),
-                        Text(kw, style: const TextStyle(color: Color(0xFFE0E0E0), fontSize: 16)),
+                        Expanded(
+                          child: Text(kw, style: const TextStyle(color: Color(0xFFE0E0E0), fontSize: 16)),
+                        ),
+                        GestureDetector(
+                          onTap: () async {
+                            await SearchHistoryService.removeOne(kw);
+                            setState(() => _history.removeAt(i));
+                          },
+                          child: const Icon(Icons.close, size: 18, color: Color(0xFF8F919A)),
+                        ),
                       ],
                     ),
                   ),
