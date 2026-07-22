@@ -70,7 +70,11 @@ class _SwipeActionCellState extends State<SwipeActionCell> with SingleTickerProv
       child: Stack(
         children: [
           // 背景按钮
-          Positioned.fill(
+          Positioned(
+            top: 0,
+            bottom: 0,
+            right: 0,
+            width: buttonWidth,
             child: GestureDetector(
               onTap: () {
                 if (_isOpen) {
@@ -80,8 +84,7 @@ class _SwipeActionCellState extends State<SwipeActionCell> with SingleTickerProv
               },
               child: Container(
                 color: widget.actionColor,
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.only(right: 16),
+                alignment: Alignment.center,
                 child: Text(
                   widget.actionLabel,
                   style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),

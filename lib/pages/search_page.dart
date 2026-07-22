@@ -68,14 +68,6 @@ class _SearchPageState extends State<SearchPage> {
             border: InputBorder.none,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search, color: Colors.white),
-            onPressed: () {
-              if (_controller.text.trim().isNotEmpty) _doSearch(_controller.text.trim());
-            },
-          ),
-        ],
       ),
       body: _history.isEmpty
           ? const Center(

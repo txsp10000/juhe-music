@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/player_service.dart';
 import '../models/song.dart';
+import '../models/platform.dart';
 import '../widgets/swipe_action_cell.dart';
 import 'player_page.dart';
 
@@ -19,7 +20,6 @@ class _PlaylistPageState extends State<PlaylistPage> {
     Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
   }
 
-  String _fmt(int sec) => '${sec ~/ 60}:${(sec % 60).toString().padLeft(2, '0')}';
   String _qualityLabel(String q) {
     return switch (q) {
       'flac' => 'FLAC',
@@ -28,6 +28,10 @@ class _PlaylistPageState extends State<PlaylistPage> {
       '128k' => '128k',
       _ => q,
     };
+  }
+  String _platformName(String code) {
+    final p = Platform.fromCode(code);
+    return p?.displayName ?? code;
   }
 
   @override
@@ -91,8 +95,15 @@ class _PlaylistPageState extends State<PlaylistPage> {
                               ],
                             ),
                           ),
-                          Text(_fmt(s.duration),
-                              style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0x226890F9),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(_platformName(s.source),
+                                style: const TextStyle(color: Color(0xFF6890F9), fontSize: 11)),
+                          ),
                         ],
                       ),
                     ),
