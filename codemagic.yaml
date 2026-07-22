@@ -22,15 +22,16 @@ workflows:
         script: flutter pub get
       - name: Disable code signing
         script: |
-          mkdir -p ios/Flutter
-          cat > ios/Flutter/Release.xcconfig << 'EOF'
+          cat >> ios/Flutter/Release.xcconfig << 'EOF'
+
           CODE_SIGNING_ALLOWED = NO
           CODE_SIGNING_REQUIRED = NO
           CODE_SIGN_IDENTITY =
           DEVELOPMENT_TEAM =
           PROVISIONING_PROFILE_SPECIFIER =
           EOF
-          cat > ios/Flutter/Debug.xcconfig << 'EOF'
+          cat >> ios/Flutter/Debug.xcconfig << 'EOF'
+
           CODE_SIGNING_ALLOWED = NO
           CODE_SIGNING_REQUIRED = NO
           CODE_SIGN_IDENTITY =
