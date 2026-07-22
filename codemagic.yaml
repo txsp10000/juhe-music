@@ -18,6 +18,14 @@ workflows:
         script: rm -rf ios
       - name: Recreate iOS project
         script: flutter create --platforms=ios .
+      - name: Disable code signing
+        script: |
+          sed -i '' 's/CODE_SIGN_IDENTITY = .*/CODE_SIGN_IDENTITY = "";/' ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/DEVELOPMENT_TEAM = .*/DEVELOPMENT_TEAM = "";/' ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = .*/"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "";/' ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/CODE_SIGNING_REQUIRED = YES/CODE_SIGNING_REQUIRED = NO/g' ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/CODE_SIGNING_ALLOWED = YES/CODE_SIGNING_ALLOWED = NO/g' ios/Runner.xcodeproj/project.pbxproj
+          echo 'CODE_SIGNING_ALLOWED = NO' >> ios/Flutter/Release.xcconfig
       - name: Set app display name
         script: |
           sed -i '' 's/PRODUCT_NAME = .*/PRODUCT_NAME = "苗苗music";/' ios/Runner.xcodeproj/project.pbxproj
