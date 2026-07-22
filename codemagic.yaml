@@ -14,32 +14,15 @@ workflows:
         - pattern: main
           include: true
     scripts:
-      - name: Recreate clean iOS project
+      - name: Setup iOS project
         script: |
           rm -rf ios
           flutter create --platforms=ios .
-      - name: Get Flutter packages
-        script: flutter pub get
-      - name: Disable code signing
+          flutter pub get
+      - name: Configure project
         script: |
-          cat > /tmp/disable_signing.py << 'PYEOF'
-          import re
-          path = 'ios/Runner.xcodeproj/project.pbxproj'
-          with open(path, 'r') as f:
-              content = f.read()
-          content = re.sub(r'DEVELOPMENT_TEAM = \"[^\"]*\";', 'DEVELOPMENT_TEAM = \"\";', content)
-          content = re.sub(r'DEVELOPMENT_TEAM = [A-Z0-9]+;', 'DEVELOPMENT_TEAM = \"\";', content)
-          content = re.sub(r'CODE_SIGN_STYLE = Automatic;', 'CODE_SIGN_STYLE = Manual;', content)
-          content = re.sub(r'CODE_SIGN_IDENTITY = \"[^\"]*\";', 'CODE_SIGN_IDENTITY = \"\";', content)
-          content = re.sub(r'PROVISIONING_PROFILE_SPECIFIER = \"[^\"]*\";', 'PROVISIONING_PROFILE_SPECIFIER = \"\";', content)
-          content = re.sub(r'PROVISIONING_PROFILE = \"[^\"]*\";', 'PROVISIONING_PROFILE = \"\";', content)
-          with open(path, 'w') as f:
-              f.write(content)
-          print('pbxproj code signing disabled')
-          PYEOF
-          python3 /tmp/disable_signing.py
+          # Disable code signing in xcconfig (append, preserve Generated.xcconfig include)
           cat >> ios/Flutter/Release.xcconfig << 'EOF'
-
           CODE_SIGNING_ALLOWED = NO
           CODE_SIGNING_REQUIRED = NO
           CODE_SIGN_IDENTITY =
@@ -47,19 +30,29 @@ workflows:
           PROVISIONING_PROFILE_SPECIFIER =
           EOF
           cat >> ios/Flutter/Debug.xcconfig << 'EOF'
-
           CODE_SIGNING_ALLOWED = NO
           CODE_SIGNING_REQUIRED = NO
           CODE_SIGN_IDENTITY =
           DEVELOPMENT_TEAM =
           PROVISIONING_PROFILE_SPECIFIER =
           EOF
-      - name: Set app display name
-        script: |
+          # Disable code signing in pbxproj
+          python3 -c '
+          import re
+          with open("ios/Runner.xcodeproj/project.pbxproj","r") as f:
+            c = f.read()
+          c = re.sub(r"DEVELOPMENT_TEAM = \"[^\"]*\";","DEVELOPMENT_TEAM = \"\";",c)
+          c = re.sub(r"DEVELOPMENT_TEAM = [A-Z0-9]+;","DEVELOPMENT_TEAM = \"\";",c)
+          c = re.sub(r"CODE_SIGN_STYLE = Automatic;","CODE_SIGN_STYLE = Manual;",c)
+          c = re.sub(r"CODE_SIGN_IDENTITY = \"[^\"]*\";","CODE_SIGN_IDENTITY = \"\";",c)
+          c = re.sub(r"PROVISIONING_PROFILE_SPECIFIER = \"[^\"]*\";","PROVISIONING_PROFILE_SPECIFIER = \"\";",c)
+          with open("ios/Runner.xcodeproj/project.pbxproj","w") as f:
+            f.write(c)
+          '
+          # Set app name
           /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 苗苗music" ios/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleName 苗苗music" ios/Runner/Info.plist
-      - name: Set app icon
-        script: |
+          # Set app icon
           ICON_SRC="assets/icon.png"
           ICON_DIR="ios/Runner/Assets.xcassets/AppIcon.appiconset"
           if [ -f "$ICON_SRC" ]; then
@@ -92,25 +85,33 @@ workflows:
             "info":{"version":1,"author":"xcode"}
           }
           ICONJSON
-            echo "App icon set generated successfully"
           fi
-      - name: Enable background audio
+          # Enable background audio
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" ios/Runner/Info.plist 2>/dev/null
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" ios/Runner/Info.plist 2>/dev/null
+      - name: Build iOS (unsigned)
         script: |
-          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" ios/Runner/Info.plist
-          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" ios/Runner/Info.plist
-      - name: Build iOS without signing
-        script: flutter build ios --release --no-codesign
-      - name: Package as IPA
+          cd ios
+          pod install
+          xcodebuild -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            SYMROOT="../build/ios"
+      - name: Package IPA
         script: |
-          APP_DIR="build/ios/iphoneos"
-          echo "=== Finding .app in $APP_DIR ==="
-          find "$APP_DIR" -name "*.app" -type d 2>/dev/null
-          APP_PATH=$(find "$APP_DIR" -name "*.app" -type d | head -1)
+          APP_PATH=$(find build/ios/Release-iphoneos -name "*.app" -type d | head -1)
           if [ -z "$APP_PATH" ]; then
             echo "ERROR: .app not found!"
             exit 1
           fi
-          echo "Using: $APP_PATH"
+          echo "App: $APP_PATH"
           rm -rf Payload
           mkdir Payload
           cp -R "$APP_PATH" Payload/
