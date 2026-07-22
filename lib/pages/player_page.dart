@@ -87,6 +87,12 @@ class _PlayerPageState extends State<PlayerPage> {
     _ => Icons.repeat,
   };
 
+  String get _loopLabel => switch (_player.loopMode) {
+    1 => '单曲循环',
+    2 => '顺序播放',
+    _ => '列表循环',
+  };
+
   String get _currentQualityLabel => _qualityLabels[_player.currentQuality] ?? 'FLAC 无损';
 
   void _showQualitySheet() {
@@ -298,10 +304,6 @@ class _PlayerPageState extends State<PlayerPage> {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           IconButton(
-            icon: Icon(_loopIcon, color: Colors.white, size: 24),
-            onPressed: _loopToggle,
-          ),
-          IconButton(
             icon: const Icon(Icons.skip_previous, color: Colors.white, size: 36),
             onPressed: () => _player.prev(),
           ),
@@ -336,6 +338,17 @@ class _PlayerPageState extends State<PlayerPage> {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _bottomAction(Icons.high_quality_outlined, '音质', _showQualitySheet),
+          GestureDetector(
+            onTap: _loopToggle,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(_loopIcon, color: const Color(0xFF8F919A), size: 22),
+                const SizedBox(height: 4),
+                Text(_loopLabel, style: const TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
+              ],
+            ),
+          ),
           GestureDetector(
             onTap: _toggleFavorite,
             child: Column(

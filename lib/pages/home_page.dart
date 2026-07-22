@@ -218,8 +218,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
               ),
               if (hasSong)
-                Container(
-                  color: const Color(0xEE09090C),
+                Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,

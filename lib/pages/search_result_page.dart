@@ -54,6 +54,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
   void _showPlatformPicker() {
     showDialog(
       context: context,
+      barrierDismissible: true,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E2030),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -74,7 +75,11 @@ class _SearchResultPageState extends State<SearchResultPage> {
           }).toList(),
         ),
       ),
-    );
+    ).then((value) {
+      if (value == null && _songs.isEmpty && mounted) {
+        Navigator.pop(context);
+      }
+    });
   }
 
   void _playAt(int index) {
