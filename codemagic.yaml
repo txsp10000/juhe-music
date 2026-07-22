@@ -16,25 +16,14 @@ workflows:
     scripts:
       - name: Disable code signing
         script: |
-          cd ios
-          ruby -e '
-            path = "Runner.xcodeproj/project.pbxproj"
-            content = File.read(path)
-            content.gsub!(/CODE_SIGN_IDENTITY = ".*?"/, "CODE_SIGN_IDENTITY = \"\"")
-            content.gsub!(/CODE_SIGN_IDENTITY = .*?;/, "CODE_SIGN_IDENTITY = \"\";")
-            content.gsub!(/DEVELOPMENT_TEAM = .*?;/, "DEVELOPMENT_TEAM = \"\";")
-            content.gsub!(/CODE_SIGNING_REQUIRED = YES/, "CODE_SIGNING_REQUIRED = NO")
-            content.gsub!(/CODE_SIGNING_ALLOWED = YES/, "CODE_SIGNING_ALLOWED = NO")
-            content.gsub!(/PROVISIONING_PROFILE_SPECIFIER = .*?;/, "PROVISIONING_PROFILE_SPECIFIER = \"\";")
-            File.write(path, content)
-          '
-          mkdir -p Flutter
-          echo 'CODE_SIGNING_ALLOWED = NO' > Flutter/Release.xcconfig
-          echo 'CODE_SIGNING_REQUIRED = NO' >> Flutter/Release.xcconfig
-          echo 'CODE_SIGN_IDENTITY = ' >> Flutter/Release.xcconfig
+          mkdir -p ios/Flutter
+          cat > ios/Flutter/Release.xcconfig << 'EOF'
+          CODE_SIGNING_ALLOWED = NO
+          CODE_SIGNING_REQUIRED = NO
+          CODE_SIGN_IDENTITY =
+          EOF
       - name: Set app display name
         script: |
-          sed -i '' 's/PRODUCT_NAME = .*/PRODUCT_NAME = "苗苗music";/' ios/Runner.xcodeproj/project.pbxproj
           /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 苗苗music" ios/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleName 苗苗music" ios/Runner/Info.plist
       - name: Set app icon
