@@ -22,21 +22,18 @@ workflows:
         script: flutter pub get
       - name: Disable code signing
         script: |
+          sed -i '' 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g' ios/Runner.xcodeproj/project.pbxproj
           cat >> ios/Flutter/Release.xcconfig << 'EOF'
 
           CODE_SIGNING_ALLOWED = NO
           CODE_SIGNING_REQUIRED = NO
           CODE_SIGN_IDENTITY =
-          DEVELOPMENT_TEAM =
-          PROVISIONING_PROFILE_SPECIFIER =
           EOF
           cat >> ios/Flutter/Debug.xcconfig << 'EOF'
 
           CODE_SIGNING_ALLOWED = NO
           CODE_SIGNING_REQUIRED = NO
           CODE_SIGN_IDENTITY =
-          DEVELOPMENT_TEAM =
-          PROVISIONING_PROFILE_SPECIFIER =
           EOF
       - name: Set app display name
         script: |
@@ -83,30 +80,15 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" ios/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" ios/Runner/Info.plist
       - name: Build iOS without signing
-        script: |
-          flutter build ios --release --no-codesign 2>/dev/null || true
-          rm -rf build/ios
-          cd ios
-          pod install
-          xcodebuild -workspace Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            DEVELOPMENT_TEAM="" \
-            PROVISIONING_PROFILE_SPECIFIER="" \
-            SYMROOT="../build/ios"
+        script: flutter build ios --release --no-codesign
       - name: Package as IPA
         script: |
-          echo "=== Finding .app ==="
-          APP_DIR="build/ios/Release-iphoneos"
+          APP_DIR="build/ios/iphoneos"
+          echo "=== Finding .app in $APP_DIR ==="
           find "$APP_DIR" -name "*.app" -type d 2>/dev/null
           APP_PATH=$(find "$APP_DIR" -name "*.app" -type d | head -1)
           if [ -z "$APP_PATH" ]; then
-            echo "ERROR: .app not found in $APP_DIR!"
+            echo "ERROR: .app not found!"
             exit 1
           fi
           echo "Using: $APP_PATH"
