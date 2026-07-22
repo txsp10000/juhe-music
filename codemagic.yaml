@@ -93,8 +93,17 @@ workflows:
         script: |
           cd ios
           pod install
-          cd ..
-          flutter build ios --release --no-codesign
+          xcodebuild -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            -derivedDataPath ../build/ios
       - name: Package IPA
         script: |
           APP_PATH=""
