@@ -11,12 +11,23 @@ class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage> {
   final _controller = TextEditingController();
+  final _focusNode = FocusNode();
   List<String> _history = [];
 
   @override
   void initState() {
     super.initState();
     _loadHistory();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
   }
 
   Future<void> _loadHistory() async {
@@ -50,7 +61,8 @@ class _SearchPageState extends State<SearchPage> {
         ),
         title: TextField(
           controller: _controller,
-          autofocus: true,
+          autofocus: false,
+          focusNode: _focusNode,
           style: const TextStyle(color: Colors.white, fontSize: 18),
           cursorColor: const Color(0xFF6890F9),
           textInputAction: TextInputAction.search,

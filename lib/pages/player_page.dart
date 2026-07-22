@@ -164,17 +164,20 @@ class _PlayerPageState extends State<PlayerPage> {
     final song = _player.currentSong;
     if (song == null) return const Scaffold(body: SizedBox());
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D0F14),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(),
-            Expanded(child: _buildCenterContent(song)),
-            _buildBottomActions(song),
-            _buildSeekBar(),
-            _buildControls(),
-          ],
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0D0F14),
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildTopBar(),
+              Expanded(child: _buildCenterContent(song)),
+              _buildBottomActions(song),
+              _buildSeekBar(),
+              _buildControls(),
+            ],
+          ),
         ),
       ),
     );
