@@ -246,13 +246,6 @@ class _PlayerPageState extends State<PlayerPage> {
             child: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 30),
           ),
           const Spacer(),
-          Column(
-            children: [
-              const Text('正在播放', style: TextStyle(color: Color(0xFF8F919A), fontSize: 12)),
-              const Text('24bit 无损', style: TextStyle(color: Color(0xFF6890F9), fontSize: 11)),
-            ],
-          ),
-          const Spacer(),
           GestureDetector(
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlaylistPage())),
             child: const Icon(Icons.queue_music, color: Colors.white, size: 26),
@@ -268,7 +261,7 @@ class _PlayerPageState extends State<PlayerPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 专辑封面 + 文字覆盖层
+          // 歌名/作者/音质
           Container(
             width: 220,
             height: 220,
@@ -279,47 +272,31 @@ class _PlayerPageState extends State<PlayerPage> {
                 BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 30, offset: const Offset(0, 10)),
               ],
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // 封面图
-                  song.cover.isNotEmpty
-                      ? Image.network(song.cover, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _defaultCover())
-                      : _defaultCover(),
-                  // 半透明遮罩 + 文字
-                  Container(
-                    color: const Color(0x88000000),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          song.name,
-                          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          song.singer,
-                          style: const TextStyle(color: Color(0xFFF4F4F7), fontSize: 12),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          '24bit 无损',
-                          style: TextStyle(color: Color(0xFF6890F9), fontSize: 11),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  song.name,
+                  style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  song.singer,
+                  style: const TextStyle(color: Color(0xFFF4F4F7), fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  '24bit 无损',
+                  style: TextStyle(color: Color(0xFF6890F9), fontSize: 11),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 24),
@@ -339,13 +316,6 @@ class _PlayerPageState extends State<PlayerPage> {
                 style: TextStyle(color: Color(0xFF8F919A), fontSize: 15)),
         ],
       ),
-    );
-  }
-
-  Widget _defaultCover() {
-    return Container(
-      color: const Color(0xFF2A2D3A),
-      child: const Center(child: Icon(Icons.music_note, color: Color(0xFF6890F9), size: 80)),
     );
   }
 

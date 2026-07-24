@@ -192,9 +192,6 @@ class _SearchResultPageState extends State<SearchResultPage> {
                                   ],
                                 ),
                               ),
-                              if (isFav)
-                                const Icon(Icons.favorite,
-                                    color: Colors.red, size: 18),
                             ],
                           ),
                         ),
