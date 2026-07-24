@@ -334,18 +334,18 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     children: [
                       IconButton(
                         onPressed: () => _player.prev(),
-                        icon: const Icon(Icons.skip_previous, color: Colors.white, size: 32),
+                        icon: const Icon(Icons.skip_previous, color: Colors.white, size: 48),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 24),
                       IconButton(
                         onPressed: () => _player.togglePlayPause(),
-                        iconSize: 34,
+                        iconSize: 60,
                         icon: Icon(_player.isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 24),
                       IconButton(
                         onPressed: () => _player.next(),
-                        icon: const Icon(Icons.skip_next, color: Colors.white, size: 32),
+                        icon: const Icon(Icons.skip_next, color: Colors.white, size: 48),
                       ),
                     ],
                   ),
