@@ -127,7 +127,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     if (currentIdx > 0) {
       lines.add(Text(
         _parsedLrc[currentIdx - 1].text,
-        style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 14),
+        style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 16),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ));
@@ -138,7 +138,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     if (currentIdx >= 0) {
       lines.add(Text(
         _parsedLrc[currentIdx].text,
-        style: const TextStyle(color: Color(0xFF6890F9), fontSize: 16, fontWeight: FontWeight.w600),
+        style: const TextStyle(color: Color(0xFF6890F9), fontSize: 18, fontWeight: FontWeight.w600),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ));
@@ -149,7 +149,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     if (currentIdx >= 0 && currentIdx + 1 < _parsedLrc.length) {
       lines.add(Text(
         _parsedLrc[currentIdx + 1].text,
-        style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 13),
+        style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 15),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ));
@@ -237,8 +237,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
               ),
               Expanded(
-                child: Center(
+                child: Align(
+                  alignment: Alignment.topCenter,
                   child: SingleChildScrollView(
+                    padding: const EdgeInsets.only(top: 30),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
