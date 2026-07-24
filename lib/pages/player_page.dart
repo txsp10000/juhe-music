@@ -170,29 +170,29 @@ class _PlayerPageState extends State<PlayerPage> {
     if (currentIdx > 0) {
       lines.add(Text(
         _parsedLrc[currentIdx - 1].text,
-        style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 14),
+        style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 17),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ));
-      lines.add(const SizedBox(height: 6));
+      lines.add(const SizedBox(height: 8));
     }
 
     // 当前行
     if (currentIdx >= 0) {
       lines.add(Text(
         _parsedLrc[currentIdx].text,
-        style: const TextStyle(color: Color(0xFF6890F9), fontSize: 16, fontWeight: FontWeight.w600),
+        style: const TextStyle(color: Color(0xFF6890F9), fontSize: 20, fontWeight: FontWeight.w600),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ));
-      lines.add(const SizedBox(height: 6));
+      lines.add(const SizedBox(height: 8));
     }
 
     // 下一行
     if (currentIdx >= 0 && currentIdx + 1 < _parsedLrc.length) {
       lines.add(Text(
         _parsedLrc[currentIdx + 1].text,
-        style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 13),
+        style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 16),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ));
@@ -224,8 +224,8 @@ class _PlayerPageState extends State<PlayerPage> {
         body: SafeArea(
           child: Column(
             children: [
-              _buildTopBar(),
-              Expanded(child: _buildCenterContent(song, lyricText)),
+              _buildTopBar(song),
+              Expanded(child: _buildCenterContent(lyricText)),
               _buildBottomActions(),
               _buildSeekBar(),
               _buildControls(),
@@ -236,16 +236,45 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  Widget _buildTopBar() {
+  Widget _buildTopBar(Song song) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: Row(
         children: [
           GestureDetector(
             onTap: () => Navigator.pop(context),
             child: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 30),
           ),
-          const Spacer(),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  song.name,
+                  style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  song.singer,
+                  style: const TextStyle(color: Color(0xFFF4F4F7), fontSize: 13),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  '24bit 无损',
+                  style: TextStyle(color: Color(0xFF6890F9), fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
           GestureDetector(
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlaylistPage())),
             child: const Icon(Icons.queue_music, color: Colors.white, size: 26),
@@ -255,54 +284,26 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  Widget _buildCenterContent(Song song, String? lyricText) {
+  Widget _buildCenterContent(String? lyricText) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 歌名/作者/音质
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                song.name,
-                style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 6),
-              Text(
-                song.singer,
-                style: const TextStyle(color: Color(0xFFF4F4F7), fontSize: 12),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                '24bit 无损',
-                style: TextStyle(color: Color(0xFF6890F9), fontSize: 11),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
           // 歌词区域
           if (_parsedLrc.isNotEmpty)
             _buildLyricArea()
           else if (lyricText != null)
             Text(
               lyricText,
-              style: const TextStyle(color: Color(0xFF6C97FF), fontSize: 15),
+              style: const TextStyle(color: Color(0xFF6C97FF), fontSize: 18),
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             )
           else
             const Text('歌词加载中...',
-                style: TextStyle(color: Color(0xFF8F919A), fontSize: 15)),
+                style: TextStyle(color: Color(0xFF8F919A), fontSize: 18)),
         ],
       ),
     );
