@@ -5,6 +5,13 @@ import 'search_page.dart';
 import 'favorites_page.dart';
 import 'player_page.dart';
 
+/// LRC 歌词行
+class _LrcLine {
+  final int timeMs;
+  final String text;
+  const _LrcLine(this.timeMs, this.text);
+}
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -21,6 +28,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Song? _currentSong;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
+  List<_LrcLine> _parsedLrc = [];
 
   @override
   void initState() {
@@ -42,15 +50,60 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       if (mounted) setState(() { _position = pos; _duration = dur ?? Duration.zero; });
     };
     _player.onSongChanged = (song) {
-      if (mounted) setState(() => _currentSong = song);
+      if (mounted) {
+        _parsedLrc = _parseLrc(song.lyric);
+        setState(() => _currentSong = song);
+      }
     };
     _player.onPlayStateChanged = (_) => mounted ? setState(() {}) : null;
   }
 
   void _syncState() {
     _currentSong = _player.currentSong;
+    if (_currentSong != null) _parsedLrc = _parseLrc(_currentSong!.lyric);
     if (_player.duration != null) _duration = _player.duration!;
     _position = _player.position;
+  }
+
+  /// 解析 LRC 歌词
+  List<_LrcLine> _parseLrc(String? lyric) {
+    if (lyric == null || lyric.isEmpty) return [];
+    final lines = <_LrcLine>[];
+    final regex = RegExp(r'\[(\d{2}):(\d{2})(?:[.:](\d{2,3}))?\](.*)');
+    for (final line in lyric.split('\n')) {
+      final match = regex.firstMatch(line.trim());
+      if (match != null) {
+        final min = int.parse(match.group(1)!);
+        final sec = int.parse(match.group(2)!);
+        var msStr = match.group(3);
+        var ms = 0;
+        if (msStr != null) {
+          ms = int.parse(msStr);
+          if (msStr.length == 2) ms *= 10; // 百分秒 → 毫秒
+        }
+        final text = match.group(4)?.trim() ?? '';
+        if (text.isNotEmpty) {
+          lines.add(_LrcLine((min * 60 + sec) * 1000 + ms, text));
+        }
+      }
+    }
+    lines.sort((a, b) => a.timeMs.compareTo(b.timeMs));
+    return lines;
+  }
+
+  /// 获取当前播放位置对应的歌词行
+  int _currentLrcIndex() {
+    if (_parsedLrc.isEmpty) return -1;
+    final posMs = _position.inMilliseconds;
+    var idx = -1;
+    for (var i = 0; i < _parsedLrc.length; i++) {
+      if (_parsedLrc[i].timeMs <= posMs) {
+        idx = i;
+      } else {
+        break;
+      }
+    }
+    return idx;
   }
 
   @override
@@ -64,10 +117,55 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
   }
 
-  String _firstLyric(String? lyric) {
-    if (lyric == null || lyric.isEmpty) return '';
-    return lyric.split('\n').firstWhere((l) => l.trim().isNotEmpty,
-        orElse: () => '').replaceAll(RegExp(r'\[.*?\]'), '').trim();
+  Widget _buildLyricArea() {
+    if (_parsedLrc.isEmpty) return const SizedBox.shrink();
+
+    final currentIdx = _currentLrcIndex();
+    final lines = <Widget>[];
+
+    // 上一行
+    if (currentIdx > 0) {
+      lines.add(Text(
+        _parsedLrc[currentIdx - 1].text,
+        style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 14),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ));
+      lines.add(const SizedBox(height: 6));
+    }
+
+    // 当前行
+    if (currentIdx >= 0) {
+      lines.add(Text(
+        _parsedLrc[currentIdx].text,
+        style: const TextStyle(color: Color(0xFF6890F9), fontSize: 16, fontWeight: FontWeight.w600),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ));
+      lines.add(const SizedBox(height: 6));
+    }
+
+    // 下一行
+    if (currentIdx >= 0 && currentIdx + 1 < _parsedLrc.length) {
+      lines.add(Text(
+        _parsedLrc[currentIdx + 1].text,
+        style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 13),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ));
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        child: Column(
+          key: ValueKey(currentIdx),
+          mainAxisSize: MainAxisSize.min,
+          children: lines,
+        ),
+      ),
+    );
   }
 
   @override
@@ -140,82 +238,91 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ),
               Expanded(
                 child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        hasSong ? _currentSong!.name : '苗苗music',
-                        style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        hasSong ? _currentSong!.singer : '搜索你喜欢的音乐',
-                        style: const TextStyle(color: Color(0xFFF4F4F7), fontSize: 17),
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        hasSong ? _firstLyric(_currentSong!.lyric) : '点击右上角搜索框开始',
-                        style: const TextStyle(color: Color(0xFF8F919A), fontSize: 15),
-                      ),
-                      const SizedBox(height: 20),
-                      if (hasSong)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 40),
-                          child: Column(
-                            children: [
-                              SliderTheme(
-                                data: SliderTheme.of(context).copyWith(
-                                  trackHeight: 4,
-                                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                                  activeTrackColor: const Color(0xFF6890F9),
-                                  inactiveTrackColor: const Color(0xFF2A2D3A),
-                                  thumbColor: const Color(0xFF6890F9),
-                                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                                ),
-                                child: Slider(
-                                  value: (_duration.inMilliseconds > 0
-                                      ? _position.inMilliseconds / _duration.inMilliseconds
-                                      : 0.0).clamp(0.0, 1.0),
-                                  onChanged: (v) {
-                                    final ms = (v * _duration.inMilliseconds).toInt();
-                                    _player.seekRelative(ms - _position.inMilliseconds);
-                                  },
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(_fmt(_position), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
-                                    Text(_fmt(_duration), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          hasSong ? _currentSong!.name : '苗苗music',
+                          style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
                         ),
-                      if (hasSong) const SizedBox(height: 16),
-                      if (hasSong)
-                        AnimatedBuilder(
-                          animation: _pulseAnimation,
-                          builder: (_, child) => Transform.scale(
-                            scale: _pulseAnimation.value,
-                            child: child,
-                          ),
-                          child: GestureDetector(
-                            onTap: () => _openPlayer(),
-                            child: Container(
-                              width: 72,
-                              height: 72,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(Icons.graphic_eq, color: Colors.white, size: 36),
+                        const SizedBox(height: 8),
+                        Text(
+                          hasSong ? _currentSong!.singer : '搜索你喜欢的音乐',
+                          style: const TextStyle(color: Color(0xFFF4F4F7), fontSize: 17),
+                        ),
+                        const SizedBox(height: 20),
+                        if (hasSong)
+                          _buildLyricArea(),
+                        if (!hasSong || _parsedLrc.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              hasSong ? '暂无歌词' : '点击右上角搜索框开始',
+                              style: const TextStyle(color: Color(0xFF8F919A), fontSize: 15),
                             ),
                           ),
-                        ),
-                    ],
+                        const SizedBox(height: 20),
+                        if (hasSong)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 40),
+                            child: Column(
+                              children: [
+                                SliderTheme(
+                                  data: SliderTheme.of(context).copyWith(
+                                    trackHeight: 4,
+                                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                                    activeTrackColor: const Color(0xFF6890F9),
+                                    inactiveTrackColor: const Color(0xFF2A2D3A),
+                                    thumbColor: const Color(0xFF6890F9),
+                                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                                  ),
+                                  child: Slider(
+                                    value: (_duration.inMilliseconds > 0
+                                        ? _position.inMilliseconds / _duration.inMilliseconds
+                                        : 0.0).clamp(0.0, 1.0),
+                                    onChanged: (v) {
+                                      final ms = (v * _duration.inMilliseconds).toInt();
+                                      _player.seekRelative(ms - _position.inMilliseconds);
+                                    },
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(_fmt(_position), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
+                                      Text(_fmt(_duration), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (hasSong) const SizedBox(height: 16),
+                        if (hasSong)
+                          AnimatedBuilder(
+                            animation: _pulseAnimation,
+                            builder: (_, child) => Transform.scale(
+                              scale: _pulseAnimation.value,
+                              child: child,
+                            ),
+                            child: GestureDetector(
+                              onTap: () => _openPlayer(),
+                              child: Container(
+                                width: 72,
+                                height: 72,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(Icons.graphic_eq, color: Colors.white, size: 36),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),

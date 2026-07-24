@@ -20,15 +20,6 @@ class _PlaylistPageState extends State<PlaylistPage> {
     Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
   }
 
-  String _qualityLabel(String q) {
-    return switch (q) {
-      'flac' => 'FLAC',
-      '320k' => '320k',
-      '192k' => '192k',
-      '128k' => '128k',
-      _ => q,
-    };
-  }
   String _platformName(String code) {
     final p = Platform.fromCode(code);
     return p?.displayName ?? code;
@@ -90,7 +81,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
                                     style: TextStyle(
                                         color: isCurrent ? const Color(0xFF6890F9) : Colors.white,
                                         fontSize: 16)),
-                                Text('${s.singer} | ${_qualityLabel(s.quality)}',
+                                Text(s.singer,
                                     style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
                               ],
                             ),

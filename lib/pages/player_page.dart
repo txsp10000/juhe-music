@@ -19,12 +19,7 @@ class _PlayerPageState extends State<PlayerPage> {
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
 
-  static const _qualityLabels = {
-    'flac': 'FLAC 无损',
-    '320k': '320kbps',
-    '192k': '192kbps',
-    '128k': '128kbps',
-  };
+
 
   @override
   void initState() {
@@ -93,38 +88,6 @@ class _PlayerPageState extends State<PlayerPage> {
     _ => '列表循环',
   };
 
-  String get _currentQualityLabel => _qualityLabels[_player.currentQuality] ?? 'FLAC 无损';
-
-  void _showQualitySheet() {
-    final codes = ['flac', '320k', '192k', '128k'];
-    final labels = ['FLAC 无损', '320k 极高', '192k 较高', '128k 标准'];
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E2030),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('选择音质', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var i = 0; i < labels.length; i++)
-              ListTile(
-                title: Text(labels[i], style: const TextStyle(color: Colors.white)),
-                trailing: _player.currentQuality == codes[i]
-                    ? const Icon(Icons.check, color: Color(0xFF6890F9))
-                    : null,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _player.switchQuality(codes[i]);
-                  setState(() {});
-                },
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _showSearchSameSheet() {
     final song = _player.currentSong;
     if (song == null) return;
@@ -173,7 +136,7 @@ class _PlayerPageState extends State<PlayerPage> {
             children: [
               _buildTopBar(),
               Expanded(child: _buildCenterContent(song)),
-              _buildBottomActions(song),
+              _buildBottomActions(),
               _buildSeekBar(),
               _buildControls(),
             ],
@@ -196,7 +159,7 @@ class _PlayerPageState extends State<PlayerPage> {
           Column(
             children: [
               const Text('正在播放', style: TextStyle(color: Color(0xFF8F919A), fontSize: 12)),
-              Text(_currentQualityLabel, style: const TextStyle(color: Color(0xFF6890F9), fontSize: 11)),
+              const Text('FLAC 无损', style: TextStyle(color: Color(0xFF6890F9), fontSize: 11)),
             ],
           ),
           const Spacer(),
@@ -215,6 +178,7 @@ class _PlayerPageState extends State<PlayerPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // 专辑封面 + 文字覆盖层
           Container(
             width: 220,
             height: 220,
@@ -227,20 +191,48 @@ class _PlayerPageState extends State<PlayerPage> {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: song.cover.isNotEmpty
-                  ? Image.network(song.cover, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _defaultCover())
-                  : _defaultCover(),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // 封面图
+                  song.cover.isNotEmpty
+                      ? Image.network(song.cover, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _defaultCover())
+                      : _defaultCover(),
+                  // 半透明遮罩 + 文字
+                  Container(
+                    color: const Color(0x88000000),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          song.name,
+                          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          song.singer,
+                          style: const TextStyle(color: Color(0xFFF4F4F7), fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          '24bit 无损',
+                          style: TextStyle(color: Color(0xFF6890F9), fontSize: 11),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 32),
-          Text(song.name,
-              style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-              maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
-          const SizedBox(height: 8),
-          Text(song.singer,
-              style: const TextStyle(color: Color(0xFF8F919A), fontSize: 16),
-              maxLines: 1, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 12),
+          const SizedBox(height: 24),
           Text(
             _firstLyric(song.lyric),
             style: const TextStyle(color: Color(0xFF6C97FF), fontSize: 15),
@@ -334,13 +326,12 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  Widget _buildBottomActions(Song song) {
+  Widget _buildBottomActions() {
     return Padding(
       padding: const EdgeInsets.only(top: 8, bottom: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _bottomAction(Icons.high_quality_outlined, '音质', _showQualitySheet),
           GestureDetector(
             onTap: _loopToggle,
             child: Column(
@@ -367,21 +358,17 @@ class _PlayerPageState extends State<PlayerPage> {
               ],
             ),
           ),
-          _bottomAction(Icons.search, '搜索同名', _showSearchSameSheet),
-        ],
-      ),
-    );
-  }
-
-  Widget _bottomAction(IconData icon, String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: const Color(0xFF8F919A), size: 22),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
+          GestureDetector(
+            onTap: _showSearchSameSheet,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.search, color: Color(0xFF8F919A), size: 22),
+                const SizedBox(height: 4),
+                const Text('搜索同名', style: TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
+              ],
+            ),
+          ),
         ],
       ),
     );
