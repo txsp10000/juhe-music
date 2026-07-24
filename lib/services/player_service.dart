@@ -13,6 +13,9 @@ class PlayerService {
   int _currentIndex = -1;
   int _loopMode = 0;
 
+  /// 当前播放的 MediaItem（替代已废弃的 AudioSource.tag）
+  MediaItem? _currentMediaItem;
+
   Song? get currentSong =>
       _currentIndex >= 0 && _currentIndex < playlist.length
           ? playlist[_currentIndex]
@@ -38,7 +41,7 @@ class PlayerService {
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.miaomiao.music.channel',
         androidNotificationChannelName: '苗苗music',
-        androidNotificationOngoing: true,
+        androidNotificationOngoing: false,
         androidStopForegroundOnPause: false,
         androidShowNotificationBadge: false,
       ),
@@ -46,8 +49,6 @@ class PlayerService {
 
     instance._player.positionStream.listen((pos) {
       instance.onProgress?.call(pos, instance._player.duration);
-      // 同步更新 CarPlay/锁屏 进度
-      AudioService.updatePosition(pos);
     });
     instance._player.playerStateStream.listen((state) {
       instance.onPlayStateChanged?.call(state.playing);
@@ -57,13 +58,10 @@ class PlayerService {
     });
     // 监听 duration 变化，更新 Now Playing
     instance._player.durationStream.listen((dur) {
-      if (dur != null) {
-        final tag = instance._player.audioSource?.tag;
-        if (tag is MediaItem) {
-          try {
-            AudioService.updateMediaItem(tag.copyWith(duration: dur));
-          } catch (_) {}
-        }
+      if (dur != null && instance._currentMediaItem != null) {
+        try {
+          AudioService.updateMediaItem(instance._currentMediaItem!.copyWith(duration: dur));
+        } catch (_) {}
       }
     });
   }
@@ -111,8 +109,8 @@ class PlayerService {
     final playId = song.lyricId.isNotEmpty ? song.lyricId : song.id;
     final picId = song.picId.isNotEmpty ? song.picId : song.id;
 
-    // 先设置 MediaItem（先用占位信息，CarPlay 立即显示歌曲名）
-    final mediaItem = MediaItem(
+    // 先设置 MediaItem（CarPlay 立即显示歌曲名）
+    _currentMediaItem = MediaItem(
       id: song.id,
       title: song.name,
       artist: song.singer,
@@ -120,7 +118,7 @@ class PlayerService {
       artUri: song.cover.isNotEmpty ? Uri.parse(song.cover) : null,
     );
     try {
-      await AudioService.setMediaItem(mediaItem);
+      await AudioService.updateMediaItem(_currentMediaItem!);
     } catch (_) {}
 
     // 并行获取 URL + 封面
@@ -133,21 +131,16 @@ class PlayerService {
 
     if (coverUrl != null && coverUrl.isNotEmpty) {
       song.cover = coverUrl;
-      // 更新 CarPlay/锁屏 封面
+      _currentMediaItem = _currentMediaItem!.copyWith(
+        artUri: Uri.parse(coverUrl),
+      );
       try {
-        AudioService.updateMediaItem(mediaItem.copyWith(
-          artUri: Uri.parse(coverUrl),
-        ));
+        AudioService.updateMediaItem(_currentMediaItem!);
       } catch (_) {}
     }
     if (url == null || url.isEmpty) return;
 
-    await _player.setAudioSource(AudioSource.uri(
-      Uri.parse(url),
-      tag: mediaItem.copyWith(
-        artUri: song.cover.isNotEmpty ? Uri.parse(song.cover) : null,
-      ),
-    ));
+    await _player.setAudioSource(AudioSource.uri(Uri.parse(url)));
 
     _player.play();
 
@@ -216,12 +209,13 @@ class _AudioPlayerTask extends BaseAudioHandler {
     // 歌曲 ready 时更新 MediaItem（包含实际时长）
     _player.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.ready) {
-        final tag = _player.audioSource?.tag;
-        if (tag is MediaItem) {
-          final updated = tag.copyWith(
+        final item = PlayerService()._currentMediaItem;
+        if (item != null) {
+          final updated = item.copyWith(
             duration: _player.duration ?? Duration.zero,
           );
           mediaItem.add(updated);
+          PlayerService()._currentMediaItem = updated;
           try { AudioService.updateMediaItem(updated); } catch (_) {}
         }
       }
