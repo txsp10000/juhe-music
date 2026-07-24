@@ -6,6 +6,13 @@ import '../utils/toast.dart';
 import 'playlist_page.dart';
 import 'search_result_page.dart';
 
+/// LRC 歌词行
+class _LrcLine {
+  final int timeMs;
+  final String text;
+  const _LrcLine(this.timeMs, this.text);
+}
+
 class PlayerPage extends StatefulWidget {
   const PlayerPage({super.key});
 
@@ -18,8 +25,7 @@ class _PlayerPageState extends State<PlayerPage> {
   bool _isFavorite = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
-
-
+  List<_LrcLine> _parsedLrc = [];
 
   @override
   void initState() {
@@ -29,7 +35,11 @@ class _PlayerPageState extends State<PlayerPage> {
     };
     _player.onPlayStateChanged = (_) => mounted ? setState(() {}) : null;
     _player.onSongChanged = (s) {
-      if (mounted) { setState(() {}); _checkFavorite(); }
+      if (mounted) {
+        _parsedLrc = _parseLrc(s.lyric);
+        setState(() {});
+        _checkFavorite();
+      }
     };
     _syncState();
     _checkFavorite();
@@ -38,6 +48,10 @@ class _PlayerPageState extends State<PlayerPage> {
   void _syncState() {
     if (_player.duration != null) _duration = _player.duration!;
     _position = _player.position;
+    final song = _player.currentSong;
+    if (song != null && _parsedLrc.isEmpty) {
+      _parsedLrc = _parseLrc(song.lyric);
+    }
   }
 
   Future<void> _checkFavorite() async {
@@ -70,23 +84,6 @@ class _PlayerPageState extends State<PlayerPage> {
     final s = d.inSeconds;
     return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
   }
-
-  void _loopToggle() {
-    _player.loopMode = (_player.loopMode + 1) % 3;
-    setState(() {});
-  }
-
-  IconData get _loopIcon => switch (_player.loopMode) {
-    1 => Icons.repeat_one,
-    2 => Icons.arrow_forward,
-    _ => Icons.repeat,
-  };
-
-  String get _loopLabel => switch (_player.loopMode) {
-    1 => '单曲循环',
-    2 => '顺序播放',
-    _ => '列表循环',
-  };
 
   void _showSearchSameSheet() {
     final song = _player.currentSong;
@@ -122,10 +119,103 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
+  /// 解析 LRC 歌词
+  List<_LrcLine> _parseLrc(String? lyric) {
+    if (lyric == null || lyric.isEmpty) return [];
+    final lines = <_LrcLine>[];
+    final regex = RegExp(r'\[(\d{2}):(\d{2})(?:[.:](\d{2,3}))?\](.*)');
+    for (final line in lyric.split('\n')) {
+      final match = regex.firstMatch(line.trim());
+      if (match != null) {
+        final min = int.parse(match.group(1)!);
+        final sec = int.parse(match.group(2)!);
+        var msStr = match.group(3);
+        var ms = 0;
+        if (msStr != null) {
+          ms = int.parse(msStr);
+          if (msStr.length == 2) ms *= 10;
+        }
+        final text = match.group(4)?.trim() ?? '';
+        if (text.isNotEmpty) {
+          lines.add(_LrcLine((min * 60 + sec) * 1000 + ms, text));
+        }
+      }
+    }
+    lines.sort((a, b) => a.timeMs.compareTo(b.timeMs));
+    return lines;
+  }
+
+  /// 获取当前播放位置对应的歌词行
+  int _currentLrcIndex() {
+    if (_parsedLrc.isEmpty) return -1;
+    final posMs = _position.inMilliseconds;
+    var idx = -1;
+    for (var i = 0; i < _parsedLrc.length; i++) {
+      if (_parsedLrc[i].timeMs <= posMs) {
+        idx = i;
+      } else {
+        break;
+      }
+    }
+    return idx;
+  }
+
+  Widget _buildLyricArea() {
+    if (_parsedLrc.isEmpty) return const SizedBox.shrink();
+
+    final currentIdx = _currentLrcIndex();
+    final lines = <Widget>[];
+
+    // 上一行
+    if (currentIdx > 0) {
+      lines.add(Text(
+        _parsedLrc[currentIdx - 1].text,
+        style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 14),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ));
+      lines.add(const SizedBox(height: 6));
+    }
+
+    // 当前行
+    if (currentIdx >= 0) {
+      lines.add(Text(
+        _parsedLrc[currentIdx].text,
+        style: const TextStyle(color: Color(0xFF6890F9), fontSize: 16, fontWeight: FontWeight.w600),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ));
+      lines.add(const SizedBox(height: 6));
+    }
+
+    // 下一行
+    if (currentIdx >= 0 && currentIdx + 1 < _parsedLrc.length) {
+      lines.add(Text(
+        _parsedLrc[currentIdx + 1].text,
+        style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 13),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ));
+    }
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      child: Column(
+        key: ValueKey(currentIdx),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: lines,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final song = _player.currentSong;
     if (song == null) return const Scaffold(body: SizedBox());
+
+    final hasLrc = _parsedLrc.isNotEmpty;
+    final lyricText = !hasLrc && song.lyric.isNotEmpty ? _firstLyric(song.lyric) : null;
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -135,7 +225,7 @@ class _PlayerPageState extends State<PlayerPage> {
           child: Column(
             children: [
               _buildTopBar(),
-              Expanded(child: _buildCenterContent(song)),
+              Expanded(child: _buildCenterContent(song, lyricText)),
               _buildBottomActions(),
               _buildSeekBar(),
               _buildControls(),
@@ -159,7 +249,7 @@ class _PlayerPageState extends State<PlayerPage> {
           Column(
             children: [
               const Text('正在播放', style: TextStyle(color: Color(0xFF8F919A), fontSize: 12)),
-              const Text('FLAC 无损', style: TextStyle(color: Color(0xFF6890F9), fontSize: 11)),
+              const Text('24bit 无损', style: TextStyle(color: Color(0xFF6890F9), fontSize: 11)),
             ],
           ),
           const Spacer(),
@@ -172,7 +262,7 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  Widget _buildCenterContent(Song song) {
+  Widget _buildCenterContent(Song song, String? lyricText) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Column(
@@ -233,13 +323,20 @@ class _PlayerPageState extends State<PlayerPage> {
             ),
           ),
           const SizedBox(height: 24),
-          Text(
-            _firstLyric(song.lyric),
-            style: const TextStyle(color: Color(0xFF6C97FF), fontSize: 15),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
+          // 歌词区域
+          if (_parsedLrc.isNotEmpty)
+            _buildLyricArea()
+          else if (lyricText != null)
+            Text(
+              lyricText,
+              style: const TextStyle(color: Color(0xFF6C97FF), fontSize: 15),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            )
+          else
+            const Text('歌词加载中...',
+                style: TextStyle(color: Color(0xFF8F919A), fontSize: 15)),
         ],
       ),
     );
@@ -332,17 +429,6 @@ class _PlayerPageState extends State<PlayerPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          GestureDetector(
-            onTap: _loopToggle,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(_loopIcon, color: const Color(0xFF8F919A), size: 22),
-                const SizedBox(height: 4),
-                Text(_loopLabel, style: const TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
-              ],
-            ),
-          ),
           GestureDetector(
             onTap: _toggleFavorite,
             child: Column(

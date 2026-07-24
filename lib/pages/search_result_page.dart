@@ -4,7 +4,6 @@ import '../models/song.dart';
 import '../services/player_service.dart';
 import '../services/favorites_service.dart';
 import '../utils/toast.dart';
-import '../widgets/swipe_action_cell.dart';
 import 'player_page.dart';
 
 class SearchResultPage extends StatefulWidget {
@@ -73,12 +72,18 @@ class _SearchResultPageState extends State<SearchResultPage> {
   }
 
   Future<void> _favoriteAll() async {
+    // 过滤掉已收藏的
+    final notFav = _songs.where((s) => !_favoritedIds.contains(s.id)).toList();
+    if (notFav.isEmpty) {
+      if (mounted) Toast.show(context, '全部歌曲已收藏');
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E2030),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('确认收藏全部 ${_songs.length} 首歌曲？',
+        title: Text('确认收藏 ${notFav.length} 首歌曲？（共${_songs.length}首，已收藏${_songs.length - notFav.length}首）',
             style: const TextStyle(color: Colors.white, fontSize: 16)),
         actions: [
           TextButton(
@@ -92,12 +97,12 @@ class _SearchResultPageState extends State<SearchResultPage> {
       ),
     );
     if (confirmed != true) return;
-    for (final s in _songs) {
+    for (final s in notFav) {
       await FavoritesService.save(s);
     }
     if (mounted) {
       _checkFavoriteStates();
-      Toast.show(context, '已收藏全部 ${_songs.length} 首');
+      Toast.show(context, '已收藏 ${notFav.length} 首');
     }
   }
 
@@ -111,23 +116,6 @@ class _SearchResultPageState extends State<SearchResultPage> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _favoriteSong(Song song) async {
-    if (_favoritedIds.contains(song.id)) {
-      await FavoritesService.remove(song);
-      _favoritedIds.remove(song.id);
-      if (mounted) {
-        setState(() {});
-        Toast.show(context, '已取消收藏: ${song.name}');
-      }
-    } else {
-      await FavoritesService.save(song);
-      _favoritedIds.add(song.id);
-      if (mounted) {
-        setState(() {});
-        Toast.show(context, '已收藏: ${song.name}');
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -169,49 +157,45 @@ class _SearchResultPageState extends State<SearchResultPage> {
                     itemBuilder: (_, i) {
                       final s = _songs[i];
                       final isFav = _favoritedIds.contains(s.id);
-                      return SwipeActionCell(
-                        key: ValueKey('${s.id}_$isFav'),
-                        actionLabel: isFav ? '取消收藏' : '收藏',
-                        actionColor:
-                            isFav ? Colors.red : const Color(0xFF6890F9),
-                        onAction: () => _favoriteSong(s),
-                        child: InkWell(
-                          onTap: () => _playAt(i),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 20, vertical: 14),
-                            decoration: const BoxDecoration(
-                              border: Border(
-                                  bottom: BorderSide(
-                                      color: Color(0x15FFFFFF))),
-                            ),
-                            child: Row(
-                              children: [
-                                Text('${i + 1}',
-                                    style: const TextStyle(
-                                        color: Color(0xFF8F919A),
-                                        fontSize: 14)),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(s.name,
-                                          style: const TextStyle(
-                                              color: Color(0xFFE0E0E0),
-                                              fontSize: 16),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis),
-                                      Text(s.singer,
-                                          style: const TextStyle(
-                                              color: Color(0xFF8F919A),
-                                              fontSize: 13)),
-                                    ],
-                                  ),
+                      return InkWell(
+                        onTap: () => _playAt(i),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 14),
+                          decoration: const BoxDecoration(
+                            border: Border(
+                                bottom: BorderSide(
+                                    color: Color(0x15FFFFFF))),
+                          ),
+                          child: Row(
+                            children: [
+                              Text('${i + 1}',
+                                  style: const TextStyle(
+                                      color: Color(0xFF8F919A),
+                                      fontSize: 14)),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(s.name,
+                                        style: const TextStyle(
+                                            color: Color(0xFFE0E0E0),
+                                            fontSize: 16),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis),
+                                    Text(s.singer,
+                                        style: const TextStyle(
+                                            color: Color(0xFF8F919A),
+                                            fontSize: 13)),
+                                  ],
                                 ),
-                              ],
-                            ),
+                              ),
+                              if (isFav)
+                                const Icon(Icons.favorite,
+                                    color: Colors.red, size: 18),
+                            ],
                           ),
                         ),
                       );

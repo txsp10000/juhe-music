@@ -11,7 +11,6 @@ class PlayerService {
   final _player = AudioPlayer();
   final List<Song> playlist = [];
   int _currentIndex = -1;
-  int _loopMode = 0;
 
   /// 当前播放的 MediaItem（替代已废弃的 AudioSource.tag）
   MediaItem? _currentMediaItem;
@@ -21,8 +20,6 @@ class PlayerService {
           ? playlist[_currentIndex]
           : null;
   int get currentIndex => _currentIndex;
-  int get loopMode => _loopMode;
-  set loopMode(int v) => _loopMode = v;
   bool get isPlaying => _player.playing;
   Duration get position => _player.position;
   Duration? get duration => _player.duration;
@@ -67,17 +64,10 @@ class PlayerService {
   }
 
   void _onComplete() {
-    if (_loopMode == 1) {
-      _player.seek(Duration.zero);
-      _player.play();
-    } else if (_loopMode == 2) {
-      if (_currentIndex < playlist.length - 1) playAt(_currentIndex + 1);
-    } else {
-      if (_currentIndex < playlist.length - 1) {
-        playAt(_currentIndex + 1);
-      } else if (playlist.isNotEmpty) {
-        playAt(0);
-      }
+    if (_currentIndex < playlist.length - 1) {
+      playAt(_currentIndex + 1);
+    } else if (playlist.isNotEmpty) {
+      playAt(0);
     }
   }
 
@@ -121,13 +111,19 @@ class PlayerService {
       await AudioService.updateMediaItem(_currentMediaItem!);
     } catch (_) {}
 
-    // 并行获取 URL + 封面
+    // 并行获取 URL + 封面 + 歌词
     final results = await Future.wait([
       _fetchPlayUrl(song),
       MusicApi.getCover(picId),
+      MusicApi.getLyric(playId),
     ]);
     final url = results[0] as String?;
     final coverUrl = results[1] as String?;
+    final lyric = results[2] as String?;
+
+    if (lyric != null && lyric.isNotEmpty) {
+      song.lyric = lyric;
+    }
 
     if (coverUrl != null && coverUrl.isNotEmpty) {
       song.cover = coverUrl;
@@ -143,9 +139,6 @@ class PlayerService {
     await _player.setAudioSource(AudioSource.uri(Uri.parse(url)));
 
     _player.play();
-
-    // 异步获取歌词
-    MusicApi.getLyric(playId).then((lyric) => song.lyric = lyric);
 
     onSongChanged?.call(song);
   }
