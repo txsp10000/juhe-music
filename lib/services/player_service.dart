@@ -16,9 +16,6 @@ class PlayerService {
   final List<Song> playlist = [];
   int _currentIndex = -1;
 
-  Duration? _headerDuration;
-  Duration? _realDuration;
-
   /// 当前播放的 MediaItem（CarPlay / 锁屏显示）
   MediaItem? _currentMediaItem;
 
@@ -28,19 +25,8 @@ class PlayerService {
           : null;
   int get currentIndex => _currentIndex;
   bool get isPlaying => _player.playing;
-
-  Duration get position {
-    final pos = _player.position;
-    if (_headerDuration != null && _realDuration != null &&
-        _realDuration!.inMilliseconds > 0 &&
-        _realDuration! != _headerDuration!) {
-      final ratio = _headerDuration!.inMilliseconds / _realDuration!.inMilliseconds;
-      return Duration(milliseconds: (pos.inMilliseconds * ratio).round());
-    }
-    return pos;
-  }
-
-  Duration? get duration => _headerDuration ?? _player.duration;
+  Duration get position => _player.position;
+  Duration? get duration => _player.duration;
 
   void Function(bool playing)? onPlayStateChanged;
 
@@ -95,7 +81,7 @@ class PlayerService {
 
     // 用 positionStream 替代 Timer.periodic：由音频硬件时钟驱动，无跨平台轮询延迟
     instance._positionSub = instance._player.positionStream.listen((pos) {
-      instance._notifyProgress(instance.position, instance.duration);
+      instance._notifyProgress(pos, instance._player.duration);
     });
 
     instance._player.playerStateStream.listen((state) {
@@ -106,15 +92,10 @@ class PlayerService {
     });
 
     instance._player.durationStream.listen((dur) {
-      if (dur != null) {
-        instance._realDuration = dur;
-        print('[PlayerService] realDuration=${dur.inMilliseconds}ms, headerDuration=${instance._headerDuration?.inMilliseconds}ms');
-      }
-      final displayDur = instance._headerDuration ?? dur;
-      if (displayDur != null && instance._currentMediaItem != null) {
+      if (dur != null && instance._currentMediaItem != null) {
         try {
           AudioService.updateMediaItem(
-              instance._currentMediaItem!.copyWith(duration: displayDur));
+              instance._currentMediaItem!.copyWith(duration: dur));
         } catch (_) {}
       }
     });
@@ -149,17 +130,7 @@ class PlayerService {
   }
 
   Future<void> seek(Duration position) async {
-    if (_headerDuration != null && _realDuration != null &&
-        _realDuration!.inMilliseconds > 0 &&
-        _realDuration! != _headerDuration!) {
-      final ratio = _realDuration!.inMilliseconds / _headerDuration!.inMilliseconds;
-      final adjusted = Duration(milliseconds: (position.inMilliseconds * ratio).round());
-      print('[PlayerService] seek: requested=${position.inMilliseconds}ms, adjusted=${adjusted.inMilliseconds}ms, ratio=$ratio');
-      await _player.seek(adjusted);
-    } else {
-      print('[PlayerService] seek: direct=${position.inMilliseconds}ms (no compensation)');
-      await _player.seek(position);
-    }
+    await _player.seek(position);
   }
 
   Future<void> playAt(int index) async {
@@ -218,15 +189,13 @@ class PlayerService {
     }
     if (url == null || url.isEmpty) return;
 
-    // 3. 音频：本地缓存优先，没有则下载到本地
-    final audioCache = AudioCacheService();
-    final localPath = await audioCache.download(song.id, url);
-    if (localPath == null) return;
-
-    _headerDuration = audioCache.parseFlacDuration(localPath);
-    _realDuration = null;
-
-    await _player.setAudioSource(AudioSource.file(localPath));
+    // 3. 直接使用网络 URL 流式播放（和 Safari 一样通过 HTTP Range 实现精确 seek）
+    await _player.setAudioSource(
+      AudioSource.uri(
+        Uri.parse(url),
+        headers: const {'User-Agent': 'Mozilla/5.0'},
+      ),
+    );
     _player.play();
 
     _notifySongChange(song);
