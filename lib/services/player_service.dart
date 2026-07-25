@@ -15,6 +15,7 @@ class PlayerService {
   final _player = AudioPlayer();
   final List<Song> playlist = [];
   int _currentIndex = -1;
+  String? _currentAudioPath;
 
   /// 当前播放的 MediaItem（CarPlay / 锁屏显示）
   MediaItem? _currentMediaItem;
@@ -130,7 +131,16 @@ class PlayerService {
   }
 
   Future<void> seek(Duration position) async {
-    await _player.seek(position);
+    if (_currentAudioPath != null) {
+      final wasPlaying = _player.playing;
+      await _player.setAudioSource(
+        AudioSource.file(_currentAudioPath!),
+        initialPosition: position,
+      );
+      if (wasPlaying) _player.play();
+    } else {
+      await _player.seek(position);
+    }
   }
 
   Future<void> playAt(int index) async {
@@ -195,6 +205,7 @@ class PlayerService {
     if (localPath == null) return;
 
     await _player.setAudioSource(AudioSource.file(localPath));
+    _currentAudioPath = localPath;
     _player.play();
 
     _notifySongChange(song);
