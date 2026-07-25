@@ -16,6 +16,9 @@ class PlayerService {
   final List<Song> playlist = [];
   int _currentIndex = -1;
 
+  Duration? _headerDuration;
+  Duration? _realDuration;
+
   /// 当前播放的 MediaItem（CarPlay / 锁屏显示）
   MediaItem? _currentMediaItem;
 
@@ -25,8 +28,19 @@ class PlayerService {
           : null;
   int get currentIndex => _currentIndex;
   bool get isPlaying => _player.playing;
-  Duration get position => _player.position;
-  Duration? get duration => _player.duration;
+
+  Duration get position {
+    final pos = _player.position;
+    if (_headerDuration != null && _realDuration != null &&
+        _realDuration!.inMilliseconds > 0 &&
+        _realDuration! != _headerDuration!) {
+      final ratio = _headerDuration!.inMilliseconds / _realDuration!.inMilliseconds;
+      return Duration(milliseconds: (pos.inMilliseconds * ratio).round());
+    }
+    return pos;
+  }
+
+  Duration? get duration => _headerDuration ?? _player.duration;
 
   void Function(bool playing)? onPlayStateChanged;
 
@@ -81,7 +95,7 @@ class PlayerService {
 
     // 用 positionStream 替代 Timer.periodic：由音频硬件时钟驱动，无跨平台轮询延迟
     instance._positionSub = instance._player.positionStream.listen((pos) {
-      instance._notifyProgress(pos, instance._player.duration);
+      instance._notifyProgress(instance.position, instance.duration);
     });
 
     instance._player.playerStateStream.listen((state) {
@@ -92,10 +106,14 @@ class PlayerService {
     });
 
     instance._player.durationStream.listen((dur) {
-      if (dur != null && instance._currentMediaItem != null) {
+      if (dur != null) {
+        instance._realDuration = dur;
+      }
+      final displayDur = instance._headerDuration ?? dur;
+      if (displayDur != null && instance._currentMediaItem != null) {
         try {
           AudioService.updateMediaItem(
-              instance._currentMediaItem!.copyWith(duration: dur));
+              instance._currentMediaItem!.copyWith(duration: displayDur));
         } catch (_) {}
       }
     });
@@ -130,7 +148,15 @@ class PlayerService {
   }
 
   Future<void> seek(Duration position) async {
-    await _player.seek(position);
+    if (_headerDuration != null && _realDuration != null &&
+        _realDuration!.inMilliseconds > 0 &&
+        _realDuration! != _headerDuration!) {
+      final ratio = _realDuration!.inMilliseconds / _headerDuration!.inMilliseconds;
+      final adjusted = Duration(milliseconds: (position.inMilliseconds * ratio).round());
+      await _player.seek(adjusted);
+    } else {
+      await _player.seek(position);
+    }
   }
 
   Future<void> playAt(int index) async {
@@ -194,18 +220,10 @@ class PlayerService {
     final localPath = await audioCache.download(song.id, url);
     if (localPath == null) return;
 
-    final flacDuration = audioCache.parseFlacDuration(localPath);
-    if (flacDuration != null) {
-      await _player.setAudioSource(
-        ClippingAudioSource(
-          child: AudioSource.file(localPath),
-          start: Duration.zero,
-          end: flacDuration,
-        ),
-      );
-    } else {
-      await _player.setAudioSource(AudioSource.file(localPath));
-    }
+    _headerDuration = audioCache.parseFlacDuration(localPath);
+    _realDuration = null;
+
+    await _player.setAudioSource(AudioSource.file(localPath));
     _player.play();
 
     _notifySongChange(song);
