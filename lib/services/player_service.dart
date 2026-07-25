@@ -171,7 +171,7 @@ class PlayerService {
   void _startLyricTimer() {
     _lyricTimer?.cancel();
     _lyricTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      if (_seekMode || !_player.playing) return;
+      if (_seekMode) return;
       final posMs = _player.position.inMilliseconds;
       final durMs = _player.duration?.inMilliseconds ?? 0;
       final clampedMs = (durMs > 0 && posMs > durMs) ? durMs : posMs;
