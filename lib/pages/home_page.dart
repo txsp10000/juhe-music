@@ -50,16 +50,20 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   void _bindPlayer() {
-    _player.onProgress = (pos, dur) {
-      if (mounted) setState(() { _position = pos; _duration = dur ?? Duration.zero; });
-    };
-    _player.onSongChanged = (song) {
-      if (mounted) {
-        _parsedLrc = _parseLrc(song.lyric);
-        setState(() => _currentSong = song);
-      }
-    };
+    _player.addProgressListener(_onProgressUpdate);
+    _player.addSongChangeListener(_onSongChange);
     _player.onPlayStateChanged = (_) => mounted ? setState(() {}) : null;
+  }
+
+  void _onProgressUpdate(Duration pos, Duration? dur) {
+    if (mounted) setState(() { _position = pos; _duration = dur ?? Duration.zero; });
+  }
+
+  void _onSongChange(Song song) {
+    if (mounted) {
+      _parsedLrc = _parseLrc(song.lyric);
+      setState(() => _currentSong = song);
+    }
   }
 
   void _syncState() {
@@ -83,7 +87,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         var ms = 0;
         if (msStr != null) {
           ms = int.parse(msStr);
-          if (msStr.length == 2) ms *= 10;
+          switch (msStr.length) {
+            case 1: ms *= 100; break;
+            case 2: ms *= 10; break;
+          }
         }
         final text = match.group(4)?.trim() ?? '';
         if (text.isNotEmpty) {
@@ -95,16 +102,21 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return lines;
   }
 
-  /// 获取当前播放位置对应的歌词行
+  /// 获取当前播放位置对应的歌词行（二分查找 + iOS 音频输出延迟补偿）
   int _currentLrcIndex() {
     if (_parsedLrc.isEmpty) return -1;
-    final posMs = _position.inMilliseconds;
-    var idx = -1;
-    for (var i = 0; i < _parsedLrc.length; i++) {
-      if (_parsedLrc[i].timeMs <= posMs) {
-        idx = i;
+    // iOS 平台增加 80ms 延迟补偿，抵消音频输出滞后
+    final posMs = _position.inMilliseconds - 80;
+    int left = 0;
+    int right = _parsedLrc.length - 1;
+    int idx = -1;
+    while (left <= right) {
+      int mid = (left + right) ~/ 2;
+      if (_parsedLrc[mid].timeMs <= posMs) {
+        idx = mid;
+        left = mid + 1;
       } else {
-        break;
+        right = mid - 1;
       }
     }
     return idx;
@@ -112,6 +124,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _player.removeProgressListener(_onProgressUpdate);
+    _player.removeSongChangeListener(_onSongChange);
     _pulseController.dispose();
     super.dispose();
   }

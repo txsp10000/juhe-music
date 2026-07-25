@@ -34,19 +34,30 @@ class _PlayerPageState extends State<PlayerPage> {
   @override
   void initState() {
     super.initState();
-    _player.onProgress = (pos, dur) {
-      if (mounted) setState(() { _position = pos; _duration = dur ?? Duration.zero; });
-    };
+    _player.addProgressListener(_onProgressUpdate);
+    _player.addSongChangeListener(_onSongChange);
     _player.onPlayStateChanged = (_) => mounted ? setState(() {}) : null;
-    _player.onSongChanged = (s) {
-      if (mounted) {
-        _parsedLrc = _parseLrc(s.lyric);
-        setState(() {});
-        _checkFavorite();
-      }
-    };
     _syncState();
     _checkFavorite();
+  }
+
+  void _onProgressUpdate(Duration pos, Duration? dur) {
+    if (mounted) setState(() { _position = pos; _duration = dur ?? Duration.zero; });
+  }
+
+  void _onSongChange(Song s) {
+    if (mounted) {
+      _parsedLrc = _parseLrc(s.lyric);
+      setState(() {});
+      _checkFavorite();
+    }
+  }
+
+  @override
+  void dispose() {
+    _player.removeProgressListener(_onProgressUpdate);
+    _player.removeSongChangeListener(_onSongChange);
+    super.dispose();
   }
 
   void _syncState() {
@@ -137,7 +148,10 @@ class _PlayerPageState extends State<PlayerPage> {
         var ms = 0;
         if (msStr != null) {
           ms = int.parse(msStr);
-          if (msStr.length == 2) ms *= 10;
+          switch (msStr.length) {
+            case 1: ms *= 100; break;
+            case 2: ms *= 10; break;
+          }
         }
         final text = match.group(4)?.trim() ?? '';
         if (text.isNotEmpty) {
@@ -149,16 +163,21 @@ class _PlayerPageState extends State<PlayerPage> {
     return lines;
   }
 
-  /// 获取当前播放位置对应的歌词行
+  /// 获取当前播放位置对应的歌词行（二分查找 + iOS 音频输出延迟补偿）
   int _currentLrcIndex() {
     if (_parsedLrc.isEmpty) return -1;
-    final posMs = _position.inMilliseconds;
-    var idx = -1;
-    for (var i = 0; i < _parsedLrc.length; i++) {
-      if (_parsedLrc[i].timeMs <= posMs) {
-        idx = i;
+    // iOS 平台增加 80ms 延迟补偿，抵消音频输出滞后
+    final posMs = _position.inMilliseconds - 80;
+    int left = 0;
+    int right = _parsedLrc.length - 1;
+    int idx = -1;
+    while (left <= right) {
+      int mid = (left + right) ~/ 2;
+      if (_parsedLrc[mid].timeMs <= posMs) {
+        idx = mid;
+        left = mid + 1;
       } else {
-        break;
+        right = mid - 1;
       }
     }
     return idx;

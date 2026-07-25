@@ -26,9 +26,39 @@ class PlayerService {
   Duration get position => _player.position;
   Duration? get duration => _player.duration;
 
-  void Function(Song song)? onSongChanged;
-  void Function(Duration pos, Duration? dur)? onProgress;
   void Function(bool playing)? onPlayStateChanged;
+
+  // 多监听器列表（方案3：避免页面间互相覆盖回调）
+  final List<void Function(Duration, Duration?)> _progressListeners = [];
+  final List<void Function(Song)> _songChangeListeners = [];
+
+  void addProgressListener(void Function(Duration, Duration?) listener) {
+    _progressListeners.add(listener);
+  }
+
+  void removeProgressListener(void Function(Duration, Duration?) listener) {
+    _progressListeners.remove(listener);
+  }
+
+  void addSongChangeListener(void Function(Song) listener) {
+    _songChangeListeners.add(listener);
+  }
+
+  void removeSongChangeListener(void Function(Song) listener) {
+    _songChangeListeners.remove(listener);
+  }
+
+  void _notifyProgress(Duration pos, Duration? dur) {
+    for (final l in _progressListeners) {
+      l(pos, dur);
+    }
+  }
+
+  void _notifySongChange(Song song) {
+    for (final l in _songChangeListeners) {
+      l(song);
+    }
+  }
 
   // 快进/快退：纯虚拟位置方案（与 TV 逻辑一致）
   bool _seekMode = false;
@@ -165,7 +195,7 @@ class PlayerService {
 
     _startLyricTimer();
 
-    onSongChanged?.call(song);
+    _notifySongChange(song);
   }
 
   void _startLyricTimer() {
@@ -175,7 +205,7 @@ class PlayerService {
       final posMs = _player.position.inMilliseconds;
       final durMs = _player.duration?.inMilliseconds ?? 0;
       final clampedMs = (durMs > 0 && posMs > durMs) ? durMs : posMs;
-      onProgress?.call(
+      _notifyProgress(
         Duration(milliseconds: clampedMs),
         _player.duration,
       );
@@ -222,7 +252,7 @@ class PlayerService {
     final maxDur =
         _player.duration?.inMilliseconds ?? double.maxFinite.toInt();
     _virtualPosMs = (_virtualPosMs + deltaMs).clamp(0, maxDur);
-    onProgress?.call(
+    _notifyProgress(
       Duration(milliseconds: _virtualPosMs),
       _player.duration,
     );
@@ -235,7 +265,7 @@ class PlayerService {
     final maxDur =
         _player.duration?.inMilliseconds ?? double.maxFinite.toInt();
     _virtualPosMs = targetMs.clamp(0, maxDur);
-    onProgress?.call(
+    _notifyProgress(
       Duration(milliseconds: _virtualPosMs),
       _player.duration,
     );
@@ -258,7 +288,7 @@ class PlayerService {
       _seekMode = false;
       _seekEndTimeMs = DateTime.now().millisecondsSinceEpoch;
       _lastSeekTarget = _player.position.inMilliseconds;
-      onProgress?.call(_player.position, _player.duration);
+      _notifyProgress(_player.position, _player.duration);
       return;
     }
 
@@ -272,7 +302,8 @@ class PlayerService {
     final realSeekPos = _player.position.inMilliseconds;
     _lastSeekTarget = realSeekPos;
     _seekEndTimeMs = DateTime.now().millisecondsSinceEpoch;
-    onProgress?.call(
+    // 方案1：seek完成后立刻主动刷新进度，不等定时器
+    _notifyProgress(
       Duration(milliseconds: realSeekPos),
       _player.duration,
     );
