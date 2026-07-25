@@ -359,19 +359,12 @@ class _PlayerPageState extends State<PlayerPage> {
             icon: const Icon(Icons.skip_previous, color: Colors.white, size: 36),
             onPressed: () => _player.prev(),
           ),
-          GestureDetector(
-            onTap: () => _player.togglePlayPause(),
-            child: Container(
-              width: 64,
-              height: 64,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Color(0xFF6890F9),
-              ),
-              child: Icon(
-                _player.isPlaying ? Icons.pause : Icons.play_arrow,
-                color: Colors.white, size: 36,
-              ),
+          IconButton(
+            onPressed: () => _player.togglePlayPause(),
+            iconSize: 40,
+            icon: Icon(
+              _player.isPlaying ? Icons.pause : Icons.play_arrow,
+              color: Colors.white,
             ),
           ),
           IconButton(

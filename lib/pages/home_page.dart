@@ -127,29 +127,29 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     if (currentIdx > 0) {
       lines.add(Text(
         _parsedLrc[currentIdx - 1].text,
-        style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 16),
+        style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 18),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ));
-      lines.add(const SizedBox(height: 6));
+      lines.add(const SizedBox(height: 8));
     }
 
     // 当前行
     if (currentIdx >= 0) {
       lines.add(Text(
         _parsedLrc[currentIdx].text,
-        style: const TextStyle(color: Color(0xFF6890F9), fontSize: 18, fontWeight: FontWeight.w600),
+        style: const TextStyle(color: Color(0xFF6890F9), fontSize: 22, fontWeight: FontWeight.w600),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ));
-      lines.add(const SizedBox(height: 6));
+      lines.add(const SizedBox(height: 8));
     }
 
     // 下一行
     if (currentIdx >= 0 && currentIdx + 1 < _parsedLrc.length) {
       lines.add(Text(
         _parsedLrc[currentIdx + 1].text,
-        style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 15),
+        style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 17),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ));
@@ -254,7 +254,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           hasSong ? _currentSong!.singer : '搜索你喜欢的音乐',
                           style: const TextStyle(color: Color(0xFFF4F4F7), fontSize: 17),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 36),
                         if (hasSong)
                           _buildLyricArea(),
                         if (!hasSong || _parsedLrc.isEmpty)
@@ -265,64 +265,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                               style: const TextStyle(color: Color(0xFF8F919A), fontSize: 15),
                             ),
                           ),
-                        const SizedBox(height: 20),
-                        if (hasSong)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 40),
-                            child: Column(
-                              children: [
-                                SliderTheme(
-                                  data: SliderTheme.of(context).copyWith(
-                                    trackHeight: 4,
-                                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                                    activeTrackColor: const Color(0xFF6890F9),
-                                    inactiveTrackColor: const Color(0xFF2A2D3A),
-                                    thumbColor: const Color(0xFF6890F9),
-                                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                                  ),
-                                  child: Slider(
-                                    value: (_duration.inMilliseconds > 0
-                                        ? _position.inMilliseconds / _duration.inMilliseconds
-                                        : 0.0).clamp(0.0, 1.0),
-                                    onChanged: (v) {
-                                      final ms = (v * _duration.inMilliseconds).toInt();
-                                      _player.seekRelative(ms - _position.inMilliseconds);
-                                    },
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(_fmt(_position), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
-                                      Text(_fmt(_duration), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        if (hasSong) const SizedBox(height: 16),
-                        if (hasSong)
-                          AnimatedBuilder(
-                            animation: _pulseAnimation,
-                            builder: (_, child) => Transform.scale(
-                              scale: _pulseAnimation.value,
-                              child: child,
-                            ),
-                            child: GestureDetector(
-                              onTap: () => _openPlayer(),
-                              child: Container(
-                                width: 72,
-                                height: 72,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(Icons.graphic_eq, color: Colors.white, size: 36),
-                              ),
-                            ),
-                          ),
                       ],
                     ),
                   ),
@@ -330,7 +272,66 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ),
               if (hasSong)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                  child: Column(
+                    children: [
+                      SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 4,
+                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                          activeTrackColor: const Color(0xFF6890F9),
+                          inactiveTrackColor: const Color(0xFF2A2D3A),
+                          thumbColor: const Color(0xFF6890F9),
+                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                        ),
+                        child: Slider(
+                          value: (_duration.inMilliseconds > 0
+                              ? _position.inMilliseconds / _duration.inMilliseconds
+                              : 0.0).clamp(0.0, 1.0),
+                          onChanged: (v) {
+                            final ms = (v * _duration.inMilliseconds).toInt();
+                            _player.seekRelative(ms - _position.inMilliseconds);
+                          },
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(_fmt(_position), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
+                            Text(_fmt(_duration), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (hasSong)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12, bottom: 4),
+                  child: AnimatedBuilder(
+                    animation: _pulseAnimation,
+                    builder: (_, child) => Transform.scale(
+                      scale: _pulseAnimation.value,
+                      child: child,
+                    ),
+                    child: GestureDetector(
+                      onTap: () => _openPlayer(),
+                      child: Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.graphic_eq, color: Colors.white, size: 32),
+                      ),
+                    ),
+                  ),
+                ),
+              if (hasSong)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 6),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
