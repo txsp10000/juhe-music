@@ -129,6 +129,10 @@ class PlayerService {
     }
   }
 
+  Future<void> seek(Duration position) async {
+    await _player.seek(position);
+  }
+
   Future<void> playAt(int index) async {
     if (index < 0 || index >= playlist.length) return;
     _currentIndex = index;
@@ -284,7 +288,7 @@ class _AudioPlayerTask extends BaseAudioHandler {
   Future<void> stop() async => _player.stop();
 
   @override
-  Future<void> seek(Duration position) async {}
+  Future<void> seek(Duration position) async => _player.seek(position);
 
   @override
   Future<void> skipToNext() async => PlayerService().next();
