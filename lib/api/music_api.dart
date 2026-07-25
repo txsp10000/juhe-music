@@ -28,29 +28,6 @@ class MusicApi {
     throw lastError ?? Exception('重试30次后仍失败');
   }
 
-  /// 搜索歌曲（最多重试30次，空结果也重试）
-  static Future<List<Song>> search(String keyword, {int num = 20}) async {
-    final encoded = _enc(keyword);
-    var songs = <Song>[];
-    for (var attempt = 1; attempt <= 30; attempt++) {
-      try {
-        final url = '$_base?types=search&source=netease&name=$encoded&count=$num';
-        final body = await _httpGet(url);
-        final list = jsonDecode(body);
-        if (list is List) {
-          songs = list
-              .whereType<Map<String, dynamic>>()
-              .map((item) => Song.fromApiJson(item))
-              .where((s) => s.id.isNotEmpty)
-              .toList();
-          if (songs.isNotEmpty) break;
-        }
-      } catch (_) {}
-      if (attempt < 30) await Future.delayed(const Duration(seconds: 1));
-    }
-    return songs.take(num).toList();
-  }
-
   /// 搜索歌曲（返回原始响应体，用于错误展示）
   static Future<SearchRawResult> searchRaw(String keyword, {int num = 20}) async {
     final encoded = _enc(keyword);

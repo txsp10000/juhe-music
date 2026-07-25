@@ -23,17 +23,6 @@ class FavoritesService {
     await prefs.setStringList(_key, raw);
   }
 
-  static Future<void> removeAll(List<Song> songs) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getStringList(_key) ?? [];
-    final ids = songs.map((s) => '${s.id}_${s.source}').toSet();
-    raw.removeWhere((s) {
-      final item = Song.fromJson(jsonDecode(s));
-      return ids.contains('${item.id}_${item.source}');
-    });
-    await prefs.setStringList(_key, raw);
-  }
-
   static Future<void> remove(Song song) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList(_key) ?? [];
@@ -78,8 +67,4 @@ class SearchHistoryService {
     await prefs.setStringList(_key, list);
   }
 
-  static Future<void> clear() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_key);
-  }
 }

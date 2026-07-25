@@ -43,24 +43,4 @@ class LyricCacheService {
     } catch (_) {}
   }
 
-  /// 删除指定歌词缓存
-  Future<void> remove(String lyricId) async {
-    try {
-      final file = await _getFile(lyricId);
-      if (await file.exists()) {
-        await file.delete();
-      }
-    } catch (_) {}
-  }
-
-  /// 清空所有歌词缓存
-  Future<void> clearAll() async {
-    try {
-      final dir = await _getCacheDir();
-      if (await dir.exists()) {
-        await dir.delete(recursive: true);
-        _cacheDir = null;
-      }
-    } catch (_) {}
-  }
 }

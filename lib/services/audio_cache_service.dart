@@ -54,14 +54,4 @@ class AudioCacheService {
     return null;
   }
 
-  /// 删除指定音频缓存
-  Future<void> remove(String songId) async {
-    try {
-      final path = await getFilePath(songId);
-      final file = File(path);
-      if (await file.exists()) {
-        await file.delete();
-      }
-    } catch (_) {}
-  }
 }
