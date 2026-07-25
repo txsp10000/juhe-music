@@ -15,6 +15,7 @@ class PlayerService {
   final _player = AudioPlayer();
   final List<Song> playlist = [];
   int _currentIndex = -1;
+  String? _currentUrl;
 
   /// 当前播放的 MediaItem（CarPlay / 锁屏显示）
   MediaItem? _currentMediaItem;
@@ -130,7 +131,19 @@ class PlayerService {
   }
 
   Future<void> seek(Duration position) async {
-    await _player.seek(position);
+    if (_currentUrl == null || _currentUrl!.isEmpty) {
+      await _player.seek(position);
+      return;
+    }
+    final wasPlaying = _player.playing;
+    await _player.setAudioSource(
+      AudioSource.uri(
+        Uri.parse(_currentUrl!),
+        headers: const {'User-Agent': 'Mozilla/5.0'},
+      ),
+      initialPosition: position,
+    );
+    if (wasPlaying) _player.play();
   }
 
   Future<void> playAt(int index) async {
@@ -188,6 +201,8 @@ class PlayerService {
       } catch (_) {}
     }
     if (url == null || url.isEmpty) return;
+
+    _currentUrl = url;
 
     // 3. 直接使用网络 URL 流式播放（和 Safari 一样通过 HTTP Range 实现精确 seek）
     await _player.setAudioSource(
@@ -289,7 +304,7 @@ class _AudioPlayerTask extends BaseAudioHandler {
   Future<void> stop() async => _player.stop();
 
   @override
-  Future<void> seek(Duration position) async => _player.seek(position);
+  Future<void> seek(Duration position) async => PlayerService().seek(position);
 
   @override
   Future<void> skipToNext() async => PlayerService().next();
