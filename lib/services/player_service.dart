@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_service/audio_service.dart';
@@ -189,12 +190,17 @@ class PlayerService {
     }
     if (url == null || url.isEmpty) return;
 
-    // 3. 音频：本地缓存优先，没有则下载到本地
+    // 3. 使用 LockCachingAudioSource：首次播放从网络流式加载并缓存到本地，
+    //    之后直接用本地缓存。网络流式播放 seek 精度远高于本地文件模式。
     final audioCache = AudioCacheService();
-    final localPath = await audioCache.download(song.id, url);
-    if (localPath == null) return;
-
-    await _player.setAudioSource(AudioSource.file(localPath));
+    final cacheFile = File(await audioCache.getFilePath(song.id, url));
+    await _player.setAudioSource(
+      LockCachingAudioSource(
+        Uri.parse(url),
+        cacheFile: cacheFile,
+        headers: const {'User-Agent': 'Mozilla/5.0'},
+      ),
+    );
     _player.play();
 
     _notifySongChange(song);
