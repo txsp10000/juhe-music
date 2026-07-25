@@ -317,7 +317,7 @@ class _PlayerPageState extends State<PlayerPage> {
                 ),
                 const SizedBox(height: 2),
                 const Text(
-                  '24bit 无损',
+                  '320kbps 高品质',
                   style: TextStyle(color: Color(0xFF6890F9), fontSize: 12),
                   textAlign: TextAlign.center,
                 ),
