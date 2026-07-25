@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_service/audio_service.dart';
 import '../models/song.dart';
@@ -232,6 +233,8 @@ class PlayerService {
 class _AudioPlayerTask extends BaseAudioHandler {
   final _player = PlayerService()._player;
 
+  static const _nowPlayingChannel = MethodChannel('com.miaomiao.music/nowplaying');
+
   _AudioPlayerTask() {
     _player.playbackEventStream.listen((event) {
       playbackState.add(playbackState.value.copyWith(
@@ -246,6 +249,7 @@ class _AudioPlayerTask extends BaseAudioHandler {
         bufferedPosition: _player.bufferedPosition,
         speed: _player.speed,
       ));
+      _syncNowPlaying();
     });
 
     _player.playerStateStream.listen((state) {
@@ -258,8 +262,23 @@ class _AudioPlayerTask extends BaseAudioHandler {
           mediaItem.add(updated);
           PlayerService()._currentMediaItem = updated;
           try { AudioService.updateMediaItem(updated); } catch (_) {}
+          _syncNowPlaying();
         }
       }
+    });
+  }
+
+  /// 直接更新 MPNowPlayingInfoCenter（绕过 audio_service 的时机问题）
+  void _syncNowPlaying() {
+    final item = PlayerService()._currentMediaItem;
+    if (item == null) return;
+    _nowPlayingChannel.invokeMethod('update', {
+      'title': item.title,
+      'artist': item.artist,
+      'album': item.album ?? '',
+      'duration': (_player.duration?.inMilliseconds ?? 0) / 1000.0,
+      'elapsedTime': _player.position.inMilliseconds / 1000.0,
+      'playbackRate': _player.playing ? 1.0 : 0.0,
     });
   }
 
