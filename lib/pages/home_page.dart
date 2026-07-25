@@ -73,7 +73,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   List<_LrcLine> _parseLrc(String? lyric) {
     if (lyric == null || lyric.isEmpty) return [];
     final lines = <_LrcLine>[];
-    final regex = RegExp(r'\[(\d{2}):(\d{2})(?:[.:](\d{2,3}))?\](.*)');
+    final regex = RegExp(r'\[(\d{2}):(\d{2})(?:\.(\d{1,3}))?\](.*)');
     for (final line in lyric.split('\n')) {
       final match = regex.firstMatch(line.trim());
       if (match != null) {
@@ -83,7 +83,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         var ms = 0;
         if (msStr != null) {
           ms = int.parse(msStr);
-          if (msStr.length == 2) ms *= 10; // 百分秒 → 毫秒
+          if (msStr.length == 2) ms *= 10;
         }
         final text = match.group(4)?.trim() ?? '';
         if (text.isNotEmpty) {
@@ -273,7 +273,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ),
               if (hasSong)
                 Padding(
-                  padding: const EdgeInsets.only(top: 12, bottom: 4),
+                  padding: const EdgeInsets.only(top: 12, bottom: 8),
                   child: AnimatedBuilder(
                     animation: _pulseAnimation,
                     builder: (_, child) => Transform.scale(

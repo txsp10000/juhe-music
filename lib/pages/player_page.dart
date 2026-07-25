@@ -127,7 +127,7 @@ class _PlayerPageState extends State<PlayerPage> {
   List<_LrcLine> _parseLrc(String? lyric) {
     if (lyric == null || lyric.isEmpty) return [];
     final lines = <_LrcLine>[];
-    final regex = RegExp(r'\[(\d{2}):(\d{2})(?:[.:](\d{2,3}))?\](.*)');
+    final regex = RegExp(r'\[(\d{2}):(\d{2})(?:\.(\d{1,3}))?\](.*)');
     for (final line in lyric.split('\n')) {
       final match = regex.firstMatch(line.trim());
       if (match != null) {

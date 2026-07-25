@@ -82,7 +82,8 @@ class PlayerService {
     });
     instance._player.playerStateStream.listen((state) {
       instance.onPlayStateChanged?.call(state.playing);
-      if (state.processingState == ProcessingState.completed) {
+      if (state.processingState == ProcessingState.completed &&
+          !instance._seekMode) {
         instance._onComplete();
       }
     });
@@ -128,6 +129,12 @@ class PlayerService {
     if (index < 0 || index >= playlist.length) return;
     _currentIndex = index;
     final song = playlist[index];
+
+    // 重置 seek 状态，避免上一首歌的防跳保护污染新歌进度
+    _seekMode = false;
+    _seekResumeTimer?.cancel();
+    _lastSeekTarget = -1;
+    _seekEndTimeMs = 0;
 
     final playId = song.lyricId.isNotEmpty ? song.lyricId : song.id;
     final picId = song.picId.isNotEmpty ? song.picId : song.id;
