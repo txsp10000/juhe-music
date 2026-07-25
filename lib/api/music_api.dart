@@ -55,7 +55,7 @@ class MusicApi {
   /// 获取播放URL（999=24bit FLAC无损，最多重试30次）
   static Future<String> getPlayUrl(String trackId) async {
     return _retry(() async {
-      final url = '$_base?types=url&source=netease&id=${_enc(trackId)}&br=999';
+      final url = '$_base?types=url&source=netease&id=${_enc(trackId)}&br=320';
       final body = await _httpGet(url);
       final json = jsonDecode(body);
       final u = json['url'] as String?;

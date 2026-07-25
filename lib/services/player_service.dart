@@ -131,19 +131,7 @@ class PlayerService {
   }
 
   Future<void> seek(Duration position) async {
-    if (_currentUrl == null || _currentUrl!.isEmpty) {
-      await _player.seek(position);
-      return;
-    }
-    final wasPlaying = _player.playing;
-    await _player.setAudioSource(
-      AudioSource.uri(
-        Uri.parse(_currentUrl!),
-        headers: const {'User-Agent': 'Mozilla/5.0'},
-      ),
-      initialPosition: position,
-    );
-    if (wasPlaying) _player.play();
+    await _player.seek(position);
   }
 
   Future<void> playAt(int index) async {
