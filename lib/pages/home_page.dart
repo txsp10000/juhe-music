@@ -237,39 +237,58 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
               ),
               Expanded(
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.only(top: 30),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          hasSong ? _currentSong!.name : '苗苗music',
-                          style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          hasSong ? _currentSong!.singer : '搜索你喜欢的音乐',
-                          style: const TextStyle(color: Color(0xFFF4F4F7), fontSize: 17),
-                        ),
-                        const SizedBox(height: 36),
-                        if (hasSong)
-                          _buildLyricArea(),
-                        if (!hasSong || _parsedLrc.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              hasSong ? '暂无歌词' : '点击右上角搜索框开始',
-                              style: const TextStyle(color: Color(0xFF8F919A), fontSize: 15),
-                            ),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 30),
+                  child: Column(
+                    children: [
+                      Text(
+                        hasSong ? _currentSong!.name : '苗苗music',
+                        style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        hasSong ? _currentSong!.singer : '搜索你喜欢的音乐',
+                        style: const TextStyle(color: Color(0xFFF4F4F7), fontSize: 17),
+                      ),
+                      const Spacer(),
+                      if (hasSong)
+                        _buildLyricArea(),
+                      if (!hasSong || _parsedLrc.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            hasSong ? '暂无歌词' : '点击右上角搜索框开始',
+                            style: const TextStyle(color: Color(0xFF8F919A), fontSize: 15),
                           ),
-                      ],
-                    ),
+                        ),
+                      const Spacer(),
+                    ],
                   ),
                 ),
               ),
+              if (hasSong)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12, bottom: 4),
+                  child: AnimatedBuilder(
+                    animation: _pulseAnimation,
+                    builder: (_, child) => Transform.scale(
+                      scale: _pulseAnimation.value,
+                      child: child,
+                    ),
+                    child: GestureDetector(
+                      onTap: () => _openPlayer(),
+                      child: Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.graphic_eq, color: Colors.white, size: 32),
+                      ),
+                    ),
+                  ),
+                ),
               if (hasSong)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -305,28 +324,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         ),
                       ),
                     ],
-                  ),
-                ),
-              if (hasSong)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12, bottom: 4),
-                  child: AnimatedBuilder(
-                    animation: _pulseAnimation,
-                    builder: (_, child) => Transform.scale(
-                      scale: _pulseAnimation.value,
-                      child: child,
-                    ),
-                    child: GestureDetector(
-                      onTap: () => _openPlayer(),
-                      child: Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.graphic_eq, color: Colors.white, size: 32),
-                      ),
-                    ),
                   ),
                 ),
               if (hasSong)
