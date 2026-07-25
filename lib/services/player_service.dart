@@ -202,7 +202,13 @@ class PlayerService {
     _lyricTimer?.cancel();
     _lyricTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
       if (_seekMode) return;
-      final posMs = _player.position.inMilliseconds;
+      var posMs = _player.position.inMilliseconds;
+      // seek后1秒内保持不低于目标值，防止播放器位置回跳
+      if (_lastSeekTarget >= 0 &&
+          DateTime.now().millisecondsSinceEpoch - _seekEndTimeMs < 1000 &&
+          posMs < _lastSeekTarget) {
+        posMs = _lastSeekTarget;
+      }
       final durMs = _player.duration?.inMilliseconds ?? 0;
       final clampedMs = (durMs > 0 && posMs > durMs) ? durMs : posMs;
       _notifyProgress(
@@ -294,11 +300,11 @@ class PlayerService {
     } catch (_) {}
 
     _seekMode = false;
-    final realSeekPos = _player.position.inMilliseconds;
-    _lastSeekTarget = realSeekPos;
+    // 用目标值而非播放器实际落点，避免流媒体 seek 偏差
+    _lastSeekTarget = targetPos;
     _seekEndTimeMs = DateTime.now().millisecondsSinceEpoch;
     _notifyProgress(
-      Duration(milliseconds: realSeekPos),
+      Duration(milliseconds: targetPos),
       _player.duration,
     );
   }
