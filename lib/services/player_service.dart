@@ -3,6 +3,8 @@ import 'package:just_audio/just_audio.dart';
 import 'package:audio_service/audio_service.dart';
 import '../models/song.dart';
 import '../api/music_api.dart';
+import 'lyric_cache_service.dart';
+import 'audio_cache_service.dart';
 
 class PlayerService {
   static final PlayerService _instance = PlayerService._();
@@ -76,9 +78,6 @@ class PlayerService {
   static const int _seekFreezeMaxMs = 600;
   /// 偏差阈值：播放器位置与冻结目标偏差小于此值时切回
   static const int _seekConvergeMs = 300;
-
-  /// 当前歌曲的本地缓存音源，切歌时清理
-  LockCachingAudioSource? _cachingSource;
 
   // 歌词独立轮询定时器
   Timer? _lyricTimer;
@@ -174,19 +173,32 @@ class PlayerService {
       await AudioService.updateMediaItem(_currentMediaItem!);
     } catch (_) {}
 
-    // 并行获取 URL + 封面 + 歌词
+    // 1. 先处理歌词：本地缓存优先，没有则下载并缓存到本地
+    final lyricCache = LyricCacheService();
+    String? lyric = await lyricCache.load(playId);
+    if (lyric == null || lyric.isEmpty) {
+      // 本地无缓存，从网络下载歌词
+      lyric = await MusicApi.getLyric(playId);
+      if (lyric != null && lyric.isNotEmpty) {
+        await lyricCache.save(playId, lyric);
+        // 同步缓存 playlist 中同 lyricId 歌曲的歌词
+        for (final s in playlist) {
+          final sid = s.lyricId.isNotEmpty ? s.lyricId : s.id;
+          if (sid == playId) {
+            s.lyric = lyric!;
+          }
+        }
+      }
+    }
+    song.lyric = lyric ?? '';
+
+    // 2. 歌词已缓存完毕，再获取播放地址和封面
     final results = await Future.wait([
       _fetchPlayUrl(song),
       MusicApi.getCover(picId),
-      MusicApi.getLyric(playId),
     ]);
     final url = results[0] as String?;
     final coverUrl = results[1] as String?;
-    final lyric = results[2] as String?;
-
-    if (lyric != null && lyric.isNotEmpty) {
-      song.lyric = lyric;
-    }
 
     if (coverUrl != null && coverUrl.isNotEmpty) {
       song.cover = coverUrl;
@@ -199,24 +211,12 @@ class PlayerService {
     }
     if (url == null || url.isEmpty) return;
 
-    // 关键：用 LockCachingAudioSource 边下边播（缓存到本地文件）
-    // 远程 MP3 流式 seek 时 AVPlayer 只能按平均码率估算字节偏移，
-    // VBR 文件没有帧索引会导致 seek 落点与请求时间不符
-    // （表现为时间显示 1:12 但唱的不是 1:12 那句）。
-    // 缓存成本地文件后可完整解析帧索引，seek 才能精准。
-    final oldCache = _cachingSource;
-    final cache = LockCachingAudioSource(Uri.parse(url));
-    _cachingSource = cache;
-    await _player.setAudioSource(cache);
+    // 3. 音频先完整下载到本地缓存，再播放
+    final audioCache = AudioCacheService();
+    final localPath = await audioCache.download(song.id, url);
+    if (localPath == null) return;
 
-    // 新音源已生效，再清理上一首的缓存文件，避免磁盘无限增长。
-    // 注意：下载未完成时 clearCache 会抛错，这里静默忽略（残留文件在系统临时目录，
-    // 会被 iOS 自动回收），不影响播放。
-    if (oldCache != null) {
-      try {
-        await oldCache.clearCache();
-      } catch (_) {}
-    }
+    await _player.setAudioSource(AudioSource.file(localPath));
 
     _player.play();
 
@@ -383,11 +383,6 @@ class PlayerService {
   void dispose() {
     _stopLyricTimer();
     _seekResumeTimer?.cancel();
-    final cache = _cachingSource;
-    _cachingSource = null;
-    if (cache != null) {
-      cache.clearCache().catchError((_) {});
-    }
     _player.dispose();
   }
 }
