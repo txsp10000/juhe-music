@@ -96,8 +96,11 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   String _fmt(Duration d) {
-    final s = d.inSeconds;
-    return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
+    final totalMs = d.inMilliseconds;
+    final min = totalMs ~/ 60000;
+    final sec = (totalMs % 60000) ~/ 1000;
+    final ms = totalMs % 1000;
+    return '${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}.${(ms ~/ 10).toString().padLeft(2, '0')}';
   }
 
   void _showSearchSameSheet() {
@@ -132,6 +135,21 @@ class _PlayerPageState extends State<PlayerPage> {
         ),
       ),
     );
+  }
+
+  /// 找到最接近目标时间的歌词行时间戳（精确到毫秒）
+  int _snapToNearestLyric(int targetMs) {
+    if (_parsedLrc.isEmpty) return targetMs;
+    int nearest = _parsedLrc[0].timeMs;
+    int minDiff = (targetMs - nearest).abs();
+    for (final line in _parsedLrc) {
+      final diff = (targetMs - line.timeMs).abs();
+      if (diff < minDiff) {
+        minDiff = diff;
+        nearest = line.timeMs;
+      }
+    }
+    return nearest;
   }
 
   /// 解析 LRC 歌词
@@ -362,15 +380,19 @@ class _PlayerPageState extends State<PlayerPage> {
                 setState(() {});
               },
               onChanged: (v) {
-                _sliderValue = v;
                 final ms = (v * _duration.inMilliseconds).toInt();
-                _player.seekVirtual(ms);
+                final snappedMs = _snapToNearestLyric(ms);
+                _sliderValue = _duration.inMilliseconds > 0
+                    ? snappedMs / _duration.inMilliseconds
+                    : 0.0;
+                _player.seekVirtual(snappedMs);
                 setState(() {});
               },
               onChangeEnd: (v) {
                 _isDragging = false;
                 final ms = (v * _duration.inMilliseconds).toInt();
-                _player.seekVirtual(ms);
+                final snappedMs = _snapToNearestLyric(ms);
+                _player.seekVirtual(snappedMs);
                 _player.seekEnd();
                 setState(() {});
               },
