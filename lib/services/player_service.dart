@@ -70,7 +70,15 @@ class PlayerService {
 
   // seek 后用 wall-clock 计算进度（不依赖播放器 position，避免流媒体位置偏差）
   int _seekAnchorMs = -1;      // seek 目标位置（毫秒）
-  int _seekAnchorWallMs = 0;   // seek 完成时的 wall-clock（毫秒）
+  int _seekAnchorWallMs = 0;   // 音频开始输出时的 wall-clock（毫秒）
+
+  // —— 优化：锚点时机后移 + 偏差自适应收敛 ——
+  /// 标记 seek 后处于缓冲阶段，等播放器就绪回调中打锚点
+  bool _isSeekingBuffering = false;
+  /// 收敛阈值：墙钟与真实位置偏差小于该值时自动切回原生进度
+  final int _convergeThresholdMs = 150;
+  /// 最大偏差阈值：超过该值时强制切回，防止锚点异常
+  final int _maxDeviationMs = 500;
 
   // 歌词独立轮询定时器
   Timer? _lyricTimer;
@@ -97,6 +105,13 @@ class PlayerService {
       if (state.processingState == ProcessingState.completed &&
           !instance._seekMode) {
         instance._onComplete();
+      }
+      // seek 后缓冲结束、音频开始输出时打墙钟锚点
+      if (state.processingState == ProcessingState.ready &&
+          state.playing &&
+          instance._isSeekingBuffering) {
+        instance._seekAnchorWallMs = DateTime.now().millisecondsSinceEpoch;
+        instance._isSeekingBuffering = false;
       }
     });
     // 监听 duration 变化，更新 Now Playing
@@ -148,6 +163,8 @@ class PlayerService {
     _seekMode = false;
     _seekResumeTimer?.cancel();
     _seekAnchorMs = -1;
+    _seekAnchorWallMs = 0;
+    _isSeekingBuffering = false;
     _stopLyricTimer();
 
     final playId = song.lyricId.isNotEmpty ? song.lyricId : song.id;
@@ -202,22 +219,49 @@ class PlayerService {
   void _startLyricTimer() {
     _lyricTimer?.cancel();
     _lyricTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      // 拖动中直接跳过，沿用虚拟位置逻辑
       if (_seekMode) return;
 
       int posMs;
-      if (_seekAnchorMs >= 0) {
-        // seek 后 5 秒内用 wall-clock 计算进度：目标位置 + 经过时间
-        // 避免播放器 position 在流媒体 seek 后不准导致的显示偏差
-        final elapsed = DateTime.now().millisecondsSinceEpoch - _seekAnchorWallMs;
-        if (elapsed < 5000) {
-          posMs = _seekAnchorMs + elapsed;
-        } else {
-          // 5 秒后切换回播放器真实位置
-          _seekAnchorMs = -1;
-          posMs = _player.position.inMilliseconds;
+      final realPos = _player.position.inMilliseconds;
+
+      // 非播放状态（暂停/加载中）：直接用原生位置，停用墙钟补偿
+      if (!_player.playing) {
+        _seekAnchorMs = -1;
+        _seekAnchorWallMs = 0;
+        posMs = realPos;
+      }
+      // seek 补偿周期内：墙钟估算 + 偏差校验
+      else if (_seekAnchorMs >= 0) {
+        // 缓冲已结束，墙钟正常计时
+        if (_seekAnchorWallMs > 0) {
+          final elapsed =
+              DateTime.now().millisecondsSinceEpoch - _seekAnchorWallMs;
+          final wallPos = _seekAnchorMs + elapsed;
+          final diffMs = (wallPos - realPos).abs();
+
+          // 满足任一条件则切回原生进度：
+          // 1. 超过 5 秒兜底周期
+          // 2. 偏差小于收敛阈值，原生位置已稳定
+          // 3. 偏差过大，锚点异常，强制回归
+          if (elapsed > 5000 ||
+              diffMs < _convergeThresholdMs ||
+              diffMs > _maxDeviationMs) {
+            _seekAnchorMs = -1;
+            _seekAnchorWallMs = 0;
+            posMs = realPos;
+          } else {
+            posMs = wallPos;
+          }
         }
-      } else {
-        posMs = _player.position.inMilliseconds;
+        // 仍在 seek 缓冲中：进度停在目标位置，不提前走动
+        else {
+          posMs = _seekAnchorMs;
+        }
+      }
+      // 正常播放：直接用播放器原生位置
+      else {
+        posMs = realPos;
       }
 
       final durMs = _player.duration?.inMilliseconds ?? 0;
@@ -250,6 +294,8 @@ class PlayerService {
     if (_seekMode) return;
     _seekMode = true;
     _seekAnchorMs = -1; // 重置锚点，等 seekEnd 再设
+    _seekAnchorWallMs = 0;
+    _isSeekingBuffering = false;
     final realPos = _player.position.inMilliseconds;
     _virtualPosMs = realPos;
     // 安全超时：5秒内无 seekEnd 则自动提交，防止 seekMode 卡死
@@ -288,6 +334,7 @@ class PlayerService {
   Future<void> seekEnd() async {
     _seekResumeTimer?.cancel();
     if (!_seekMode) return;
+
     var targetPos = _virtualPosMs;
     final durMs = _player.duration?.inMilliseconds ?? 0;
 
@@ -296,22 +343,35 @@ class PlayerService {
       targetPos = targetPos.clamp(0, durMs - 500);
     }
 
-    // 位置差小于100ms直接跳过
+    // 微小位移跳过 seek
     if ((targetPos - _player.position.inMilliseconds).abs() < 100) {
       _seekMode = false;
+      _seekAnchorMs = -1;
+      _seekAnchorWallMs = 0;
+      _isSeekingBuffering = false;
       _notifyProgress(_player.position, _player.duration);
       return;
     }
 
     try {
       await _player.seek(Duration(milliseconds: targetPos));
-    } catch (_) {}
+    } catch (_) {
+      // seek 失败时重置所有补偿状态
+      _seekMode = false;
+      _seekAnchorMs = -1;
+      _seekAnchorWallMs = 0;
+      _isSeekingBuffering = false;
+      return;
+    }
 
     _seekMode = false;
 
-    // 用 wall-clock 锚点计算进度，不依赖播放器 position（流媒体 position 不准）
+    // 关键改动：只记录目标位置，不立刻打时间锚点
+    // 标记缓冲状态，等播放器真正出声时（playerStateStream 回调）再设置墙钟起点
     _seekAnchorMs = targetPos;
-    _seekAnchorWallMs = DateTime.now().millisecondsSinceEpoch;
+    _seekAnchorWallMs = 0;
+    _isSeekingBuffering = true;
+
     _notifyProgress(
       Duration(milliseconds: targetPos),
       _player.duration,
