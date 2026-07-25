@@ -69,16 +69,6 @@ class PlayerService {
   // 暴露 seekMode 给外部判断
   bool get isSeeking => _seekMode;
 
-  // —— 简化 seek 后进度方案 ——
-  // seek 后短暂冻结在目标位置，等播放器位置追上后切回原生位置
-  int _seekFreezeMs = -1;         // seek 冻结目标位置（-1 = 无冻结）
-  int _seekFreezeStartWallMs = 0; // 冻结开始的墙钟时间
-  /// 冻结最大时长（毫秒），超过后无条件切回原生位置
-  /// 本地缓存后 seek 很快生效，冻结只需覆盖极短的位置上报延迟
-  static const int _seekFreezeMaxMs = 600;
-  /// 偏差阈值：播放器位置与冻结目标偏差小于此值时切回
-  static const int _seekConvergeMs = 300;
-
   // 歌词独立轮询定时器
   Timer? _lyricTimer;
 
@@ -154,8 +144,6 @@ class PlayerService {
     // 重置 seek 状态
     _seekMode = false;
     _seekResumeTimer?.cancel();
-    _seekFreezeMs = -1;
-    _seekFreezeStartWallMs = 0;
     _stopLyricTimer();
 
     final playId = song.lyricId.isNotEmpty ? song.lyricId : song.id;
@@ -228,33 +216,10 @@ class PlayerService {
   void _startLyricTimer() {
     _lyricTimer?.cancel();
     _lyricTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      // 拖动中直接跳过，沿用虚拟位置逻辑
+      // 拖动中直接跳过
       if (_seekMode) return;
 
-      final realPosMs = _player.position.inMilliseconds;
-      int posMs;
-
-      // seek 冻结期：短暂显示目标位置，避免视觉回跳
-      if (_seekFreezeMs >= 0) {
-        final elapsed =
-            DateTime.now().millisecondsSinceEpoch - _seekFreezeStartWallMs;
-        final diff = (realPosMs - _seekFreezeMs).abs();
-
-        // 切回原生位置的条件（满足任一）：
-        // 1. 播放器位置已经追上冻结目标（偏差 < _seekConvergeMs）
-        // 2. 冻结时间超过上限
-        if (diff < _seekConvergeMs || elapsed > _seekFreezeMaxMs) {
-          _seekFreezeMs = -1;
-          _seekFreezeStartWallMs = 0;
-          posMs = realPosMs;
-        } else {
-          // 仍在冻结期：显示目标位置
-          posMs = _seekFreezeMs;
-        }
-      } else {
-        // 正常播放：直接用播放器原生位置
-        posMs = realPosMs;
-      }
+      final posMs = _player.position.inMilliseconds;
 
       final durMs = _player.duration?.inMilliseconds ?? 0;
       final clampedMs = (durMs > 0 && posMs > durMs) ? durMs : posMs;
@@ -285,8 +250,6 @@ class PlayerService {
     _seekResumeTimer?.cancel();
     if (_seekMode) return;
     _seekMode = true;
-    _seekFreezeMs = -1;
-    _seekFreezeStartWallMs = 0;
     final realPos = _player.position.inMilliseconds;
     _virtualPosMs = realPos;
     // 安全超时：5秒内无 seekEnd 则自动提交，防止 seekMode 卡死
@@ -337,33 +300,23 @@ class PlayerService {
     // 微小位移跳过 seek
     if ((targetPos - _player.position.inMilliseconds).abs() < 100) {
       _seekMode = false;
-      _seekFreezeMs = -1;
-      _seekFreezeStartWallMs = 0;
       _notifyProgress(_player.position, _player.duration);
       return;
     }
 
     try {
       await _player.seek(Duration(milliseconds: targetPos));
+      // 等待播放器稳定，然后直接用实际位置（不再冻结）
+      await Future.delayed(const Duration(milliseconds: 80));
     } catch (_) {
-      // seek 失败时重置状态
       _seekMode = false;
-      _seekFreezeMs = -1;
-      _seekFreezeStartWallMs = 0;
       return;
     }
 
     _seekMode = false;
 
-    // 简化方案：seek 后冻结在目标位置，等播放器追上后切回原生
-    // 这避免了墙钟补偿导致的长时间位置偏差
-    _seekFreezeMs = targetPos;
-    _seekFreezeStartWallMs = DateTime.now().millisecondsSinceEpoch;
-
-    _notifyProgress(
-      Duration(milliseconds: targetPos),
-      _player.duration,
-    );
+    // 用播放器实际位置，保证显示和音频一致
+    _notifyProgress(_player.position, _player.duration);
   }
 
   /// 单次快进/快退（自动延时提交）
