@@ -62,7 +62,7 @@ class PlayerService {
   }
 
   // 歌词轮询定时器
-  Timer? _lyricTimer;
+  StreamSubscription<Duration>? _positionSub;
 
   /// 初始化 audio_service 和 just_audio
   static Future<void> init() async {
@@ -78,6 +78,11 @@ class PlayerService {
         androidShowNotificationBadge: false,
       ),
     );
+
+    // 用 positionStream 替代 Timer.periodic：由音频硬件时钟驱动，无跨平台轮询延迟
+    instance._positionSub = instance._player.positionStream.listen((pos) {
+      instance._notifyProgress(pos, instance._player.duration);
+    });
 
     instance._player.playerStateStream.listen((state) {
       instance.onPlayStateChanged?.call(state.playing);
@@ -119,10 +124,8 @@ class PlayerService {
   void togglePlayPause() {
     if (_player.playing) {
       _player.pause();
-      _stopLyricTimer();
     } else {
       _player.play();
-      _startLyricTimer();
     }
   }
 
@@ -130,8 +133,6 @@ class PlayerService {
     if (index < 0 || index >= playlist.length) return;
     _currentIndex = index;
     final song = playlist[index];
-
-    _stopLyricTimer();
 
     final playId = song.lyricId.isNotEmpty ? song.lyricId : song.id;
     final picId = song.picId.isNotEmpty ? song.picId : song.id;
@@ -192,26 +193,7 @@ class PlayerService {
     await _player.setAudioSource(AudioSource.file(localPath));
     _player.play();
 
-    _startLyricTimer();
     _notifySongChange(song);
-  }
-
-  void _startLyricTimer() {
-    _lyricTimer?.cancel();
-    _lyricTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      final posMs = _player.position.inMilliseconds;
-      final durMs = _player.duration?.inMilliseconds ?? 0;
-      final clampedMs = (durMs > 0 && posMs > durMs) ? durMs : posMs;
-      _notifyProgress(
-        Duration(milliseconds: clampedMs),
-        _player.duration,
-      );
-    });
-  }
-
-  void _stopLyricTimer() {
-    _lyricTimer?.cancel();
-    _lyricTimer = null;
   }
 
   Future<String?> _fetchPlayUrl(Song song) async {
@@ -224,7 +206,7 @@ class PlayerService {
   }
 
   void dispose() {
-    _stopLyricTimer();
+    _positionSub?.cancel();
     _player.dispose();
   }
 }
