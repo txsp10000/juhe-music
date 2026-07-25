@@ -59,27 +59,7 @@ class PlayerService {
       ),
     );
 
-    instance._player.positionStream.listen((pos) {
-      if (!instance._seekMode) {
-        var posMs = pos.inMilliseconds;
-        // seek后3秒内：跟踪最高位置，但不强制clamp（iOS seek精度不如Android）
-        final now = DateTime.now().millisecondsSinceEpoch;
-        if (instance._lastSeekTarget >= 0 &&
-            now - instance._seekEndTimeMs < 3000 &&
-            posMs > instance._lastSeekTarget) {
-          instance._lastSeekTarget = posMs;
-        }
-        // 边界保护
-        final durMs = instance._player.duration?.inMilliseconds ?? 0;
-        if (durMs > 0 && posMs > durMs) {
-          posMs = durMs;
-        }
-        instance.onProgress?.call(
-          Duration(milliseconds: posMs),
-          instance._player.duration,
-        );
-      }
-    });
+    // 进度更新统一由 _lyricTimer 驱动，不再使用 positionStream
     instance._player.playerStateStream.listen((state) {
       instance.onPlayStateChanged?.call(state.playing);
       if (state.processingState == ProcessingState.completed &&
@@ -190,7 +170,7 @@ class PlayerService {
 
   void _startLyricTimer() {
     _lyricTimer?.cancel();
-    _lyricTimer = Timer.periodic(const Duration(milliseconds: 150), (_) {
+    _lyricTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
       if (_seekMode || !_player.playing) return;
       final posMs = _player.position.inMilliseconds;
       final durMs = _player.duration?.inMilliseconds ?? 0;
