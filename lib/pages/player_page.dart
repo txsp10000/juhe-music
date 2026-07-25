@@ -27,10 +27,6 @@ class _PlayerPageState extends State<PlayerPage> {
   Duration _duration = Duration.zero;
   List<_LrcLine> _parsedLrc = [];
 
-  // seek 拖拽状态
-  bool _isDragging = false;
-  double _sliderValue = 0.0;
-
   @override
   void initState() {
     super.initState();
@@ -42,7 +38,12 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   void _onProgressUpdate(Duration pos, Duration? dur) {
-    if (mounted) setState(() { _position = pos; _duration = dur ?? Duration.zero; });
+    if (mounted) {
+      setState(() {
+        _position = pos;
+        _duration = dur ?? Duration.zero;
+      });
+    }
   }
 
   void _onSongChange(Song s) {
@@ -96,11 +97,8 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   String _fmt(Duration d) {
-    final totalMs = d.inMilliseconds;
-    final min = totalMs ~/ 60000;
-    final sec = (totalMs % 60000) ~/ 1000;
-    final ms = totalMs % 1000;
-    return '${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}.${(ms ~/ 10).toString().padLeft(2, '0')}';
+    final s = d.inSeconds;
+    return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
   }
 
   void _showSearchSameSheet() {
@@ -111,45 +109,43 @@ class _PlayerPageState extends State<PlayerPage> {
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E2030),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('搜索同名歌曲或歌手', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+        title: const Text('搜索同名歌曲或歌手',
+            style: TextStyle(
+                color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.music_note, color: Color(0xFF6890F9)),
-              title: Text('歌曲名: ${song.name}', style: const TextStyle(color: Colors.white)),
+              leading:
+                  const Icon(Icons.music_note, color: Color(0xFF6890F9)),
+              title: Text('歌曲名: ${song.name}',
+                  style: const TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(ctx);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => SearchResultPage(keyword: song.name)));
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) =>
+                            SearchResultPage(keyword: song.name)));
               },
             ),
             ListTile(
               leading: const Icon(Icons.person, color: Color(0xFF6890F9)),
-              title: Text('歌手: ${song.singer}', style: const TextStyle(color: Colors.white)),
+              title: Text('歌手: ${song.singer}',
+                  style: const TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(ctx);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => SearchResultPage(keyword: song.singer)));
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) =>
+                            SearchResultPage(keyword: song.singer)));
               },
             ),
           ],
         ),
       ),
     );
-  }
-
-  /// 找到最接近目标时间的歌词行时间戳（精确到毫秒）
-  int _snapToNearestLyric(int targetMs) {
-    if (_parsedLrc.isEmpty) return targetMs;
-    int nearest = _parsedLrc[0].timeMs;
-    int minDiff = (targetMs - nearest).abs();
-    for (final line in _parsedLrc) {
-      final diff = (targetMs - line.timeMs).abs();
-      if (diff < minDiff) {
-        minDiff = diff;
-        nearest = line.timeMs;
-      }
-    }
-    return nearest;
   }
 
   /// 解析 LRC 歌词
@@ -167,8 +163,12 @@ class _PlayerPageState extends State<PlayerPage> {
         if (msStr != null) {
           ms = int.parse(msStr);
           switch (msStr.length) {
-            case 1: ms *= 100; break;
-            case 2: ms *= 10; break;
+            case 1:
+              ms *= 100;
+              break;
+            case 2:
+              ms *= 10;
+              break;
           }
         }
         final text = match.group(4)?.trim() ?? '';
@@ -181,7 +181,7 @@ class _PlayerPageState extends State<PlayerPage> {
     return lines;
   }
 
-  /// 获取当前播放位置对应的歌词行（二分查找）
+  /// 二分查找当前播放位置对应的歌词行
   int _currentLrcIndex() {
     if (_parsedLrc.isEmpty) return -1;
     final posMs = _position.inMilliseconds;
@@ -206,7 +206,6 @@ class _PlayerPageState extends State<PlayerPage> {
     final currentIdx = _currentLrcIndex();
     final lines = <Widget>[];
 
-    // 前两行
     for (var i = currentIdx - 2; i < currentIdx; i++) {
       if (i >= 0) {
         lines.add(Text(
@@ -218,17 +217,18 @@ class _PlayerPageState extends State<PlayerPage> {
         lines.add(const SizedBox(height: 6));
       }
     }
-    // 当前行
     if (currentIdx >= 0) {
       lines.add(Text(
         _parsedLrc[currentIdx].text,
-        style: const TextStyle(color: Color(0xFF6890F9), fontSize: 21, fontWeight: FontWeight.w600),
+        style: const TextStyle(
+            color: Color(0xFF6890F9),
+            fontSize: 21,
+            fontWeight: FontWeight.w600),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ));
       lines.add(const SizedBox(height: 6));
     }
-    // 后三行
     for (var i = currentIdx + 1; i <= currentIdx + 3; i++) {
       if (i < _parsedLrc.length) {
         lines.add(Text(
@@ -258,7 +258,8 @@ class _PlayerPageState extends State<PlayerPage> {
     if (song == null) return const Scaffold(body: SizedBox());
 
     final hasLrc = _parsedLrc.isNotEmpty;
-    final lyricText = !hasLrc && song.lyric.isNotEmpty ? _firstLyric(song.lyric) : null;
+    final lyricText =
+        !hasLrc && song.lyric.isNotEmpty ? _firstLyric(song.lyric) : null;
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -270,7 +271,7 @@ class _PlayerPageState extends State<PlayerPage> {
               _buildTopBar(song),
               Expanded(child: _buildCenterContent(lyricText)),
               _buildBottomActions(),
-              _buildSeekBar(),
+              _buildTimeBar(),
               _buildControls(),
             ],
           ),
@@ -286,7 +287,8 @@ class _PlayerPageState extends State<PlayerPage> {
         children: [
           GestureDetector(
             onTap: () => Navigator.pop(context),
-            child: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 30),
+            child: const Icon(Icons.keyboard_arrow_down,
+                color: Colors.white, size: 30),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -295,7 +297,10 @@ class _PlayerPageState extends State<PlayerPage> {
               children: [
                 Text(
                   song.name,
-                  style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
@@ -319,8 +324,10 @@ class _PlayerPageState extends State<PlayerPage> {
           ),
           const SizedBox(width: 12),
           GestureDetector(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlaylistPage())),
-            child: const Icon(Icons.queue_music, color: Colors.white, size: 26),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const PlaylistPage())),
+            child:
+                const Icon(Icons.queue_music, color: Colors.white, size: 26),
           ),
         ],
       ),
@@ -333,7 +340,6 @@ class _PlayerPageState extends State<PlayerPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 歌词区域
           if (_parsedLrc.isNotEmpty)
             _buildLyricArea()
           else if (lyricText != null)
@@ -352,62 +358,18 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  Widget _buildSeekBar() {
-    final progress = _duration.inMilliseconds > 0
-        ? _position.inMilliseconds / _duration.inMilliseconds
-        : 0.0;
+  Widget _buildTimeBar() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              trackHeight: 3,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-              activeTrackColor: const Color(0xFF6890F9),
-              inactiveTrackColor: const Color(0xFF2A2D3A),
-              thumbColor: const Color(0xFF6890F9),
-              overlayColor: const Color(0x226890F9),
-            ),
-            child: Slider(
-              value: _isDragging
-                  ? _sliderValue
-                  : progress.clamp(0.0, 1.0),
-              onChangeStart: (v) {
-                _isDragging = true;
-                _sliderValue = v;
-                _player.seekStart();
-                setState(() {});
-              },
-              onChanged: (v) {
-                final ms = (v * _duration.inMilliseconds).toInt();
-                final snappedMs = _snapToNearestLyric(ms);
-                _sliderValue = _duration.inMilliseconds > 0
-                    ? snappedMs / _duration.inMilliseconds
-                    : 0.0;
-                _player.seekVirtual(snappedMs);
-                setState(() {});
-              },
-              onChangeEnd: (v) {
-                _isDragging = false;
-                final ms = (v * _duration.inMilliseconds).toInt();
-                final snappedMs = _snapToNearestLyric(ms);
-                _player.seekVirtual(snappedMs);
-                _player.seekEnd();
-                setState(() {});
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(_fmt(_position), style: const TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
-                Text(_fmt(_duration), style: const TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
-              ],
-            ),
-          ),
+          Text(_fmt(_position),
+              style:
+                  const TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
+          Text(_fmt(_duration),
+              style:
+                  const TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
         ],
       ),
     );
@@ -420,7 +382,8 @@ class _PlayerPageState extends State<PlayerPage> {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           IconButton(
-            icon: const Icon(Icons.skip_previous, color: Colors.white, size: 36),
+            icon: const Icon(Icons.skip_previous,
+                color: Colors.white, size: 36),
             onPressed: () => _player.prev(),
           ),
           IconButton(
@@ -457,7 +420,9 @@ class _PlayerPageState extends State<PlayerPage> {
                   size: 22,
                 ),
                 const SizedBox(height: 4),
-                Text(_isFavorite ? '已收藏' : '收藏', style: const TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
+                Text(_isFavorite ? '已收藏' : '收藏',
+                    style:
+                        const TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
               ],
             ),
           ),
@@ -468,7 +433,9 @@ class _PlayerPageState extends State<PlayerPage> {
               children: [
                 const Icon(Icons.search, color: Color(0xFF8F919A), size: 22),
                 const SizedBox(height: 4),
-                const Text('搜索同名', style: TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
+                const Text('搜索同名',
+                    style:
+                        TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
               ],
             ),
           ),
@@ -479,7 +446,11 @@ class _PlayerPageState extends State<PlayerPage> {
 
   String _firstLyric(String? lyric) {
     if (lyric == null || lyric.isEmpty) return '歌词加载中...';
-    return lyric.split('\n').firstWhere((l) => l.trim().isNotEmpty,
-        orElse: () => '歌词加载中...').replaceAll(RegExp(r'\[.*?\]'), '').trim();
+    return lyric
+        .split('\n')
+        .firstWhere((l) => l.trim().isNotEmpty,
+            orElse: () => '歌词加载中...')
+        .replaceAll(RegExp(r'\[.*?\]'), '')
+        .trim();
   }
 }

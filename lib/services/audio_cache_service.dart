@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 
@@ -9,7 +8,6 @@ class AudioCacheService {
   AudioCacheService._();
 
   static final _client = http.Client();
-  static const _channel = MethodChannel('com.miaomiao.music/converter');
   Directory? _cacheDir;
 
   Future<Directory> _getCacheDir() async {
@@ -22,77 +20,48 @@ class AudioCacheService {
     return _cacheDir!;
   }
 
-  /// 获取 MP3 缓存路径
-  Future<String> _getMp3Path(String songId) async {
+  /// 获取音频缓存文件路径
+  Future<String> getFilePath(String songId) async {
     final dir = await _getCacheDir();
     return '${dir.path}/$songId.mp3';
   }
 
-  /// 获取 WAV 缓存路径（用于精确 seek 播放）
-  Future<String> getWavPath(String songId) async {
-    final dir = await _getCacheDir();
-    return '${dir.path}/$songId.wav';
-  }
-
-  /// 检查 WAV 是否已缓存
+  /// 检查音频是否已缓存
   Future<bool> isCached(String songId) async {
-    final path = await getWavPath(songId);
+    final path = await getFilePath(songId);
     return File(path).exists();
   }
 
-  /// 下载 MP3 并转为 WAV，返回 WAV 路径
-  /// 返回 null 表示失败
-  Future<String?> downloadAndConvert(String songId, String url) async {
+  /// 下载音频到本地缓存，返回本地文件路径
+  /// 已缓存则直接返回，未缓存则下载
+  Future<String?> download(String songId, String url) async {
     try {
-      final wavPath = await getWavPath(songId);
+      final path = await getFilePath(songId);
+      final file = File(path);
 
-      // WAV 已缓存，直接返回
-      if (await File(wavPath).exists()) return wavPath;
+      if (await file.exists()) return path;
 
-      // 1. 下载 MP3
-      final mp3Path = await _getMp3Path(songId);
-      final mp3File = File(mp3Path);
-      if (!await mp3File.exists()) {
-        final response = await _client.get(
-          Uri.parse(url),
-          headers: {'User-Agent': 'Mozilla/5.0'},
-        );
-        if (response.statusCode != 200 || response.bodyBytes.isEmpty) {
-          return null;
-        }
-        await mp3File.writeAsBytes(response.bodyBytes);
+      final response = await _client.get(
+        Uri.parse(url),
+        headers: {'User-Agent': 'Mozilla/5.0'},
+      );
+
+      if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+        await file.writeAsBytes(response.bodyBytes);
+        return path;
       }
-
-      // 2. 调用原生平台通道转 WAV（AVAssetExportSession 帧精准）
-      try {
-        await _channel.invokeMethod('mp3ToWav', {
-          'input': mp3Path,
-          'output': wavPath,
-        });
-      } catch (_) {
-        // 转换失败时回退用 MP3
-        return mp3Path;
-      }
-
-      // 3. 转换成功后删除 MP3 节省空间
-      try { await mp3File.delete(); } catch (_) {}
-
-      return wavPath;
-    } catch (_) {
-      return null;
-    }
+    } catch (_) {}
+    return null;
   }
 
   /// 删除指定音频缓存
   Future<void> remove(String songId) async {
     try {
-      final wavPath = await getWavPath(songId);
-      final wavFile = File(wavPath);
-      if (await wavFile.exists()) await wavFile.delete();
-
-      final mp3Path = await _getMp3Path(songId);
-      final mp3File = File(mp3Path);
-      if (await mp3File.exists()) await mp3File.delete();
+      final path = await getFilePath(songId);
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
     } catch (_) {}
   }
 }
