@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_service/audio_service.dart';
@@ -190,13 +189,23 @@ class PlayerService {
     }
     if (url == null || url.isEmpty) return;
 
-    // 3. 直接使用网络 URL 播放
-    await _player.setAudioSource(
-      AudioSource.uri(
-        Uri.parse(url),
-        headers: const {'User-Agent': 'Mozilla/5.0'},
-      ),
-    );
+    // 3. 音频：本地缓存优先，没有则下载到本地
+    final audioCache = AudioCacheService();
+    final localPath = await audioCache.download(song.id, url);
+    if (localPath == null) return;
+
+    final flacDuration = audioCache.parseFlacDuration(localPath);
+    if (flacDuration != null) {
+      await _player.setAudioSource(
+        ClippingAudioSource(
+          child: AudioSource.file(localPath),
+          start: Duration.zero,
+          end: flacDuration,
+        ),
+      );
+    } else {
+      await _player.setAudioSource(AudioSource.file(localPath));
+    }
     _player.play();
 
     _notifySongChange(song);

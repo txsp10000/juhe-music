@@ -74,4 +74,29 @@ class AudioCacheService {
     return null;
   }
 
+  Duration? parseFlacDuration(String path) {
+    try {
+      final file = File(path);
+      final raf = file.openSync();
+      final header = raf.readSync(42);
+      raf.closeSync();
+      if (header.length < 42 ||
+          header[0] != 0x66 || header[1] != 0x4C ||
+          header[2] != 0x61 || header[3] != 0x43) {
+        return null;
+      }
+      final si = header.sublist(8, 42);
+      final sampleRate =
+          (si[10] << 12) | (si[11] << 4) | ((si[12] >> 4) & 0x0F);
+      if (sampleRate == 0) return null;
+      final totalSamples = ((si[13] & 0x0F) << 32) |
+          (si[14] << 24) | (si[15] << 16) | (si[16] << 8) | si[17];
+      if (totalSamples == 0) return null;
+      final ms = (totalSamples * 1000) ~/ sampleRate;
+      return Duration(milliseconds: ms);
+    } catch (_) {
+      return null;
+    }
+  }
+
 }
