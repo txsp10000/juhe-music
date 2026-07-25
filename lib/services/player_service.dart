@@ -64,8 +64,6 @@ class PlayerService {
   bool _seekMode = false;
   int _virtualPosMs = 0;
   Timer? _seekResumeTimer;
-  int _lastSeekTarget = -1;
-  int _seekEndTimeMs = 0;
 
   // 暴露 seekMode 给外部判断
   bool get isSeeking => _seekMode;
@@ -145,8 +143,6 @@ class PlayerService {
     // 重置 seek 状态，避免上一首歌的防跳保护污染新歌进度
     _seekMode = false;
     _seekResumeTimer?.cancel();
-    _lastSeekTarget = -1;
-    _seekEndTimeMs = 0;
     _stopLyricTimer();
 
     final playId = song.lyricId.isNotEmpty ? song.lyricId : song.id;
@@ -203,12 +199,6 @@ class PlayerService {
     _lyricTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
       if (_seekMode) return;
       var posMs = _player.position.inMilliseconds;
-      // seek后1秒内保持不低于目标值，防止播放器位置回跳
-      if (_lastSeekTarget >= 0 &&
-          DateTime.now().millisecondsSinceEpoch - _seekEndTimeMs < 1000 &&
-          posMs < _lastSeekTarget) {
-        posMs = _lastSeekTarget;
-      }
       final durMs = _player.duration?.inMilliseconds ?? 0;
       final clampedMs = (durMs > 0 && posMs > durMs) ? durMs : posMs;
       _notifyProgress(
@@ -287,24 +277,21 @@ class PlayerService {
     // 位置差小于100ms直接跳过
     if ((targetPos - _player.position.inMilliseconds).abs() < 100) {
       _seekMode = false;
-      _seekEndTimeMs = DateTime.now().millisecondsSinceEpoch;
-      _lastSeekTarget = _player.position.inMilliseconds;
       _notifyProgress(_player.position, _player.duration);
       return;
     }
-
-    _lastSeekTarget = targetPos;
 
     try {
       await _player.seek(Duration(milliseconds: targetPos));
     } catch (_) {}
 
     _seekMode = false;
-    // 用目标值而非播放器实际落点，避免流媒体 seek 偏差
-    _lastSeekTarget = targetPos;
-    _seekEndTimeMs = DateTime.now().millisecondsSinceEpoch;
+
+    // 等播放器位置稳定后读取真实位置，保证显示与音频一致
+    await Future.delayed(const Duration(milliseconds: 300));
+    final realPos = _player.position.inMilliseconds;
     _notifyProgress(
-      Duration(milliseconds: targetPos),
+      Duration(milliseconds: realPos),
       _player.duration,
     );
   }
