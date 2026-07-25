@@ -30,10 +30,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Duration _duration = Duration.zero;
   List<_LrcLine> _parsedLrc = [];
 
-  // seek 拖拽状态
-  bool _isDragging = false;
-  double _sliderValue = 0.0;
-
   @override
   void initState() {
     super.initState();
@@ -312,55 +308,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               if (hasSong)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40),
-                  child: Column(
-                    children: [
-                      SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          trackHeight: 4,
-                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                          activeTrackColor: const Color(0xFF6890F9),
-                          inactiveTrackColor: const Color(0xFF2A2D3A),
-                          thumbColor: const Color(0xFF6890F9),
-                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                        ),
-                        child: Slider(
-                          value: _isDragging
-                              ? _sliderValue
-                              : (_duration.inMilliseconds > 0
-                                  ? _position.inMilliseconds / _duration.inMilliseconds
-                                  : 0.0).clamp(0.0, 1.0),
-                          onChangeStart: (v) {
-                            _isDragging = true;
-                            _sliderValue = v;
-                            _player.seekStart();
-                            setState(() {});
-                          },
-                          onChanged: (v) {
-                            _sliderValue = v;
-                            final ms = (v * _duration.inMilliseconds).toInt();
-                            _player.seekVirtual(ms);
-                            setState(() {});
-                          },
-                          onChangeEnd: (v) {
-                            _isDragging = false;
-                            final ms = (v * _duration.inMilliseconds).toInt();
-                            _player.seekVirtual(ms);
-                            _player.seekEnd();
-                            setState(() {});
-                          },
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(_fmt(_position), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
-                            Text(_fmt(_duration), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
-                          ],
-                        ),
-                      ),
-                    ],
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(_fmt(_position), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
+                        Text(_fmt(_duration), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
+                      ],
+                    ),
                   ),
                 ),
               if (hasSong)
