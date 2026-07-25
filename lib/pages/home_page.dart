@@ -30,6 +30,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Duration _duration = Duration.zero;
   List<_LrcLine> _parsedLrc = [];
 
+  // seek 拖拽状态
+  bool _isDragging = false;
+  double _sliderValue = 0.0;
+
   @override
   void initState() {
     super.initState();
@@ -304,12 +308,29 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
                         ),
                         child: Slider(
-                          value: (_duration.inMilliseconds > 0
-                              ? _position.inMilliseconds / _duration.inMilliseconds
-                              : 0.0).clamp(0.0, 1.0),
+                          value: _isDragging
+                              ? _sliderValue
+                              : (_duration.inMilliseconds > 0
+                                  ? _position.inMilliseconds / _duration.inMilliseconds
+                                  : 0.0).clamp(0.0, 1.0),
+                          onChangeStart: (v) {
+                            _isDragging = true;
+                            _sliderValue = v;
+                            _player.seekStart();
+                            setState(() {});
+                          },
                           onChanged: (v) {
+                            _sliderValue = v;
                             final ms = (v * _duration.inMilliseconds).toInt();
-                            _player.seekRelative(ms - _position.inMilliseconds);
+                            _player.seekVirtual(ms);
+                            setState(() {});
+                          },
+                          onChangeEnd: (v) {
+                            _isDragging = false;
+                            final ms = (v * _duration.inMilliseconds).toInt();
+                            _player.seekVirtual(ms);
+                            _player.seekEnd();
+                            setState(() {});
                           },
                         ),
                       ),

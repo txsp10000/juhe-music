@@ -27,6 +27,10 @@ class _PlayerPageState extends State<PlayerPage> {
   Duration _duration = Duration.zero;
   List<_LrcLine> _parsedLrc = [];
 
+  // seek 拖拽状态
+  bool _isDragging = false;
+  double _sliderValue = 0.0;
+
   @override
   void initState() {
     super.initState();
@@ -327,10 +331,27 @@ class _PlayerPageState extends State<PlayerPage> {
               overlayColor: const Color(0x226890F9),
             ),
             child: Slider(
-              value: progress.clamp(0.0, 1.0),
+              value: _isDragging
+                  ? _sliderValue
+                  : progress.clamp(0.0, 1.0),
+              onChangeStart: (v) {
+                _isDragging = true;
+                _sliderValue = v;
+                _player.seekStart();
+                setState(() {});
+              },
               onChanged: (v) {
-                final newPos = Duration(milliseconds: (v * _duration.inMilliseconds).toInt());
-                _player.seekRelative(newPos.inMilliseconds - _position.inMilliseconds);
+                _sliderValue = v;
+                final ms = (v * _duration.inMilliseconds).toInt();
+                _player.seekVirtual(ms);
+                setState(() {});
+              },
+              onChangeEnd: (v) {
+                _isDragging = false;
+                final ms = (v * _duration.inMilliseconds).toInt();
+                _player.seekVirtual(ms);
+                _player.seekEnd();
+                setState(() {});
               },
             ),
           ),
