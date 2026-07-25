@@ -102,11 +102,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return lines;
   }
 
-  /// 获取当前播放位置对应的歌词行（二分查找 + iOS 音频输出延迟补偿）
+  /// 获取当前播放位置对应的歌词行（二分查找）
   int _currentLrcIndex() {
     if (_parsedLrc.isEmpty) return -1;
-    // iOS 平台增加 80ms 延迟补偿，抵消音频输出滞后
-    final posMs = _position.inMilliseconds - 80;
+    final posMs = _position.inMilliseconds;
     int left = 0;
     int right = _parsedLrc.length - 1;
     int idx = -1;
@@ -141,36 +140,39 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final currentIdx = _currentLrcIndex();
     final lines = <Widget>[];
 
-    // 上一行
-    if (currentIdx > 0) {
-      lines.add(Text(
-        _parsedLrc[currentIdx - 1].text,
-        style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 18),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ));
-      lines.add(const SizedBox(height: 8));
+    // 前两行
+    for (var i = currentIdx - 2; i < currentIdx; i++) {
+      if (i >= 0) {
+        lines.add(Text(
+          _parsedLrc[i].text,
+          style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 17),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ));
+        lines.add(const SizedBox(height: 6));
+      }
     }
-
     // 当前行
     if (currentIdx >= 0) {
       lines.add(Text(
         _parsedLrc[currentIdx].text,
-        style: const TextStyle(color: Color(0xFF6890F9), fontSize: 22, fontWeight: FontWeight.w600),
+        style: const TextStyle(color: Color(0xFF6890F9), fontSize: 21, fontWeight: FontWeight.w600),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ));
-      lines.add(const SizedBox(height: 8));
+      lines.add(const SizedBox(height: 6));
     }
-
-    // 下一行
-    if (currentIdx >= 0 && currentIdx + 1 < _parsedLrc.length) {
-      lines.add(Text(
-        _parsedLrc[currentIdx + 1].text,
-        style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 17),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ));
+    // 后三行
+    for (var i = currentIdx + 1; i <= currentIdx + 3; i++) {
+      if (i < _parsedLrc.length) {
+        lines.add(Text(
+          _parsedLrc[i].text,
+          style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 16),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ));
+        if (i < currentIdx + 3) lines.add(const SizedBox(height: 6));
+      }
     }
 
     return Padding(
