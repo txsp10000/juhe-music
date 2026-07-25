@@ -285,6 +285,20 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ),
               if (hasSong)
                 Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(_fmt(_position), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
+                        Text(_fmt(_duration), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ),
+              if (hasSong)
+                Padding(
                   padding: const EdgeInsets.only(top: 12, bottom: 8),
                   child: AnimatedBuilder(
                     animation: _pulseAnimation,
@@ -302,20 +316,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         ),
                         child: const Icon(Icons.graphic_eq, color: Colors.white, size: 32),
                       ),
-                    ),
-                  ),
-                ),
-              if (hasSong)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(_fmt(_position), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
-                        Text(_fmt(_duration), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
-                      ],
                     ),
                   ),
                 ),

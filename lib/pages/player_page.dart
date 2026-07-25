@@ -270,8 +270,8 @@ class _PlayerPageState extends State<PlayerPage> {
             children: [
               _buildTopBar(song),
               Expanded(child: _buildCenterContent(lyricText)),
-              _buildBottomActions(),
               _buildTimeBar(),
+              _buildBottomActions(),
               _buildControls(),
             ],
           ),
