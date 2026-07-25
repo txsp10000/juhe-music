@@ -67,10 +67,6 @@ class PlayerService {
   int _lastSeekTarget = -1;
   int _seekEndTimeMs = 0;
 
-  // seek后歌词补偿：seek 后 2 秒内从 1000ms 线性衰减到 0，抵消 iOS 音频解码延迟
-  int _postSeekCompMs = 0;
-  int _postSeekCompStartMs = 0;
-
   // 暴露 seekMode 给外部判断
   bool get isSeeking => _seekMode;
 
@@ -151,7 +147,6 @@ class PlayerService {
     _seekResumeTimer?.cancel();
     _lastSeekTarget = -1;
     _seekEndTimeMs = 0;
-    _postSeekCompMs = 0;
     _stopLyricTimer();
 
     final playId = song.lyricId.isNotEmpty ? song.lyricId : song.id;
@@ -209,10 +204,9 @@ class PlayerService {
       if (_seekMode) return;
       final posMs = _player.position.inMilliseconds;
       final durMs = _player.duration?.inMilliseconds ?? 0;
-      final comp = _currentSeekCompensation();
-      final displayMs = (posMs + comp).clamp(0, durMs);
+      final clampedMs = (durMs > 0 && posMs > durMs) ? durMs : posMs;
       _notifyProgress(
-        Duration(milliseconds: displayMs),
+        Duration(milliseconds: clampedMs),
         _player.duration,
       );
     });
@@ -221,17 +215,6 @@ class PlayerService {
   void _stopLyricTimer() {
     _lyricTimer?.cancel();
     _lyricTimer = null;
-  }
-
-  /// seek后补偿：2秒内从 1000ms 线性衰减到 0
-  int _currentSeekCompensation() {
-    if (_postSeekCompMs <= 0) return 0;
-    final elapsed = DateTime.now().millisecondsSinceEpoch - _postSeekCompStartMs;
-    if (elapsed >= 2000) {
-      _postSeekCompMs = 0;
-      return 0;
-    }
-    return (_postSeekCompMs * (1.0 - elapsed / 2000.0)).round();
   }
 
   Future<String?> _fetchPlayUrl(Song song) async {
@@ -305,8 +288,6 @@ class PlayerService {
       _seekMode = false;
       _seekEndTimeMs = DateTime.now().millisecondsSinceEpoch;
       _lastSeekTarget = _player.position.inMilliseconds;
-      _postSeekCompMs = 1000;
-      _postSeekCompStartMs = DateTime.now().millisecondsSinceEpoch;
       _notifyProgress(_player.position, _player.duration);
       return;
     }
@@ -321,8 +302,6 @@ class PlayerService {
     final realSeekPos = _player.position.inMilliseconds;
     _lastSeekTarget = realSeekPos;
     _seekEndTimeMs = DateTime.now().millisecondsSinceEpoch;
-    _postSeekCompMs = 1000;
-    _postSeekCompStartMs = DateTime.now().millisecondsSinceEpoch;
     _notifyProgress(
       Duration(milliseconds: realSeekPos),
       _player.duration,
