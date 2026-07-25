@@ -40,6 +40,9 @@ class PlayerService {
   // 暴露 seekMode 给外部判断
   bool get isSeeking => _seekMode;
 
+  // 歌词独立轮询定时器
+  Timer? _lyricTimer;
+
   /// 初始化 audio_service 和 just_audio
   static Future<void> init() async {
     final instance = PlayerService();
@@ -117,8 +120,10 @@ class PlayerService {
   void togglePlayPause() {
     if (_player.playing) {
       _player.pause();
+      _stopLyricTimer();
     } else {
       _player.play();
+      _startLyricTimer();
     }
   }
 
@@ -132,6 +137,7 @@ class PlayerService {
     _seekResumeTimer?.cancel();
     _lastSeekTarget = -1;
     _seekEndTimeMs = 0;
+    _stopLyricTimer();
 
     final playId = song.lyricId.isNotEmpty ? song.lyricId : song.id;
     final picId = song.picId.isNotEmpty ? song.picId : song.id;
@@ -177,7 +183,28 @@ class PlayerService {
 
     _player.play();
 
+    _startLyricTimer();
+
     onSongChanged?.call(song);
+  }
+
+  void _startLyricTimer() {
+    _lyricTimer?.cancel();
+    _lyricTimer = Timer.periodic(const Duration(milliseconds: 150), (_) {
+      if (_seekMode || !_player.playing) return;
+      final posMs = _player.position.inMilliseconds;
+      final durMs = _player.duration?.inMilliseconds ?? 0;
+      final clampedMs = (durMs > 0 && posMs > durMs) ? durMs : posMs;
+      onProgress?.call(
+        Duration(milliseconds: clampedMs),
+        _player.duration,
+      );
+    });
+  }
+
+  void _stopLyricTimer() {
+    _lyricTimer?.cancel();
+    _lyricTimer = null;
   }
 
   Future<String?> _fetchPlayUrl(Song song) async {
@@ -197,12 +224,15 @@ class PlayerService {
     _seekMode = true;
     final realPos = _player.position.inMilliseconds;
     final now = DateTime.now().millisecondsSinceEpoch;
-    // 仅播放状态下才叠加已播放时长，暂停时进度静止，直接用真实位置
     _virtualPosMs = (_lastSeekTarget >= 0 &&
             now - _seekEndTimeMs < 3000 &&
             _player.playing)
         ? max(_lastSeekTarget + (now - _seekEndTimeMs), realPos)
         : realPos;
+    // 安全超时：5秒内无 seekEnd 则自动提交，防止 seekMode 卡死
+    _seekResumeTimer = Timer(const Duration(seconds: 5), () {
+      if (_seekMode) seekEnd();
+    });
   }
 
   /// seek 中：仅更新虚拟位置（不碰播放器）
@@ -283,6 +313,7 @@ class PlayerService {
   }
 
   void dispose() {
+    _stopLyricTimer();
     _player.dispose();
   }
 }

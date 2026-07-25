@@ -328,6 +328,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           onChangeEnd: (v) {
                             _isDragging = false;
                             final ms = (v * _duration.inMilliseconds).toInt();
+                            _position = Duration(milliseconds: ms); // 先更新UI，不等异步seek
                             _player.seekVirtual(ms);
                             _player.seekEnd();
                             setState(() {});
