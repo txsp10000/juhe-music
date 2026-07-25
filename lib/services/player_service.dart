@@ -15,7 +15,6 @@ class PlayerService {
   final _player = AudioPlayer();
   final List<Song> playlist = [];
   int _currentIndex = -1;
-  String? _currentAudioPath;
 
   /// 当前播放的 MediaItem（CarPlay / 锁屏显示）
   MediaItem? _currentMediaItem;
@@ -196,7 +195,6 @@ class PlayerService {
     if (localPath == null) return;
 
     await _player.setAudioSource(AudioSource.file(localPath));
-    _currentAudioPath = localPath;
     _player.play();
 
     _notifySongChange(song);

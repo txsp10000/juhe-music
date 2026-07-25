@@ -21,14 +21,28 @@ class AudioCacheService {
   }
 
   /// 获取音频缓存文件路径
-  Future<String> getFilePath(String songId) async {
+  Future<String> getFilePath(String songId, [String? url]) async {
     final dir = await _getCacheDir();
-    return '${dir.path}/$songId.mp3';
+    final ext = _extractExt(url);
+    return '${dir.path}/$songId.$ext';
+  }
+
+  String _extractExt(String? url) {
+    if (url == null || url.isEmpty) return 'mp3';
+    final uri = Uri.tryParse(url);
+    if (uri == null) return 'mp3';
+    final path = uri.path.toLowerCase();
+    if (path.endsWith('.flac')) return 'flac';
+    if (path.endsWith('.m4a')) return 'm4a';
+    if (path.endsWith('.aac')) return 'aac';
+    if (path.endsWith('.wav')) return 'wav';
+    if (path.endsWith('.ogg')) return 'ogg';
+    return 'mp3';
   }
 
   /// 检查音频是否已缓存
-  Future<bool> isCached(String songId) async {
-    final path = await getFilePath(songId);
+  Future<bool> isCached(String songId, [String? url]) async {
+    final path = await getFilePath(songId, url);
     return File(path).exists();
   }
 
@@ -36,10 +50,16 @@ class AudioCacheService {
   /// 已缓存则直接返回，未缓存则下载
   Future<String?> download(String songId, String url) async {
     try {
-      final path = await getFilePath(songId);
+      final path = await getFilePath(songId, url);
       final file = File(path);
 
       if (await file.exists()) return path;
+
+      final dir = await _getCacheDir();
+      final oldMp3 = File('${dir.path}/$songId.mp3');
+      if (!path.endsWith('.mp3') && await oldMp3.exists()) {
+        await oldMp3.delete();
+      }
 
       final response = await _client.get(
         Uri.parse(url),
