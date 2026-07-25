@@ -190,14 +190,10 @@ class PlayerService {
     }
     if (url == null || url.isEmpty) return;
 
-    // 3. 使用 LockCachingAudioSource：首次播放从网络流式加载并缓存到本地，
-    //    之后直接用本地缓存。网络流式播放 seek 精度远高于本地文件模式。
-    final audioCache = AudioCacheService();
-    final cacheFile = File(await audioCache.getFilePath(song.id, url));
+    // 3. 直接使用网络 URL 播放
     await _player.setAudioSource(
-      LockCachingAudioSource(
+      AudioSource.uri(
         Uri.parse(url),
-        cacheFile: cacheFile,
         headers: const {'User-Agent': 'Mozilla/5.0'},
       ),
     );
