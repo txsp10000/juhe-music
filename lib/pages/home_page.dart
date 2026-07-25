@@ -285,16 +285,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ),
               if (hasSong)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(_fmt(_position), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
-                        Text(_fmt(_duration), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
-                      ],
-                    ),
+                  padding: const EdgeInsets.only(top: 12, bottom: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(_fmt(_position), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
+                      const SizedBox(width: 10),
+                      const Text('/', style: TextStyle(color: Color(0xFF5A5D6E), fontSize: 12)),
+                      const SizedBox(width: 10),
+                      Text(_fmt(_duration), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
+                    ],
                   ),
                 ),
               if (hasSong)

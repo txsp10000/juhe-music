@@ -360,16 +360,19 @@ class _PlayerPageState extends State<PlayerPage> {
 
   Widget _buildTimeBar() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(_fmt(_position),
               style:
-                  const TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
+                  const TextStyle(color: Color(0xFF8F919A), fontSize: 12)),
+          const SizedBox(width: 10),
+          const Text('/', style: TextStyle(color: Color(0xFF5A5D6E), fontSize: 12)),
+          const SizedBox(width: 10),
           Text(_fmt(_duration),
               style:
-                  const TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
+                  const TextStyle(color: Color(0xFF8F919A), fontSize: 12)),
         ],
       ),
     );

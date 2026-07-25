@@ -239,6 +239,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				97C146F81CF9000F007C117D /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -249,6 +250,11 @@
 			includeInIndex = 0;
 			path = Runner.app;
 			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+
+		97C146F81CF9000F007C117D /* Assets.xcassets in Resources */ = {
+			isa = PBXBuildFile;
+			fileRef = 97C146F91CF9000F007C117D /* Assets.xcassets */;
 		};
 
 		97C146EF1CF9000F007C117D /* Products */ = {
@@ -264,6 +270,7 @@
 			isa = PBXGroup;
 			children = (
 				97C146F11CF9000F007C117D /* AppDelegate.swift */,
+				97C146F91CF9000F007C117D /* Assets.xcassets */,
 				97C146F51CF9000F007C117D /* Info.plist */,
 			);
 			name = Runner;
@@ -281,6 +288,13 @@
 			isa = PBXFileReference;
 			lastKnownFileType = text.plist.xml;
 			path = Info.plist;
+			sourceTree = "<group>";
+		};
+
+		97C146F91CF9000F007C117D /* Assets.xcassets */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = folder.assetcatalog;
+			path = Assets.xcassets;
 			sourceTree = "<group>";
 		};
 
