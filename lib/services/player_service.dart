@@ -59,15 +59,12 @@ class PlayerService {
     instance._player.positionStream.listen((pos) {
       if (!instance._seekMode) {
         var posMs = pos.inMilliseconds;
-        // seek后3秒内的防跳保护
+        // seek后3秒内：跟踪最高位置，但不强制clamp（iOS seek精度不如Android）
         final now = DateTime.now().millisecondsSinceEpoch;
         if (instance._lastSeekTarget >= 0 &&
-            now - instance._seekEndTimeMs < 3000) {
-          if (posMs < instance._lastSeekTarget - 500) {
-            posMs = instance._lastSeekTarget;
-          } else if (posMs > instance._lastSeekTarget) {
-            instance._lastSeekTarget = posMs;
-          }
+            now - instance._seekEndTimeMs < 3000 &&
+            posMs > instance._lastSeekTarget) {
+          instance._lastSeekTarget = posMs;
         }
         // 边界保护
         final durMs = instance._player.duration?.inMilliseconds ?? 0;
