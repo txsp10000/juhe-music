@@ -199,9 +199,9 @@ class PlayerService {
     }
     if (url == null || url.isEmpty) return;
 
-    // 3. 音频先完整下载到本地缓存，再播放
+    // 3. 下载 MP3 → 转 WAV → 播放（WAV 可帧精准 seek）
     final audioCache = AudioCacheService();
-    final localPath = await audioCache.download(song.id, url);
+    final localPath = await audioCache.downloadAndConvert(song.id, url);
     if (localPath == null) return;
 
     await _player.setAudioSource(AudioSource.file(localPath));
@@ -284,7 +284,7 @@ class PlayerService {
     );
   }
 
-  /// 结束 seek：seek 到目标位置，偏差大时自动修正
+  /// 结束 seek：WAV 文件 seek 帧精准，直接定位即可
   Future<void> seekEnd() async {
     _seekResumeTimer?.cancel();
     if (!_seekMode) return;
@@ -298,7 +298,7 @@ class PlayerService {
     }
 
     // 微小位移跳过
-    if ((targetPos - _player.position.inMilliseconds).abs() < 100) {
+    if ((targetPos - _player.position.inMilliseconds).abs() < 50) {
       _seekMode = false;
       _notifyProgress(_player.position, _player.duration);
       return;
@@ -306,21 +306,9 @@ class PlayerService {
 
     try {
       await _player.seek(Duration(milliseconds: targetPos));
-      // 等播放器稳定
-      await Future.delayed(const Duration(milliseconds: 200));
     } catch (_) {
       _seekMode = false;
       return;
-    }
-
-    // 检查实际落点，偏差 > 200ms 则追加一次修正 seek
-    final actual1 = _player.position.inMilliseconds;
-    final error1 = targetPos - actual1;
-    if (error1.abs() > 200) {
-      try {
-        await _player.seek(Duration(milliseconds: targetPos + error1));
-        await Future.delayed(const Duration(milliseconds: 100));
-      } catch (_) {}
     }
 
     _seekMode = false;
