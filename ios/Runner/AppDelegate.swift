@@ -1,6 +1,7 @@
 import Flutter
 import UIKit
 import AVFAudio
+import AVFoundation
 import MediaPlayer
 
 @main
@@ -9,9 +10,9 @@ import MediaPlayer
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    AVPlayerPreciseSeekSwizzle.activate()
     GeneratedPluginRegistrant.register(with: self)
 
-    // 配置音频会话：后台播放 + CarPlay
     let session = AVAudioSession.sharedInstance()
     do {
       try session.setCategory(.playback, mode: .default, policy: .longFormAudio)
@@ -20,15 +21,10 @@ import MediaPlayer
       print("AVAudioSession 配置失败: \(error)")
     }
 
-    // 注册远程控制（锁屏 / CarPlay 控制中心）
     UIApplication.shared.beginReceivingRemoteControlEvents()
 
-    // Flutter 引擎初始化
     let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
 
-    // CarPlay / 锁屏 Now Playing 信息更新通道
-    // audio_service 的 updateMediaItem 在播放前调用，缺少 elapsedTime/playbackRate
-    // 导致 CarPlay "播放中" 不显示，这里直接接管 MPNowPlayingInfoCenter 全量更新
     if let controller = window?.rootViewController as? FlutterViewController {
       let channel = FlutterMethodChannel(
         name: "com.miaomiao.music/nowplaying",
@@ -60,5 +56,23 @@ import MediaPlayer
     }
 
     return result
+  }
+}
+
+class AVPlayerPreciseSeekSwizzle {
+  static func activate() {
+    let originalSelector = NSSelectorFromString("seekToTime:completionHandler:")
+    let swizzledSelector = #selector(AVPlayer.preciseSeekToTime(_:completionHandler:))
+    guard let originalMethod = class_getInstanceMethod(AVPlayer.self, originalSelector),
+          let swizzledMethod = class_getInstanceMethod(AVPlayer.self, swizzledSelector) else {
+      return
+    }
+    method_exchangeImplementations(originalMethod, swizzledMethod)
+  }
+}
+
+extension AVPlayer {
+  @objc func preciseSeekToTime(_ time: CMTime, completionHandler: @escaping (Bool) -> Void) {
+    self.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero, completionHandler: completionHandler)
   }
 }
