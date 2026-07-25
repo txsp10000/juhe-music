@@ -233,12 +233,7 @@ class PlayerService {
     if (_seekMode) return;
     _seekMode = true;
     final realPos = _player.position.inMilliseconds;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    _virtualPosMs = (_lastSeekTarget >= 0 &&
-            now - _seekEndTimeMs < 3000 &&
-            _player.playing)
-        ? max(_lastSeekTarget + (now - _seekEndTimeMs), realPos)
-        : realPos;
+    _virtualPosMs = realPos;
     // 安全超时：5秒内无 seekEnd 则自动提交，防止 seekMode 卡死
     _seekResumeTimer = Timer(const Duration(seconds: 5), () {
       if (_seekMode) seekEnd();
