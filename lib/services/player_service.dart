@@ -108,6 +108,7 @@ class PlayerService {
     instance._player.durationStream.listen((dur) {
       if (dur != null) {
         instance._realDuration = dur;
+        print('[PlayerService] realDuration=${dur.inMilliseconds}ms, headerDuration=${instance._headerDuration?.inMilliseconds}ms');
       }
       final displayDur = instance._headerDuration ?? dur;
       if (displayDur != null && instance._currentMediaItem != null) {
@@ -153,8 +154,10 @@ class PlayerService {
         _realDuration! != _headerDuration!) {
       final ratio = _realDuration!.inMilliseconds / _headerDuration!.inMilliseconds;
       final adjusted = Duration(milliseconds: (position.inMilliseconds * ratio).round());
+      print('[PlayerService] seek: requested=${position.inMilliseconds}ms, adjusted=${adjusted.inMilliseconds}ms, ratio=$ratio');
       await _player.seek(adjusted);
     } else {
+      print('[PlayerService] seek: direct=${position.inMilliseconds}ms (no compensation)');
       await _player.seek(position);
     }
   }
