@@ -69,9 +69,6 @@ class PlayerService {
   // 暴露 seekMode 给外部判断
   bool get isSeeking => _seekMode;
 
-  // 当前播放的本地文件路径，用于精确 seek
-  String? _currentLocalPath;
-
   // 歌词独立轮询定时器
   Timer? _lyricTimer;
 
@@ -207,7 +204,6 @@ class PlayerService {
     final localPath = await audioCache.download(song.id, url);
     if (localPath == null) return;
 
-    _currentLocalPath = localPath;
     await _player.setAudioSource(AudioSource.file(localPath));
 
     _player.play();
@@ -288,7 +284,7 @@ class PlayerService {
     );
   }
 
-  /// 结束 seek：重新加载音频到目标位置（比 AVPlayer.seek 更精准）
+  /// 结束 seek：seek 到目标位置，偏差大时自动修正
   Future<void> seekEnd() async {
     _seekResumeTimer?.cancel();
     if (!_seekMode) return;
@@ -308,29 +304,26 @@ class PlayerService {
       return;
     }
 
-    final path = _currentLocalPath;
-    if (path == null) {
-      _seekMode = false;
-      return;
-    }
-
     try {
-      // 用 initialPosition 重新加载音频，比 seek() 精准
-      // AVPlayer 从文件头解码到目标位置，不会有 MP3 帧估算偏差
-      await _player.setAudioSource(
-        AudioSource.file(path),
-        initialPosition: Duration(milliseconds: targetPos),
-      );
-      _player.play();
+      await _player.seek(Duration(milliseconds: targetPos));
+      // 等播放器稳定
+      await Future.delayed(const Duration(milliseconds: 200));
     } catch (_) {
       _seekMode = false;
       return;
     }
 
-    _seekMode = false;
+    // 检查实际落点，偏差 > 200ms 则追加一次修正 seek
+    final actual1 = _player.position.inMilliseconds;
+    final error1 = targetPos - actual1;
+    if (error1.abs() > 200) {
+      try {
+        await _player.seek(Duration(milliseconds: targetPos + error1));
+        await Future.delayed(const Duration(milliseconds: 100));
+      } catch (_) {}
+    }
 
-    // 短暂等待后读播放器实际位置
-    await Future.delayed(const Duration(milliseconds: 100));
+    _seekMode = false;
     _notifyProgress(_player.position, _player.duration);
   }
 
