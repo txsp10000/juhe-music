@@ -131,16 +131,7 @@ class PlayerService {
   }
 
   Future<void> seek(Duration position) async {
-    if (_currentAudioPath != null) {
-      final wasPlaying = _player.playing;
-      await _player.setAudioSource(
-        AudioSource.file(_currentAudioPath!),
-        initialPosition: position,
-      );
-      if (wasPlaying) _player.play();
-    } else {
-      await _player.seek(position);
-    }
+    await _player.seek(position);
   }
 
   Future<void> playAt(int index) async {
