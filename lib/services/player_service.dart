@@ -68,6 +68,10 @@ class PlayerService {
   // 暴露 seekMode 给外部判断
   bool get isSeeking => _seekMode;
 
+  // seek 后用 wall-clock 计算进度（不依赖播放器 position，避免流媒体位置偏差）
+  int _seekAnchorMs = -1;      // seek 目标位置（毫秒）
+  int _seekAnchorWallMs = 0;   // seek 完成时的 wall-clock（毫秒）
+
   // 歌词独立轮询定时器
   Timer? _lyricTimer;
 
@@ -140,9 +144,10 @@ class PlayerService {
     _currentIndex = index;
     final song = playlist[index];
 
-    // 重置 seek 状态，避免上一首歌的防跳保护污染新歌进度
+    // 重置 seek 状态，避免上一首歌的状态污染新歌进度
     _seekMode = false;
     _seekResumeTimer?.cancel();
+    _seekAnchorMs = -1;
     _stopLyricTimer();
 
     final playId = song.lyricId.isNotEmpty ? song.lyricId : song.id;
@@ -198,7 +203,23 @@ class PlayerService {
     _lyricTimer?.cancel();
     _lyricTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
       if (_seekMode) return;
-      var posMs = _player.position.inMilliseconds;
+
+      int posMs;
+      if (_seekAnchorMs >= 0) {
+        // seek 后 5 秒内用 wall-clock 计算进度：目标位置 + 经过时间
+        // 避免播放器 position 在流媒体 seek 后不准导致的显示偏差
+        final elapsed = DateTime.now().millisecondsSinceEpoch - _seekAnchorWallMs;
+        if (elapsed < 5000) {
+          posMs = _seekAnchorMs + elapsed;
+        } else {
+          // 5 秒后切换回播放器真实位置
+          _seekAnchorMs = -1;
+          posMs = _player.position.inMilliseconds;
+        }
+      } else {
+        posMs = _player.position.inMilliseconds;
+      }
+
       final durMs = _player.duration?.inMilliseconds ?? 0;
       final clampedMs = (durMs > 0 && posMs > durMs) ? durMs : posMs;
       _notifyProgress(
@@ -228,6 +249,7 @@ class PlayerService {
     _seekResumeTimer?.cancel();
     if (_seekMode) return;
     _seekMode = true;
+    _seekAnchorMs = -1; // 重置锚点，等 seekEnd 再设
     final realPos = _player.position.inMilliseconds;
     _virtualPosMs = realPos;
     // 安全超时：5秒内无 seekEnd 则自动提交，防止 seekMode 卡死
@@ -287,11 +309,11 @@ class PlayerService {
 
     _seekMode = false;
 
-    // 等播放器位置稳定后读取真实位置，保证显示与音频一致
-    await Future.delayed(const Duration(milliseconds: 300));
-    final realPos = _player.position.inMilliseconds;
+    // 用 wall-clock 锚点计算进度，不依赖播放器 position（流媒体 position 不准）
+    _seekAnchorMs = targetPos;
+    _seekAnchorWallMs = DateTime.now().millisecondsSinceEpoch;
     _notifyProgress(
-      Duration(milliseconds: realPos),
+      Duration(milliseconds: targetPos),
       _player.duration,
     );
   }
