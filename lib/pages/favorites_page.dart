@@ -23,6 +23,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
   void initState() {
     super.initState();
     _load();
+    _player.addSongChangeListener(_onSongChange);
   }
 
   void _onSongChange(Song _) {
