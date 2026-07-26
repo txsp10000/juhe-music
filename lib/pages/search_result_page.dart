@@ -80,7 +80,11 @@ class _SearchResultPageState extends State<SearchResultPage> {
       if (widget.fromPlayer) {
         Navigator.pop(context);
       } else {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const PlayerPage()),
+          (route) => route.isFirst,
+        );
       }
       return;
     }
@@ -90,7 +94,11 @@ class _SearchResultPageState extends State<SearchResultPage> {
     if (widget.fromPlayer) {
       Navigator.pop(context);
     } else {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const PlayerPage()),
+        (route) => route.isFirst,
+      );
     }
   }
 
@@ -225,3 +233,4 @@ class _SearchResultPageState extends State<SearchResultPage> {
     );
   }
 }
+

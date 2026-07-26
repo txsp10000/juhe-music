@@ -47,9 +47,11 @@ class _FavoritesPageState extends State<FavoritesPage> {
       if (widget.fromPlayer) {
         Navigator.pop(context);
       } else {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage())).then((_) {
-          if (mounted) setState(() {});
-        });
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const PlayerPage()),
+          (route) => route.isFirst,
+        );
       }
       return;
     }
@@ -59,9 +61,11 @@ class _FavoritesPageState extends State<FavoritesPage> {
     if (widget.fromPlayer) {
       Navigator.pop(context);
     } else {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage())).then((_) {
-        if (mounted) setState(() {});
-      });
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const PlayerPage()),
+        (route) => route.isFirst,
+      );
     }
   }
 
@@ -231,3 +235,4 @@ class _FavoritesPageState extends State<FavoritesPage> {
     );
   }
 }
+
