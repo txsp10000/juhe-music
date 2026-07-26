@@ -105,20 +105,19 @@
           echo "Frameworks:"
           ls "$APP_PATH/Frameworks/" 2>/dev/null || echo "  (none)"
 
-          # Install ldid for TrollStore signing
-          which ldid || brew install ldid
-
-          # Sign all framework binaries
-          find "$APP_PATH/Frameworks" -type f -perm +111 | while read bin; do
-            ldid -S "$bin" 2>/dev/null || true
+          # Sign with entitlements using codesign (ad-hoc) for TrollStore
+          # First sign all frameworks
+          find "$APP_PATH/Frameworks" -name "*.framework" -type d | while read fw; do
+            codesign --force --sign - "$fw" 2>/dev/null || true
           done
 
           # Sign main binary with CarPlay entitlements
-          ldid -S"ios_native/Runner.entitlements" "$APP_PATH/Runner"
+          codesign --force --sign - --entitlements ios_native/Runner.entitlements "$APP_PATH/Runner"
+          echo "Signed with entitlements via codesign"
 
-          # Verify
+          # Verify entitlements
           echo "=== Entitlements ==="
-          ldid -e "$APP_PATH/Runner"
+          codesign -d --entitlements - "$APP_PATH/Runner" 2>&1 || true
           echo "==================="
 
           rm -rf Payload
@@ -129,3 +128,4 @@
 
     artifacts:
       - Runner.ipa
+
