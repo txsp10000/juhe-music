@@ -15,6 +15,11 @@ class _PlaylistPageState extends State<PlaylistPage> {
   final _player = PlayerService();
 
   void _playAt(int index) {
+    if (_player.currentSong?.id == _player.playlist[index].id) {
+      // Already playing this song, just open player
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+      return;
+    }
     _player.playAt(index);
     Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
   }

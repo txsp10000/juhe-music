@@ -76,6 +76,11 @@ class _SearchResultPageState extends State<SearchResultPage> {
   }
 
   void _playAt(int index) {
+    if (_player.currentSong?.id == _songs[index].id) {
+      // Already playing this song, just open player
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+      return;
+    }
     _player.playlist.clear();
     _player.playlist.addAll(_songs);
     _player.playAt(index);
