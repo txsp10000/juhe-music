@@ -361,8 +361,8 @@ class _PlayerPageState extends State<PlayerPage> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 2),
-                const Text(
-                  '24bit 无损',
+                  Text(
+                    _currentBrLabel(),
                   style: TextStyle(color: Color(0xFF6890F9), fontSize: 12),
                   textAlign: TextAlign.center,
                 ),
@@ -603,6 +603,18 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
+  String _currentBrLabel() {
+    final br = _player.currentPlayingBr;
+    switch (br) {
+      case 128: return '128kbps';
+      case 192: return '192kbps';
+      case 320: return '320kbps';
+      case 740: return '16bit 无损';
+      case 999: return '24bit 无损';
+      default: return '${br}kbps';
+    }
+  }
+
   String _qualityLabel() {
     switch (SettingsService().quality) {
       case AudioQuality.low128: return '128k';
@@ -655,7 +667,6 @@ class _PlayerPageState extends State<PlayerPage> {
         .trim();
   }
 }
-
 
 
 

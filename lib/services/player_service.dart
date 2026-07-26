@@ -8,6 +8,7 @@ import '../api/music_api.dart';
 import 'lyric_cache_service.dart';
 import 'audio_cache_service.dart';
 import 'cover_cache_service.dart';
+import 'settings_service.dart';
 
 class PlayerService {
   static final PlayerService _instance = PlayerService._();
@@ -18,6 +19,7 @@ class PlayerService {
   final List<Song> playlist = [];
   int _currentIndex = -1;
   String? _currentUrl;
+  int _currentPlayingBr = 999;
   bool _isPlaying = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
@@ -33,6 +35,7 @@ class PlayerService {
   bool get isPlaying => _isPlaying;
   Duration get position => _position;
   Duration? get duration => _duration;
+  int get currentPlayingBr => _currentPlayingBr;
 
   void Function(bool playing)? onPlayStateChanged;
 
@@ -174,6 +177,8 @@ class PlayerService {
     _currentIndex = index;
     final song = playlist[index];
     final currentGen = ++_playGeneration;
+    // Clear any lingering download progress from previous song
+    _notifyDownloadProgress(null);
 
     final playId = song.lyricId.isNotEmpty ? song.lyricId : song.id;
     final picId = song.picId.isNotEmpty ? song.picId : song.id;
@@ -227,6 +232,7 @@ class PlayerService {
 
     // If audio is already cached locally at sufficient quality, play directly
     if (hasCachedAudio) {
+      _currentPlayingBr = _extractBrFromPath(cachedPath!);
       await _player.open(Media('file://$cachedPath'), play: true);
       if (currentGen != _playGeneration) return;
       return;
@@ -285,8 +291,20 @@ class PlayerService {
       return;
     }
     // Download complete, start playback
+    _currentPlayingBr = SettingsService().quality.br;
     await _player.open(Media('file://$localPath'), play: true);
     if (currentGen != _playGeneration) return;
+  }
+
+  /// Extract br quality value from cached file path (e.g. songId_320.mp3 -> 320)
+  int _extractBrFromPath(String path) {
+    final name = path.split('/').last.split('\\').last;
+    // Format: songId_br.ext
+    final match = RegExp(r'_(\d+)\.[a-z0-9]+$').firstMatch(name);
+    if (match != null) {
+      return int.tryParse(match.group(1)!) ?? 999;
+    }
+    return 999;
   }
 
   /// Re-download current song at new quality setting.
@@ -306,6 +324,7 @@ class PlayerService {
     final cached = await audioCache.findCachedFile(song.id);
     if (cached != null) {
       // Already have sufficient quality
+      _currentPlayingBr = _extractBrFromPath(cached);
       await _player.open(Media('file://$cached'), play: true);
       return;
     }
@@ -328,6 +347,7 @@ class PlayerService {
     if (currentGen != _playGeneration) return;
 
     if (localPath == null || localPath.isEmpty) return;
+    _currentPlayingBr = SettingsService().quality.br;
     await _player.open(Media('file://$localPath'), play: true);
   }
 
