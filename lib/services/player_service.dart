@@ -249,7 +249,13 @@ class PlayerService {
     }
     if (currentGen != _playGeneration) return;
 
-    if (localPath == null || localPath.isEmpty) return;
+    if (localPath == null || localPath.isEmpty) {
+      // Cache failed, auto skip to next song
+      if (_currentIndex < playlist.length - 1) {
+        playAt(_currentIndex + 1);
+      }
+      return;
+    }
     await _player.open(Media('file://$localPath'), play: true);
     if (currentGen != _playGeneration) return;
 

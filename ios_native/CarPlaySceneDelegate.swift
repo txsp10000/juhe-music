@@ -38,7 +38,7 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     let playlistTab = createPlaylistTab()
     let favoritesTab = createFavoritesTab()
 
-    let tabBar = CPTabBarTemplate(templates: [playlistTab, favoritesTab])
+    let tabBar = CPTabBarTemplate(templates: [favoritesTab, playlistTab])
     tabBar.delegate = self
     interfaceController?.setRootTemplate(tabBar, animated: true, completion: nil)
   }
