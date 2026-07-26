@@ -27,59 +27,6 @@
           cp ios_native/CarPlaySceneDelegate.swift ios/Runner/CarPlaySceneDelegate.swift
           cp ios_native/Runner.entitlements ios/Runner/Runner.entitlements
 
-      - name: First pod install (let CocoaPods set base configs)
-        script: |
-          cd ios && pod install && cd ..
-
-      - name: Patch project after pod install
-        script: |
-          python3 << 'PYTHON'
-          import re
-
-          pbx_path = "ios/Runner.xcodeproj/project.pbxproj"
-          with open(pbx_path, "r") as f:
-              c = f.read()
-
-          # 1. Bundle identifier (only in Runner target build settings)
-          c = re.sub(r"PRODUCT_BUNDLE_IDENTIFIER = [^;]+;", "PRODUCT_BUNDLE_IDENTIFIER = com.miaomiao.music;", c)
-
-          # 2. Add CODE_SIGN_ENTITLEMENTS to target build settings
-          if "CODE_SIGN_ENTITLEMENTS" not in c:
-              c = re.sub(
-                  r"(ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;)",
-                  r"\1\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;",
-                  c
-              )
-
-          # 3. Add CarPlaySceneDelegate.swift to compile sources and file group
-          if "CarPlaySceneDelegate" not in c:
-              # PBXFileReference
-              file_ref = '\t\tCARP00000001 /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };'
-              # PBXBuildFile
-              build_src = '\t\tCARP00000003 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CARP00000001 /* CarPlaySceneDelegate.swift */; };'
-
-              c = c.replace("/* End PBXFileReference section */", file_ref + "\n/* End PBXFileReference section */")
-              c = c.replace("/* End PBXBuildFile section */", build_src + "\n/* End PBXBuildFile section */")
-
-              # Add to Sources build phase
-              c = re.sub(
-                  r"(/\* Sources \*/ = \{[^}]*files = \()",
-                  r"\1\n\t\t\t\tCARP00000003 /* CarPlaySceneDelegate.swift in Sources */,",
-                  c
-              )
-
-              # Add to Runner file group
-              c = re.sub(
-                  r"(AppDelegate\.swift \*/,)",
-                  r"\1\n\t\t\t\tCARP00000001 /* CarPlaySceneDelegate.swift */,",
-                  c
-              )
-
-          with open(pbx_path, "w") as f:
-              f.write(c)
-          print("pbxproj patched: bundle ID, entitlements, CarPlaySceneDelegate")
-          PYTHON
-
       - name: Configure Info.plist
         script: |
           PLIST="ios/Runner/Info.plist"
@@ -108,7 +55,41 @@
             printf '%s\n' '{"images":[{"size":"20x20","idiom":"iphone","filename":"Icon-App-40x40.png","scale":"2x"},{"size":"20x20","idiom":"iphone","filename":"Icon-App-60x60.png","scale":"3x"},{"size":"29x29","idiom":"iphone","filename":"Icon-App-58x58.png","scale":"2x"},{"size":"29x29","idiom":"iphone","filename":"Icon-App-87x87.png","scale":"3x"},{"size":"40x40","idiom":"iphone","filename":"Icon-App-80x80.png","scale":"2x"},{"size":"40x40","idiom":"iphone","filename":"Icon-App-120x120.png","scale":"3x"},{"size":"60x60","idiom":"iphone","filename":"Icon-App-120x120.png","scale":"2x"},{"size":"60x60","idiom":"iphone","filename":"Icon-App-180x180.png","scale":"3x"},{"size":"20x20","idiom":"ipad","filename":"Icon-App-20x20.png","scale":"1x"},{"size":"20x20","idiom":"ipad","filename":"Icon-App-40x40.png","scale":"2x"},{"size":"29x29","idiom":"ipad","filename":"Icon-App-29x29.png","scale":"1x"},{"size":"29x29","idiom":"ipad","filename":"Icon-App-58x58.png","scale":"2x"},{"size":"40x40","idiom":"ipad","filename":"Icon-App-40x40.png","scale":"1x"},{"size":"40x40","idiom":"ipad","filename":"Icon-App-80x80.png","scale":"2x"},{"size":"76x76","idiom":"ipad","filename":"Icon-App-76x76.png","scale":"1x"},{"size":"76x76","idiom":"ipad","filename":"Icon-App-152x152.png","scale":"2x"},{"size":"83.5x83.5","idiom":"ipad","filename":"Icon-App-167x167.png","scale":"2x"},{"size":"1024x1024","idiom":"ios-marketing","filename":"Icon-App-1024x1024.png","scale":"1x"}],"info":{"version":1,"author":"xcode"}}' > "$ICON_DIR/Contents.json"
           fi
 
-      - name: Build iOS
+      - name: Patch Xcode project
+        script: |
+          python3 << 'PYTHON'
+          import re
+
+          pbx_path = "ios/Runner.xcodeproj/project.pbxproj"
+          with open(pbx_path, "r") as f:
+              c = f.read()
+
+          # Bundle identifier
+          c = re.sub(r"PRODUCT_BUNDLE_IDENTIFIER = [^;]+;", "PRODUCT_BUNDLE_IDENTIFIER = com.miaomiao.music;", c)
+
+          # Entitlements
+          if "CODE_SIGN_ENTITLEMENTS" not in c:
+              c = re.sub(
+                  r"(ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;)",
+                  r"\1\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;",
+                  c
+              )
+
+          # Add CarPlaySceneDelegate.swift
+          if "CarPlaySceneDelegate" not in c:
+              file_ref = '\t\tCARP00000001 /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };'
+              build_src = '\t\tCARP00000003 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CARP00000001 /* CarPlaySceneDelegate.swift */; };'
+              c = c.replace("/* End PBXFileReference section */", file_ref + "\n/* End PBXFileReference section */")
+              c = c.replace("/* End PBXBuildFile section */", build_src + "\n/* End PBXBuildFile section */")
+              c = re.sub(r"(/\* Sources \*/ = \{[^}]*files = \()", r"\1\n\t\t\t\tCARP00000003 /* CarPlaySceneDelegate.swift in Sources */,", c)
+              c = re.sub(r"(AppDelegate\.swift \*/,)", r"\1\n\t\t\t\tCARP00000001 /* CarPlaySceneDelegate.swift */,", c)
+
+          with open(pbx_path, "w") as f:
+              f.write(c)
+          print("Done: bundle ID, entitlements, CarPlaySceneDelegate added")
+          PYTHON
+
+      - name: Build iOS (flutter handles pod install internally)
         script: |
           flutter build ios --release --no-codesign
 
@@ -126,16 +107,21 @@
           echo "Frameworks:"
           ls "$APP_PATH/Frameworks/" 2>/dev/null || echo "  (none)"
 
-          # Sign with entitlements using ldid (TrollStore compatible)
-          # Install ldid if not present
+          # Install ldid for TrollStore-compatible signing
           which ldid || brew install ldid
 
-          # Apply entitlements to the main binary
-          ldid -Sios_native/Runner.entitlements "$APP_PATH/Runner"
-          echo "Entitlements applied with ldid"
+          # Sign all framework binaries
+          find "$APP_PATH/Frameworks" -type f -perm +111 | while read bin; do
+            ldid -S "$bin" 2>/dev/null || true
+          done
 
-          # Verify
-          ldid -e "$APP_PATH/Runner" || true
+          # Sign main binary WITH CarPlay entitlements
+          ldid -S"ios_native/Runner.entitlements" "$APP_PATH/Runner"
+
+          # Verify entitlements
+          echo "=== Entitlements ==="
+          ldid -e "$APP_PATH/Runner"
+          echo "==================="
 
           rm -rf Payload
           mkdir Payload
