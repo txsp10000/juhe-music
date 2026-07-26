@@ -19,13 +19,26 @@ class AudioCacheService {
     }
     return _cacheDir!;
   }
+  /// Clean up any leftover .tmp files from interrupted downloads
+  Future<void> cleanupIncomplete() async {
+    try {
+      final dir = await _getCacheDir();
+      await for (final entity in dir.list()) {
+        if (entity is File && entity.path.endsWith('.tmp')) {
+          await entity.delete();
+        }
+      }
+    } catch (_) {}
+  }
 
   Future<String> getFilePath(String songId, [String? url]) async {
     final dir = await _getCacheDir();
     final ext = _extractExt(url);
     return '${dir.path}/$songId.$ext';
   }
+
   /// Find any cached audio file for this songId regardless of extension
+  /// Only returns files that are fully downloaded (not .tmp files)
   Future<String?> findCachedFile(String songId) async {
     final dir = await _getCacheDir();
     if (!await dir.exists()) return null;
@@ -34,6 +47,8 @@ class AudioCacheService {
       await for (final entity in dir.list()) {
         if (entity is File) {
           final name = entity.path.split('/').last.split('\\').last;
+          // Skip temporary download files
+          if (name.endsWith('.tmp')) continue;
           if (name.startsWith(prefix)) {
             if (await entity.length() > 0) {
               return entity.path;
@@ -64,6 +79,7 @@ class AudioCacheService {
   }
 
   /// Download with progress callback. Returns local file path on success.
+  /// Uses a temporary file during download; only renames to final path on complete.
   Future<String?> download(
     String songId,
     String url, {
@@ -73,7 +89,8 @@ class AudioCacheService {
       final path = await getFilePath(songId, url);
       final file = File(path);
 
-      if (await file.exists()) {
+      // Already fully cached
+      if (await file.exists() && await file.length() > 0) {
         onProgress?.call(1.0);
         return path;
       }
@@ -84,6 +101,15 @@ class AudioCacheService {
         await oldMp3.delete();
       }
 
+      // Download to a temporary file first
+      final tmpPath = '$path.tmp';
+      final tmpFile = File(tmpPath);
+
+      // Clean up any previous incomplete download
+      if (await tmpFile.exists()) {
+        await tmpFile.delete();
+      }
+
       final request = http.Request('GET', Uri.parse(url));
       request.headers['User-Agent'] = 'Mozilla/5.0';
       final response = await _client.send(request);
@@ -92,7 +118,7 @@ class AudioCacheService {
         final totalBytes = response.contentLength ?? 0;
         int receivedBytes = 0;
 
-        final sink = file.openWrite();
+        final sink = tmpFile.openWrite();
         await for (final chunk in response.stream) {
           sink.add(chunk);
           receivedBytes += chunk.length;
@@ -100,8 +126,6 @@ class AudioCacheService {
             final progress = (receivedBytes / totalBytes).clamp(0.0, 1.0);
             onProgress?.call(progress);
           } else {
-            // No content-length: show indeterminate progress based on received MB
-            // Cap at 0.95 so user knows it's still downloading
             final mbReceived = receivedBytes / (1024 * 1024);
             final estimatedProgress = (mbReceived / 15.0).clamp(0.0, 0.95);
             onProgress?.call(estimatedProgress);
@@ -109,13 +133,30 @@ class AudioCacheService {
         }
         await sink.close();
 
-        if (await file.length() > 0) {
+        // Only rename to final path if download completed fully
+        if (await tmpFile.length() > 0) {
+          // If totalBytes was known, verify we got everything
+          if (totalBytes > 0 && receivedBytes < totalBytes) {
+            // Incomplete download, delete tmp
+            await tmpFile.delete();
+            return null;
+          }
+          await tmpFile.rename(path);
           onProgress?.call(1.0);
           return path;
         }
-        await file.delete();
+        await tmpFile.delete();
       }
-    } catch (_) {}
+    } catch (_) {
+      // Clean up tmp file on any error
+      try {
+        final path = await getFilePath(songId, url);
+        final tmpFile = File('$path.tmp');
+        if (await tmpFile.exists()) {
+          await tmpFile.delete();
+        }
+      } catch (_) {}
+    }
     return null;
   }
 }
