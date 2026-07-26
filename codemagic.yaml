@@ -28,27 +28,27 @@
           cp ios_native/CarPlaySceneDelegate.swift ios/Runner/CarPlaySceneDelegate.swift
           cp ios_native/Runner.entitlements ios/Runner/Runner.entitlements
 
-          # Overwrite Podfile with our custom one that sets platform to 14.0
+          # Overwrite Podfile with correct platform version
           cat > ios/Podfile << 'PODFILE'
-          platform :ios, '14.0'
+platform :ios, '14.0'
 
-          target 'Runner' do
-            use_frameworks!
-            use_modular_headers!
+target 'Runner' do
+  use_frameworks!
+  use_modular_headers!
 
-            flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 
-            target 'RunnerTests' do
-              inherit! :search_paths
-            end
-          end
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
+end
 
-          post_install do |installer|
-            installer.pods_project.targets.each do |target|
-              flutter_additional_ios_build_settings(target)
-            end
-          end
-          PODFILE
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+  end
+end
+PODFILE
 
       - name: Configure Xcode project
         script: |
@@ -273,3 +273,4 @@
 
     artifacts:
       - Runner.ipa
+
