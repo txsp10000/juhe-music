@@ -20,6 +20,7 @@ class PlayerService {
   bool _isPlaying = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
+  int _playGeneration = 0;
 
   MediaItem? _currentMediaItem;
 
@@ -143,6 +144,7 @@ class PlayerService {
     if (index < 0 || index >= playlist.length) return;
     _currentIndex = index;
     final song = playlist[index];
+    final currentGen = ++_playGeneration;
 
     final playId = song.lyricId.isNotEmpty ? song.lyricId : song.id;
     final picId = song.picId.isNotEmpty ? song.picId : song.id;
@@ -173,36 +175,43 @@ class PlayerService {
       }
     }
     song.lyric = lyric ?? '';
+    if (currentGen != _playGeneration) return;
 
     final results = await Future.wait([
       _fetchPlayUrl(song),
       _fetchCover(picId),
     ]);
+    if (currentGen != _playGeneration) return;
     final url = results[0] as String?;
     final coverUrl = results[1] as String?;
 
     if (coverUrl != null && coverUrl.isNotEmpty) {
       song.cover = coverUrl;
-      final coverCache = CoverCacheService();
-      final localPath = await coverCache.getLocalPath(picId);
-      final uri = localPath != null ? Uri.file(localPath) : Uri.parse(coverUrl);
+    }
+    final coverCache = CoverCacheService();
+    final localCover = await coverCache.getLocalPath(picId);
+    if (localCover != null || (coverUrl != null && coverUrl.isNotEmpty)) {
+      final uri = localCover != null ? Uri.file(localCover) : Uri.parse(coverUrl!);
       _currentMediaItem = _currentMediaItem!.copyWith(artUri: uri);
       try {
         AudioService.updateMediaItem(_currentMediaItem!);
       } catch (_) {}
     }
     if (url == null || url.isEmpty) return;
+    if (currentGen != _playGeneration) return;
 
     _currentUrl = url;
 
     final audioCache = AudioCacheService();
     String? localPath = await audioCache.download(song.id, url);
+    if (currentGen != _playGeneration) return;
 
     if (localPath != null) {
       await _player.open(Media('file://$localPath'), play: true);
     } else {
       await _player.open(Media(url), play: true);
     }
+    if (currentGen != _playGeneration) return;
 
     _notifySongChange(song);
   }
@@ -219,7 +228,7 @@ class PlayerService {
   Future<String?> _fetchCover(String picId) async {
     final coverCache = CoverCacheService();
     final cached = await coverCache.getLocalPath(picId);
-    if (cached != null) return 'cached';
+    if (cached != null) return null;
     try {
       final url = await MusicApi.getCover(picId);
       if (url.isNotEmpty) {

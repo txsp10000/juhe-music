@@ -20,7 +20,6 @@ class AudioCacheService {
     return _cacheDir!;
   }
 
-  /// 获取音频缓存文件路径
   Future<String> getFilePath(String songId, [String? url]) async {
     final dir = await _getCacheDir();
     final ext = _extractExt(url);
@@ -40,14 +39,11 @@ class AudioCacheService {
     return 'mp3';
   }
 
-  /// 检查音频是否已缓存
   Future<bool> isCached(String songId, [String? url]) async {
     final path = await getFilePath(songId, url);
     return File(path).exists();
   }
 
-  /// 下载音频到本地缓存，返回本地文件路径
-  /// 已缓存则直接返回，未缓存则下载
   Future<String?> download(String songId, String url) async {
     try {
       final path = await getFilePath(songId, url);
@@ -61,42 +57,18 @@ class AudioCacheService {
         await oldMp3.delete();
       }
 
-      final response = await _client.get(
-        Uri.parse(url),
-        headers: {'User-Agent': 'Mozilla/5.0'},
-      );
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers['User-Agent'] = 'Mozilla/5.0';
+      final response = await _client.send(request);
 
-      if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
-        await file.writeAsBytes(response.bodyBytes);
-        return path;
+      if (response.statusCode == 200) {
+        final sink = file.openWrite();
+        await response.stream.pipe(sink);
+        await sink.close();
+        if (await file.length() > 0) return path;
+        await file.delete();
       }
     } catch (_) {}
     return null;
   }
-
-  Duration? parseFlacDuration(String path) {
-    try {
-      final file = File(path);
-      final raf = file.openSync();
-      final header = raf.readSync(42);
-      raf.closeSync();
-      if (header.length < 42 ||
-          header[0] != 0x66 || header[1] != 0x4C ||
-          header[2] != 0x61 || header[3] != 0x43) {
-        return null;
-      }
-      final si = header.sublist(8, 42);
-      final sampleRate =
-          (si[10] << 12) | (si[11] << 4) | ((si[12] >> 4) & 0x0F);
-      if (sampleRate == 0) return null;
-      final totalSamples = ((si[13] & 0x0F) << 32) |
-          (si[14] << 24) | (si[15] << 16) | (si[16] << 8) | si[17];
-      if (totalSamples == 0) return null;
-      final ms = (totalSamples * 1000) ~/ sampleRate;
-      return Duration(milliseconds: ms);
-    } catch (_) {
-      return null;
-    }
-  }
-
 }

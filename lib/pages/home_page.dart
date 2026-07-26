@@ -48,6 +48,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   void _bindPlayer() {
+    _player.removeProgressListener(_onProgressUpdate);
+    _player.removeSongChangeListener(_onSongChange);
     _player.addProgressListener(_onProgressUpdate);
     _player.addSongChangeListener(_onSongChange);
     _player.onPlayStateChanged = (_) => mounted ? setState(() {}) : null;
