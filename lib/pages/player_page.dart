@@ -6,6 +6,7 @@ import '../models/song.dart';
 import '../utils/toast.dart';
 import 'playlist_page.dart';
 import 'search_result_page.dart';
+import '../services/settings_service.dart';
 import 'dart:typed_data';
 
 /// LRC 歌词行
@@ -316,8 +317,8 @@ class _PlayerPageState extends State<PlayerPage> {
               _buildTopBar(song),
               Expanded(child: _buildCenterContent(lyricText)),
               _buildDownloadProgress(),
-              _buildTimeBar(),
               _buildBottomActions(),
+              _buildTimeBar(),
               _buildControls(),
             ],
           ),
@@ -584,8 +585,66 @@ class _PlayerPageState extends State<PlayerPage> {
               ],
             ),
           ),
+          GestureDetector(
+            onTap: _showQualityPicker,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.high_quality, color: Color(0xFF8F919A), size: 22),
+                const SizedBox(height: 4),
+                Text(_qualityLabel(),
+                    style:
+                        const TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
+              ],
+            ),
+          ),
         ],
       ),
+    );
+  }
+
+  String _qualityLabel() {
+    switch (SettingsService().quality) {
+      case AudioQuality.low128: return '128k';
+      case AudioQuality.medium192: return '192k';
+      case AudioQuality.high320: return '320k';
+      case AudioQuality.lossless999: return '无损';
+    }
+  }
+
+  void _showQualityPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E2030),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text('音质选择', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+              ),
+              ...AudioQuality.values.map((q) {
+                final selected = SettingsService().quality == q;
+                return ListTile(
+                  title: Text(q.label, style: TextStyle(color: selected ? const Color(0xFF6890F9) : Colors.white, fontSize: 15)),
+                  trailing: selected ? const Icon(Icons.check_circle, color: Color(0xFF6890F9), size: 20) : null,
+                  onTap: () async {
+                    await SettingsService().setQuality(q);
+                    Navigator.pop(ctx);
+                    if (mounted) setState(() {});
+                  },
+                );
+              }),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
     );
   }
 
