@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../api/music_api.dart';
 import '../models/song.dart';
 import '../services/player_service.dart';
@@ -157,6 +157,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
                     itemBuilder: (_, i) {
                       final s = _songs[i];
                       final isFav = _favoritedIds.contains(s.id);
+                      final isCurrent = _player.currentSong?.id == s.id;
                       return InkWell(
                         onTap: () => _playAt(i),
                         child: Container(
@@ -170,8 +171,8 @@ class _SearchResultPageState extends State<SearchResultPage> {
                           child: Row(
                             children: [
                               Text('${i + 1}',
-                                  style: const TextStyle(
-                                      color: Color(0xFF8F919A),
+                                  style: TextStyle(
+                                      color: isCurrent ? const Color(0xFF6890F9) : const Color(0xFF8F919A),
                                       fontSize: 14)),
                               const SizedBox(width: 14),
                               Expanded(
@@ -180,8 +181,8 @@ class _SearchResultPageState extends State<SearchResultPage> {
                                       CrossAxisAlignment.start,
                                   children: [
                                     Text(s.name,
-                                        style: const TextStyle(
-                                            color: Color(0xFFE0E0E0),
+                                        style: TextStyle(
+                                            color: isCurrent ? const Color(0xFF6890F9) : const Color(0xFFE0E0E0),
                                             fontSize: 16),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis),

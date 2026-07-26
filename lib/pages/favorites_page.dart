@@ -155,6 +155,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
                     ),
                   );
                 }
+                final isCurrent = _player.currentSong?.id == s.id;
                 return SwipeActionCell(
                   actionLabel: '删除',
                   actionColor: Colors.red,
@@ -168,13 +169,13 @@ class _FavoritesPageState extends State<FavoritesPage> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.music_note, color: Color(0xFF8F919A), size: 22),
+                          Icon(Icons.music_note, color: isCurrent ? const Color(0xFF6890F9) : const Color(0xFF8F919A), size: 22),
                           const SizedBox(width: 14),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(s.name, style: const TextStyle(color: Color(0xFFE0E0E0), fontSize: 16)),
+                                Text(s.name, style: TextStyle(color: isCurrent ? const Color(0xFF6890F9) : const Color(0xFFE0E0E0), fontSize: 16)),
                                 const SizedBox(height: 4),
                                 Text(s.singer, style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
                               ],
