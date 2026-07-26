@@ -25,8 +25,19 @@ class _SearchResultPageState extends State<SearchResultPage> {
   void initState() {
     super.initState();
     _search();
+    _player.addSongChangeListener(_onSongChange);
   }
 
+
+  void _onSongChange(Song _) {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _player.removeSongChangeListener(_onSongChange);
+    super.dispose();
+  }
   Future<void> _search() async {
     try {
       final result = await MusicApi.searchRaw(widget.keyword);
@@ -161,35 +172,35 @@ class _SearchResultPageState extends State<SearchResultPage> {
                       return InkWell(
                         onTap: () => _playAt(i),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 14),
-                          decoration: const BoxDecoration(
-                            border: Border(
-                                bottom: BorderSide(
-                                    color: Color(0x15FFFFFF))),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                          decoration: BoxDecoration(
+                            color: isCurrent ? const Color(0x1A6890F9) : Colors.transparent,
+                            border: isCurrent
+                                ? const Border(bottom: BorderSide(color: Color(0xFF6890F9), width: 2))
+                                : const Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
                           ),
                           child: Row(
                             children: [
-                              Text('${i + 1}',
-                                  style: TextStyle(
-                                      color: isCurrent ? const Color(0xFF6890F9) : const Color(0xFF8F919A),
-                                      fontSize: 14)),
+                              SizedBox(
+                                width: 28,
+                                child: isCurrent
+                                    ? const Icon(Icons.volume_up, color: Color(0xFF6890F9), size: 22)
+                                    : Text('${i + 1}', textAlign: TextAlign.center,
+                                        style: const TextStyle(color: Color(0xFF8F919A), fontSize: 14)),
+                              ),
                               const SizedBox(width: 14),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(s.name,
                                         style: TextStyle(
-                                            color: isCurrent ? const Color(0xFF6890F9) : const Color(0xFFE0E0E0),
+                                            color: isCurrent ? const Color(0xFF6890F9) : Colors.white,
                                             fontSize: 16),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis),
                                     Text(s.singer,
-                                        style: const TextStyle(
-                                            color: Color(0xFF8F919A),
-                                            fontSize: 13)),
+                                        style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
                                   ],
                                 ),
                               ),

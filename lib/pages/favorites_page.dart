@@ -25,6 +25,16 @@ class _FavoritesPageState extends State<FavoritesPage> {
     _load();
   }
 
+  void _onSongChange(Song _) {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _player.removeSongChangeListener(_onSongChange);
+    super.dispose();
+  }
+
   Future<void> _load() async {
     final songs = await FavoritesService.load();
     if (mounted) setState(() => _songs = songs);
@@ -164,20 +174,32 @@ class _FavoritesPageState extends State<FavoritesPage> {
                     onTap: () => _playAt(i),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                      decoration: const BoxDecoration(
-                        border: Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
+                      decoration: BoxDecoration(
+                        color: isCurrent ? const Color(0x1A6890F9) : Colors.transparent,
+                        border: isCurrent
+                            ? const Border(bottom: BorderSide(color: Color(0xFF6890F9), width: 2))
+                            : const Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.music_note, color: isCurrent ? const Color(0xFF6890F9) : const Color(0xFF8F919A), size: 22),
+                          SizedBox(
+                            width: 28,
+                            child: isCurrent
+                                ? const Icon(Icons.volume_up, color: Color(0xFF6890F9), size: 22)
+                                : Text('${i + 1}', textAlign: TextAlign.center,
+                                    style: const TextStyle(color: Color(0xFF8F919A), fontSize: 14)),
+                          ),
                           const SizedBox(width: 14),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(s.name, style: TextStyle(color: isCurrent ? const Color(0xFF6890F9) : const Color(0xFFE0E0E0), fontSize: 16)),
-                                const SizedBox(height: 4),
-                                Text(s.singer, style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
+                                Text(s.name,
+                                    style: TextStyle(
+                                        color: isCurrent ? const Color(0xFF6890F9) : Colors.white,
+                                        fontSize: 16)),
+                                Text(s.singer,
+                                    style: const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
                               ],
                             ),
                           ),
