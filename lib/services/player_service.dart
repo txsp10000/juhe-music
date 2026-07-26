@@ -1,4 +1,5 @@
-﻿import 'dart:async';
+﻿import 'dart:io';
+import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:audio_service/audio_service.dart';
@@ -205,6 +206,32 @@ class PlayerService {
     song.lyric = lyric ?? '';
     if (currentGen != _playGeneration) return;
 
+    // Check local audio cache first (offline support)
+    final audioCache = AudioCacheService();
+    final cachedPath = await audioCache.getFilePath(song.id);
+    final cachedFile = File(cachedPath);
+    final hasCachedAudio = await cachedFile.exists() && (await cachedFile.length()) > 0;
+
+    // Load cover from local cache
+    final coverCache = CoverCacheService();
+    final localCover = await coverCache.getLocalPath(picId);
+    if (localCover != null) {
+      if (song.cover.isEmpty) song.cover = 'file://$localCover';
+      final uri = Uri.file(localCover);
+      _currentMediaItem = _currentMediaItem!.copyWith(artUri: uri);
+      try { AudioService.updateMediaItem(_currentMediaItem!); } catch (_) {}
+    }
+
+    // If audio is already cached locally, play directly without network
+    if (hasCachedAudio) {
+      await _player.open(Media('file://$cachedPath'), play: true);
+      if (currentGen != _playGeneration) return;
+      _notifySongChange(song);
+      return;
+    }
+
+    // Not cached: fetch URL from network, download, then play
+    if (currentGen != _playGeneration) return;
     final results = await Future.wait([
       _fetchPlayUrl(song),
       _fetchCover(picId),
@@ -216,28 +243,30 @@ class PlayerService {
     if (coverUrl != null && coverUrl.isNotEmpty) {
       song.cover = coverUrl;
     }
-    final coverCache = CoverCacheService();
-    final localCover = await coverCache.getLocalPath(picId);
-    if (localCover != null) {
-      if (song.cover.isEmpty) song.cover = 'file://$localCover';
-      final uri = Uri.file(localCover);
-      _currentMediaItem = _currentMediaItem!.copyWith(artUri: uri);
-      try {
-        AudioService.updateMediaItem(_currentMediaItem!);
-      } catch (_) {}
-    } else if (coverUrl != null && coverUrl.isNotEmpty) {
-      final uri = Uri.parse(coverUrl);
-      _currentMediaItem = _currentMediaItem!.copyWith(artUri: uri);
-      try {
-        AudioService.updateMediaItem(_currentMediaItem!);
-      } catch (_) {}
+    // Update cover if fetched from network
+    if (localCover == null) {
+      final networkCover = await coverCache.getLocalPath(picId);
+      if (networkCover != null) {
+        final uri = Uri.file(networkCover);
+        _currentMediaItem = _currentMediaItem!.copyWith(artUri: uri);
+        try { AudioService.updateMediaItem(_currentMediaItem!); } catch (_) {}
+      } else if (coverUrl != null && coverUrl.isNotEmpty) {
+        final uri = Uri.parse(coverUrl);
+        _currentMediaItem = _currentMediaItem!.copyWith(artUri: uri);
+        try { AudioService.updateMediaItem(_currentMediaItem!); } catch (_) {}
+      }
     }
-    if (url == null || url.isEmpty) return;
+
+    if (url == null || url.isEmpty) {
+      // No URL available (offline and not cached) - skip to next
+      if (_currentIndex < playlist.length - 1) {
+        playAt(_currentIndex + 1);
+      }
+      return;
+    }
     if (currentGen != _playGeneration) return;
 
     _currentUrl = url;
-
-    final audioCache = AudioCacheService();
     _notifyDownloadProgress(0.0);
     String? localPath = await audioCache.download(song.id, url, onProgress: (p) {
       if (currentGen == _playGeneration) {
@@ -375,6 +404,5 @@ class _AudioPlayerTask extends BaseAudioHandler {
   @override
   Future<void> skipToPrevious() async => PlayerService().prev();
 }
-
 
 
