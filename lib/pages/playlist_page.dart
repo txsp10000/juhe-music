@@ -15,12 +15,30 @@ class PlaylistPage extends StatefulWidget {
 class _PlaylistPageState extends State<PlaylistPage> {
   final _player = PlayerService();
 
+  @override
+  void initState() {
+    super.initState();
+    _player.addSongChangeListener(_onSongChange);
+  }
+
+  void _onSongChange(Song _) {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _player.removeSongChangeListener(_onSongChange);
+    super.dispose();
+  }
+
   void _playAt(int index) {
     if (_player.currentSong?.id == _player.playlist[index].id) {
       if (widget.fromPlayer) {
         Navigator.pop(context);
       } else {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage())).then((_) {
+          if (mounted) setState(() {});
+        });
       }
       return;
     }
@@ -28,7 +46,9 @@ class _PlaylistPageState extends State<PlaylistPage> {
     if (widget.fromPlayer) {
       Navigator.pop(context);
     } else {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage())).then((_) {
+        if (mounted) setState(() {});
+      });
     }
   }
 
