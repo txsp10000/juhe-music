@@ -7,7 +7,8 @@ import '../utils/toast.dart';
 import 'player_page.dart';
 
 class FavoritesPage extends StatefulWidget {
-  const FavoritesPage({super.key});
+  final bool fromPlayer;
+  const FavoritesPage({super.key, this.fromPlayer = false});
 
   @override
   State<FavoritesPage> createState() => _FavoritesPageState();
@@ -43,14 +44,25 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
   void _playAt(int index) {
     if (_player.currentSong?.id == _songs[index].id) {
-      // Already playing this song, just open player
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+      if (widget.fromPlayer) {
+        Navigator.pop(context);
+      } else {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage())).then((_) {
+          if (mounted) setState(() {});
+        });
+      }
       return;
     }
     _player.playlist.clear();
     _player.playlist.addAll(_songs);
     _player.playAt(index);
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+    if (widget.fromPlayer) {
+      Navigator.pop(context);
+    } else {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage())).then((_) {
+        if (mounted) setState(() {});
+      });
+    }
   }
 
 

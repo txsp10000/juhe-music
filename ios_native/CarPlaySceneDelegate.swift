@@ -7,6 +7,7 @@ import Flutter
 class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   var interfaceController: CPInterfaceController?
   private var methodChannel: FlutterMethodChannel?
+  private var retryTimer: Timer?
 
   func templateApplicationScene(
     _ templateApplicationScene: CPTemplateApplicationScene,
@@ -23,19 +24,18 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   ) {
     self.interfaceController = nil
     self.methodChannel = nil
+    retryTimer?.invalidate()
+    retryTimer = nil
   }
 
   private func setupMethodChannel() {
-    // Try multiple ways to get the Flutter engine's binary messenger
     var messenger: FlutterBinaryMessenger?
 
-    // Method 1: Get from the app delegate's window root view controller
     if let appDelegate = UIApplication.shared.delegate as? FlutterAppDelegate,
        let controller = appDelegate.window?.rootViewController as? FlutterViewController {
       messenger = controller.binaryMessenger
     }
 
-    // Method 2: Search connected scenes for the Flutter window scene
     if messenger == nil {
       for scene in UIApplication.shared.connectedScenes {
         if let windowScene = scene as? UIWindowScene {
@@ -51,25 +51,43 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     }
 
     guard let binaryMessenger = messenger else {
-      // Retry after a short delay if Flutter engine isn't ready yet
-      DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-        self?.setupMethodChannel()
-        if self?.methodChannel != nil {
-          self?.showRootTemplate()
-        }
-      }
+      startRetryTimer()
       return
     }
+
+    retryTimer?.invalidate()
+    retryTimer = nil
 
     methodChannel = FlutterMethodChannel(
       name: "com.miaomiao.music/carplay",
       binaryMessenger: binaryMessenger
     )
+
+    refreshAllTabs()
+  }
+
+  private func startRetryTimer() {
+    retryTimer?.invalidate()
+    retryTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] timer in
+      guard let self = self else { timer.invalidate(); return }
+      self.setupMethodChannel()
+    }
+  }
+
+  private func refreshAllTabs() {
+    guard let tabBar = interfaceController?.rootTemplate as? CPTabBarTemplate else { return }
+    for template in tabBar.templates {
+      if let listTemplate = template as? CPListTemplate {
+        if listTemplate.tabTitle == "播放列表" {
+          refreshPlaylist(template: listTemplate)
+        } else if listTemplate.tabTitle == "收藏" {
+          refreshFavorites(template: listTemplate)
+        }
+      }
+    }
   }
 
   private func showRootTemplate() {
-    guard methodChannel != nil else { return }
-
     let favoritesTab = createFavoritesTab()
     let playlistTab = createPlaylistTab()
 
@@ -80,7 +98,9 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
 
   // MARK: - Playlist Tab
   private func createPlaylistTab() -> CPListTemplate {
-    let template = CPListTemplate(title: "播放列表", sections: [])
+    let loadingItem = CPListItem(text: "加载中...", detailText: "正在获取播放列表")
+    let section = CPListSection(items: [loadingItem])
+    let template = CPListTemplate(title: "播放列表", sections: [section])
     template.tabImage = UIImage(systemName: "music.note.list") ?? UIImage()
     template.tabTitle = "播放列表"
     template.emptyViewTitleVariants = ["暂无播放列表"]
@@ -93,7 +113,9 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
 
   // MARK: - Favorites Tab
   private func createFavoritesTab() -> CPListTemplate {
-    let template = CPListTemplate(title: "收藏", sections: [])
+    let loadingItem = CPListItem(text: "加载中...", detailText: "正在获取收藏列表")
+    let section = CPListSection(items: [loadingItem])
+    let template = CPListTemplate(title: "收藏", sections: [section])
     template.tabImage = UIImage(systemName: "heart.fill") ?? UIImage()
     template.tabTitle = "收藏"
     template.emptyViewTitleVariants = ["暂无收藏"]
@@ -106,10 +128,16 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
 
   // MARK: - Data Loading
   private func refreshPlaylist(template: CPListTemplate) {
-    methodChannel?.invokeMethod("getCurrentSongId", arguments: nil) { currentId in
+    guard let channel = methodChannel else { return }
+    channel.invokeMethod("getCurrentSongId", arguments: nil) { currentId in
       let songId = currentId as? String
-      self.methodChannel?.invokeMethod("getPlaylist", arguments: nil) { result in
-        guard let songs = result as? [[String: Any]] else { return }
+      channel.invokeMethod("getPlaylist", arguments: nil) { result in
+        guard let songs = result as? [[String: Any]], !songs.isEmpty else {
+          let emptyItem = CPListItem(text: "暂无歌曲", detailText: "在手机上播放音乐后显示")
+          let section = CPListSection(items: [emptyItem])
+          template.updateSections([section])
+          return
+        }
         let items = self.buildListItems(from: songs, action: "playAtIndex", currentSongId: songId)
         let section = CPListSection(items: items, header: "当前播放列表", sectionIndexTitle: nil)
         template.updateSections([section])
@@ -118,10 +146,16 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   }
 
   private func refreshFavorites(template: CPListTemplate) {
-    methodChannel?.invokeMethod("getCurrentSongId", arguments: nil) { currentId in
+    guard let channel = methodChannel else { return }
+    channel.invokeMethod("getCurrentSongId", arguments: nil) { currentId in
       let songId = currentId as? String
-      self.methodChannel?.invokeMethod("getFavorites", arguments: nil) { result in
-        guard let songs = result as? [[String: Any]] else { return }
+      channel.invokeMethod("getFavorites", arguments: nil) { result in
+        guard let songs = result as? [[String: Any]], !songs.isEmpty else {
+          let emptyItem = CPListItem(text: "暂无收藏", detailText: "收藏歌曲后会在这里显示")
+          let section = CPListSection(items: [emptyItem])
+          template.updateSections([section])
+          return
+        }
         let items = self.buildListItems(from: songs, action: "playFavorite", currentSongId: songId)
         let section = CPListSection(items: items, header: "我的收藏", sectionIndexTitle: nil)
         template.updateSections([section])
@@ -141,7 +175,6 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
       }
       item.handler = { [weak self] _, completion in
         self?.methodChannel?.invokeMethod(action, arguments: index)
-        // Push now playing template
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
           if let intf = self?.interfaceController {
             let nowPlaying = CPNowPlayingTemplate.shared

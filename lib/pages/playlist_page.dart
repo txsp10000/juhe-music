@@ -5,7 +5,8 @@ import '../widgets/swipe_action_cell.dart';
 import 'player_page.dart';
 
 class PlaylistPage extends StatefulWidget {
-  const PlaylistPage({super.key});
+  final bool fromPlayer;
+  const PlaylistPage({super.key, this.fromPlayer = false});
 
   @override
   State<PlaylistPage> createState() => _PlaylistPageState();
@@ -16,12 +17,19 @@ class _PlaylistPageState extends State<PlaylistPage> {
 
   void _playAt(int index) {
     if (_player.currentSong?.id == _player.playlist[index].id) {
-      // Already playing this song, just open player
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+      if (widget.fromPlayer) {
+        Navigator.pop(context);
+      } else {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+      }
       return;
     }
     _player.playAt(index);
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+    if (widget.fromPlayer) {
+      Navigator.pop(context);
+    } else {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+    }
   }
 
 

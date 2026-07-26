@@ -172,7 +172,7 @@ class _PlayerPageState extends State<PlayerPage> {
                     context,
                     MaterialPageRoute(
                         builder: (_) =>
-                            SearchResultPage(keyword: song.name)));
+                            SearchResultPage(keyword: song.name, fromPlayer: true)));
               },
             ),
             ListTile(
@@ -185,7 +185,7 @@ class _PlayerPageState extends State<PlayerPage> {
                     context,
                     MaterialPageRoute(
                         builder: (_) =>
-                            SearchResultPage(keyword: song.singer)));
+                            SearchResultPage(keyword: song.singer, fromPlayer: true)));
               },
             ),
           ],
@@ -372,7 +372,7 @@ class _PlayerPageState extends State<PlayerPage> {
           const SizedBox(width: 12),
           GestureDetector(
             onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const PlaylistPage())),
+                MaterialPageRoute(builder: (_) => const PlaylistPage(fromPlayer: true))),
             child:
                 const Icon(Icons.queue_music, color: Colors.white, size: 26),
           ),
@@ -667,6 +667,7 @@ class _PlayerPageState extends State<PlayerPage> {
         .trim();
   }
 }
+
 
 
 

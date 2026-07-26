@@ -8,7 +8,8 @@ import 'player_page.dart';
 
 class SearchResultPage extends StatefulWidget {
   final String keyword;
-  const SearchResultPage({super.key, required this.keyword});
+  final bool fromPlayer;
+  const SearchResultPage({super.key, required this.keyword, this.fromPlayer = false});
 
   @override
   State<SearchResultPage> createState() => _SearchResultPageState();
@@ -43,7 +44,6 @@ class _SearchResultPageState extends State<SearchResultPage> {
       final result = await MusicApi.searchRaw(widget.keyword);
       if (!mounted) return;
       if (result.songs.isNotEmpty) {
-        // 后台加载封面
         final picIds =
             result.songs.map((s) => s.picId.isNotEmpty ? s.picId : s.id).toList();
         MusicApi.getCovers(picIds).then((covers) {
@@ -77,18 +77,24 @@ class _SearchResultPageState extends State<SearchResultPage> {
 
   void _playAt(int index) {
     if (_player.currentSong?.id == _songs[index].id) {
-      // Already playing this song, just open player
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+      if (widget.fromPlayer) {
+        Navigator.pop(context);
+      } else {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+      }
       return;
     }
     _player.playlist.clear();
     _player.playlist.addAll(_songs);
     _player.playAt(index);
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+    if (widget.fromPlayer) {
+      Navigator.pop(context);
+    } else {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+    }
   }
 
   Future<void> _favoriteAll() async {
-    // 过滤掉已收藏的
     final notFav = _songs.where((s) => !_favoritedIds.contains(s.id)).toList();
     if (notFav.isEmpty) {
       if (mounted) Toast.show(context, '全部歌曲已收藏');
