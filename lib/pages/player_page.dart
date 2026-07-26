@@ -83,18 +83,24 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   Future<void> _loadCover(Song song) async {
-    if (song.cover.isEmpty) return;
+    if (song.cover.isEmpty) {
+      print('[Cover] song.cover is empty for: ${song.name}');
+      return;
+    }
     if (song.cover == _coverUrl && _coverBytes != null) return;
     final url = song.cover;
     _coverUrl = url;
     _coverBytes = null;
+    print('[Cover] Loading cover for: ${song.name}, url: $url');
     try {
       final resp = await http.get(Uri.parse(url),
           headers: {'User-Agent': 'Mozilla/5.0'});
+      print('[Cover] Response status: ${resp.statusCode}, bytes: ${resp.bodyBytes.length}');
       if (resp.statusCode == 200 && resp.bodyBytes.isNotEmpty && mounted && _coverUrl == url) {
         setState(() => _coverBytes = resp.bodyBytes);
       }
-    } catch (_) {
+    } catch (e) {
+      print('[Cover] Error: $e');
       if (_coverUrl == url) _coverUrl = '';
     }
   }

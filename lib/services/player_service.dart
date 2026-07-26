@@ -244,8 +244,14 @@ class _AudioPlayerTask extends BaseAudioHandler {
         final updated = item.copyWith(duration: dur);
         mediaItem.add(updated);
         ps._currentMediaItem = updated;
-        try { AudioService.updateMediaItem(updated); } catch (_) {}
         _syncNowPlaying();
+      }
+    });
+
+    ps.addSongChangeListener((song) {
+      final item = ps._currentMediaItem;
+      if (item != null) {
+        mediaItem.add(item);
       }
     });
   }

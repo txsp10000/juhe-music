@@ -34,7 +34,7 @@ import MediaPlayer
       channel.setMethodCallHandler { [weak self] (call, result) in
         guard let self = self else { result(nil); return }
         if call.method == "update", let args = call.arguments as? [String: Any] {
-          var info: [String: Any] = [:]
+          var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
           if let title = args["title"] as? String, !title.isEmpty {
             info[MPMediaItemPropertyTitle] = title
           }
@@ -59,6 +59,7 @@ import MediaPlayer
 
           if let artUri = args["artUri"] as? String, !artUri.isEmpty, artUri != self.lastArtUri {
             self.lastArtUri = artUri
+            print("[NowPlaying] New artUri: \(artUri)")
             self.loadArtwork(from: artUri)
           }
           result(nil)
@@ -70,11 +71,27 @@ import MediaPlayer
   }
 
   private func loadArtwork(from urlString: String) {
-    guard let url = URL(string: urlString) else { return }
+    guard let url = URL(string: urlString) else {
+      print("[Artwork] Invalid URL: \(urlString)")
+      return
+    }
+    print("[Artwork] Downloading: \(urlString)")
     var request = URLRequest(url: url)
     request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
-    URLSession.shared.dataTask(with: request) { [weak self] data, _, _ in
-      guard let self = self, let data = data, let image = UIImage(data: data) else { return }
+    URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+      if let error = error {
+        print("[Artwork] Error: \(error)")
+        return
+      }
+      guard let self = self, let data = data, !data.isEmpty else {
+        print("[Artwork] No data received")
+        return
+      }
+      guard let image = UIImage(data: data) else {
+        print("[Artwork] Failed to create image from data (\(data.count) bytes)")
+        return
+      }
+      print("[Artwork] Success: \(image.size), \(data.count) bytes")
       let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
       DispatchQueue.main.async {
         self.cachedArtwork = artwork
