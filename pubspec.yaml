@@ -11,7 +11,8 @@ dependencies:
     sdk: flutter
   http: ^1.1.0
   shared_preferences: ^2.2.2
-  just_audio: ^0.9.39
+  media_kit: ^1.2.6
+  media_kit_libs_ios_audio: ^1.0.4
   audio_service: ^0.18.12
   path_provider: ^2.1.1
 

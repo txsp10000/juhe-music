@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:audio_service/audio_service.dart';
 import '../models/song.dart';
 import '../api/music_api.dart';
@@ -12,12 +12,14 @@ class PlayerService {
   factory PlayerService() => _instance;
   PlayerService._();
 
-  final _player = AudioPlayer();
+  late final Player _player;
   final List<Song> playlist = [];
   int _currentIndex = -1;
   String? _currentUrl;
+  bool _isPlaying = false;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
 
-  /// 当前播放的 MediaItem（CarPlay / 锁屏显示）
   MediaItem? _currentMediaItem;
 
   Song? get currentSong =>
@@ -25,9 +27,9 @@ class PlayerService {
           ? playlist[_currentIndex]
           : null;
   int get currentIndex => _currentIndex;
-  bool get isPlaying => _player.playing;
-  Duration get position => _player.position;
-  Duration? get duration => _player.duration;
+  bool get isPlaying => _isPlaying;
+  Duration get position => _position;
+  Duration? get duration => _duration;
 
   void Function(bool playing)? onPlayStateChanged;
 
@@ -62,12 +64,15 @@ class PlayerService {
     }
   }
 
-  // 歌词轮询定时器
-  StreamSubscription<Duration>? _positionSub;
+  StreamSubscription? _positionSub;
+  StreamSubscription? _durationSub;
+  StreamSubscription? _playingSub;
+  StreamSubscription? _completedSub;
 
-  /// 初始化 audio_service 和 just_audio
   static Future<void> init() async {
+    MediaKit.ensureInitialized();
     final instance = PlayerService();
+    instance._player = Player();
 
     await AudioService.init(
       builder: () => _AudioPlayerTask(),
@@ -80,25 +85,28 @@ class PlayerService {
       ),
     );
 
-    // 用 positionStream 替代 Timer.periodic：由音频硬件时钟驱动，无跨平台轮询延迟
-    instance._positionSub = instance._player.positionStream.listen((pos) {
-      instance._notifyProgress(pos, instance._player.duration);
+    instance._positionSub = instance._player.stream.position.listen((pos) {
+      instance._position = pos;
+      instance._notifyProgress(pos, instance._duration);
     });
 
-    instance._player.playerStateStream.listen((state) {
-      instance.onPlayStateChanged?.call(state.playing);
-      if (state.processingState == ProcessingState.completed) {
-        instance._onComplete();
-      }
-    });
-
-    instance._player.durationStream.listen((dur) {
-      if (dur != null && instance._currentMediaItem != null) {
+    instance._durationSub = instance._player.stream.duration.listen((dur) {
+      instance._duration = dur;
+      if (instance._currentMediaItem != null) {
         try {
           AudioService.updateMediaItem(
               instance._currentMediaItem!.copyWith(duration: dur));
         } catch (_) {}
       }
+    });
+
+    instance._playingSub = instance._player.stream.playing.listen((playing) {
+      instance._isPlaying = playing;
+      instance.onPlayStateChanged?.call(playing);
+    });
+
+    instance._completedSub = instance._player.stream.completed.listen((completed) {
+      if (completed) instance._onComplete();
     });
   }
 
@@ -123,15 +131,11 @@ class PlayerService {
   }
 
   void togglePlayPause() {
-    if (_player.playing) {
-      _player.pause();
-    } else {
-      _player.play();
-    }
+    _player.playOrPause();
   }
 
   Future<void> seek(Duration position) async {
-    await _player.seek(position);
+    _player.seek(position);
   }
 
   Future<void> playAt(int index) async {
@@ -142,7 +146,6 @@ class PlayerService {
     final playId = song.lyricId.isNotEmpty ? song.lyricId : song.id;
     final picId = song.picId.isNotEmpty ? song.picId : song.id;
 
-    // 先设置 MediaItem（CarPlay 立即显示歌曲名）
     _currentMediaItem = MediaItem(
       id: song.id,
       title: song.name,
@@ -154,7 +157,6 @@ class PlayerService {
       await AudioService.updateMediaItem(_currentMediaItem!);
     } catch (_) {}
 
-    // 1. 歌词：本地缓存优先，没有则下载并缓存
     final lyricCache = LyricCacheService();
     String? lyric = await lyricCache.load(playId);
     if (lyric == null || lyric.isEmpty) {
@@ -171,7 +173,6 @@ class PlayerService {
     }
     song.lyric = lyric ?? '';
 
-    // 2. 获取播放地址和封面
     final results = await Future.wait([
       _fetchPlayUrl(song),
       MusicApi.getCover(picId),
@@ -192,14 +193,14 @@ class PlayerService {
 
     _currentUrl = url;
 
-    // 3. 直接使用网络 URL 流式播放（和 Safari 一样通过 HTTP Range 实现精确 seek）
-    await _player.setAudioSource(
-      AudioSource.uri(
-        Uri.parse(url),
-        headers: const {'User-Agent': 'Mozilla/5.0'},
-      ),
-    );
-    _player.play();
+    final audioCache = AudioCacheService();
+    String? localPath = await audioCache.download(song.id, url);
+
+    if (localPath != null) {
+      await _player.open(Media('file://$localPath'), play: true);
+    } else {
+      await _player.open(Media(url), play: true);
+    }
 
     _notifySongChange(song);
   }
@@ -215,81 +216,77 @@ class PlayerService {
 
   void dispose() {
     _positionSub?.cancel();
+    _durationSub?.cancel();
+    _playingSub?.cancel();
+    _completedSub?.cancel();
     _player.dispose();
   }
 }
 
-/// audio_service 后台音频任务（iOS: CarPlay / 锁屏控制）
 class _AudioPlayerTask extends BaseAudioHandler {
-  final _player = PlayerService()._player;
-
   static const _nowPlayingChannel = MethodChannel('com.miaomiao.music/nowplaying');
 
   _AudioPlayerTask() {
-    _player.playbackEventStream.listen((event) {
-      playbackState.add(playbackState.value.copyWith(
-        controls: [
-          MediaControl.skipToPrevious,
-          if (_player.playing) MediaControl.pause else MediaControl.play,
-          MediaControl.skipToNext,
-        ],
-        processingState: _mapProcessingState(_player.processingState),
-        playing: _player.playing,
-        updatePosition: _player.position,
-        bufferedPosition: _player.bufferedPosition,
-        speed: _player.speed,
-      ));
+    final ps = PlayerService();
+
+    ps._player.stream.playing.listen((playing) {
+      _updatePlaybackState();
+    });
+
+    ps._player.stream.position.listen((_) {
+      _updatePlaybackState();
       _syncNowPlaying();
     });
 
-    _player.playerStateStream.listen((state) {
-      if (state.processingState == ProcessingState.ready) {
-        final item = PlayerService()._currentMediaItem;
-        if (item != null) {
-          final updated = item.copyWith(
-            duration: _player.duration ?? Duration.zero,
-          );
-          mediaItem.add(updated);
-          PlayerService()._currentMediaItem = updated;
-          try { AudioService.updateMediaItem(updated); } catch (_) {}
-          _syncNowPlaying();
-        }
+    ps._player.stream.duration.listen((dur) {
+      final item = ps._currentMediaItem;
+      if (item != null && dur > Duration.zero) {
+        final updated = item.copyWith(duration: dur);
+        mediaItem.add(updated);
+        ps._currentMediaItem = updated;
+        try { AudioService.updateMediaItem(updated); } catch (_) {}
+        _syncNowPlaying();
       }
     });
   }
 
-  /// 直接更新 MPNowPlayingInfoCenter（绕过 audio_service 的时机问题）
+  void _updatePlaybackState() {
+    final ps = PlayerService();
+    playbackState.add(playbackState.value.copyWith(
+      controls: [
+        MediaControl.skipToPrevious,
+        if (ps._isPlaying) MediaControl.pause else MediaControl.play,
+        MediaControl.skipToNext,
+      ],
+      processingState: AudioProcessingState.ready,
+      playing: ps._isPlaying,
+      updatePosition: ps._position,
+      speed: 1.0,
+    ));
+  }
+
   void _syncNowPlaying() {
-    final item = PlayerService()._currentMediaItem;
+    final ps = PlayerService();
+    final item = ps._currentMediaItem;
     if (item == null) return;
     _nowPlayingChannel.invokeMethod('update', {
       'title': item.title,
       'artist': item.artist,
       'album': item.album ?? '',
-      'duration': (_player.duration?.inMilliseconds ?? 0) / 1000.0,
-      'elapsedTime': _player.position.inMilliseconds / 1000.0,
-      'playbackRate': _player.playing ? 1.0 : 0.0,
+      'duration': ps._duration.inMilliseconds / 1000.0,
+      'elapsedTime': ps._position.inMilliseconds / 1000.0,
+      'playbackRate': ps._isPlaying ? 1.0 : 0.0,
     });
   }
 
-  AudioProcessingState _mapProcessingState(ProcessingState s) {
-    return switch (s) {
-      ProcessingState.idle => AudioProcessingState.idle,
-      ProcessingState.loading => AudioProcessingState.loading,
-      ProcessingState.buffering => AudioProcessingState.buffering,
-      ProcessingState.ready => AudioProcessingState.ready,
-      ProcessingState.completed => AudioProcessingState.completed,
-    };
-  }
+  @override
+  Future<void> play() async => PlayerService()._player.play();
 
   @override
-  Future<void> play() async => _player.play();
+  Future<void> pause() async => PlayerService()._player.pause();
 
   @override
-  Future<void> pause() async => _player.pause();
-
-  @override
-  Future<void> stop() async => _player.stop();
+  Future<void> stop() async => PlayerService()._player.stop();
 
   @override
   Future<void> seek(Duration position) async => PlayerService().seek(position);

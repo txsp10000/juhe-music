@@ -1,7 +1,6 @@
 import Flutter
 import UIKit
 import AVFAudio
-import AVFoundation
 import MediaPlayer
 
 @main
@@ -10,7 +9,6 @@ import MediaPlayer
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    AVPlayerPreciseSeekSwizzle.activate()
     GeneratedPluginRegistrant.register(with: self)
 
     let session = AVAudioSession.sharedInstance()
@@ -56,23 +54,5 @@ import MediaPlayer
     }
 
     return result
-  }
-}
-
-class AVPlayerPreciseSeekSwizzle {
-  static func activate() {
-    let originalSelector = NSSelectorFromString("seekToTime:completionHandler:")
-    let swizzledSelector = #selector(AVPlayer.preciseSeekToTime(_:completionHandler:))
-    guard let originalMethod = class_getInstanceMethod(AVPlayer.self, originalSelector),
-          let swizzledMethod = class_getInstanceMethod(AVPlayer.self, swizzledSelector) else {
-      return
-    }
-    method_exchangeImplementations(originalMethod, swizzledMethod)
-  }
-}
-
-extension AVPlayer {
-  @objc func preciseSeekToTime(_ time: CMTime, completionHandler: @escaping (Bool) -> Void) {
-    self.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero, completionHandler: completionHandler)
   }
 }
