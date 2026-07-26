@@ -14,7 +14,7 @@
         - pattern: main
           include: true
     scripts:
-      - name: Setup Flutter and recreate iOS project
+      - name: Setup Flutter project
         script: |
           flutter config --no-enable-swift-package-manager
           rm -rf ios
@@ -23,13 +23,12 @@
 
       - name: Install custom native files
         script: |
+          # Copy custom Swift source files
           cp ios_native/AppDelegate.swift ios/Runner/AppDelegate.swift
           cp ios_native/CarPlaySceneDelegate.swift ios/Runner/CarPlaySceneDelegate.swift
           cp ios_native/Runner.entitlements ios/Runner/Runner.entitlements
-          # Fix platform version in generated Podfile
-          sed -i '' "s/platform :ios, '.*'/platform :ios, '14.0'/" ios/Podfile
 
-      - name: Configure Xcode project
+      - name: Patch Xcode project for CarPlay
         script: |
           python3 << 'PYTHON'
           import re
@@ -38,62 +37,28 @@
           with open(pbx_path, "r") as f:
               c = f.read()
 
-          # 1. Bundle identifier
-          c = re.sub(
-              r"PRODUCT_BUNDLE_IDENTIFIER = [^;]+;",
-              "PRODUCT_BUNDLE_IDENTIFIER = com.miaomiao.music;",
-              c
-          )
+          # Bundle identifier
+          c = re.sub(r"PRODUCT_BUNDLE_IDENTIFIER = [^;]+;", "PRODUCT_BUNDLE_IDENTIFIER = com.miaomiao.music;", c)
 
-          # 2. Disable code signing
-          c = re.sub(r'DEVELOPMENT_TEAM = "[^"]*";', 'DEVELOPMENT_TEAM = "";', c)
-          c = re.sub(r"DEVELOPMENT_TEAM = [A-Z0-9]+;", 'DEVELOPMENT_TEAM = "";', c)
-          c = re.sub(r"CODE_SIGN_STYLE = Automatic;", "CODE_SIGN_STYLE = Manual;", c)
-          c = re.sub(r'CODE_SIGN_IDENTITY = "[^"]*";', 'CODE_SIGN_IDENTITY = "";', c)
-          c = re.sub(r'PROVISIONING_PROFILE_SPECIFIER = "[^"]*";', 'PROVISIONING_PROFILE_SPECIFIER = "";', c)
-
-          # 3. Deployment target
+          # Deployment target
           c = re.sub(r"IPHONEOS_DEPLOYMENT_TARGET = [^;]+;", "IPHONEOS_DEPLOYMENT_TARGET = 14.0;", c)
 
-          # 4. Entitlements
+          # Entitlements
           if "CODE_SIGN_ENTITLEMENTS" not in c:
-              c = re.sub(
-                  r"(ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;)",
-                  r"\1\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;",
-                  c
-              )
+              c = re.sub(r"(ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;)", r"\1\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;", c)
 
-          # 5. CarPlaySceneDelegate + CarPlay.framework
+          # Add CarPlaySceneDelegate.swift to compile sources
           if "CarPlaySceneDelegate" not in c:
               file_ref = '\t\tCARP00000001 /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };'
-              fw_ref = '\t\tCARP00000002 /* CarPlay.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CarPlay.framework; path = System/Library/Frameworks/CarPlay.framework; sourceTree = SDKROOT; };'
               build_src = '\t\tCARP00000003 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CARP00000001 /* CarPlaySceneDelegate.swift */; };'
-              build_fw = '\t\tCARP00000004 /* CarPlay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CARP00000002 /* CarPlay.framework */; };'
-
-              c = c.replace("/* End PBXFileReference section */", file_ref + "\n" + fw_ref + "\n/* End PBXFileReference section */")
-              c = c.replace("/* End PBXBuildFile section */", build_src + "\n" + build_fw + "\n/* End PBXBuildFile section */")
+              c = c.replace("/* End PBXFileReference section */", file_ref + "\n/* End PBXFileReference section */")
+              c = c.replace("/* End PBXBuildFile section */", build_src + "\n/* End PBXBuildFile section */")
               c = re.sub(r"(/\* Sources \*/ = \{[^}]*files = \()", r"\1\n\t\t\t\tCARP00000003 /* CarPlaySceneDelegate.swift in Sources */,", c)
               c = re.sub(r"(AppDelegate\.swift \*/,)", r"\1\n\t\t\t\tCARP00000001 /* CarPlaySceneDelegate.swift */,", c)
 
-              if "PBXFrameworksBuildPhase" not in c:
-                  fw_phase = ("/* Begin PBXFrameworksBuildPhase section */\n"
-                      "\t\tCARP00000005 /* Frameworks */ = {\n"
-                      "\t\t\tisa = PBXFrameworksBuildPhase;\n"
-                      "\t\t\tbuildActionMask = 2147483647;\n"
-                      "\t\t\tfiles = (\n"
-                      "\t\t\t\tCARP00000004 /* CarPlay.framework in Frameworks */,\n"
-                      "\t\t\t);\n"
-                      "\t\t\trunOnlyForDeploymentPostprocessing = 0;\n"
-                      "\t\t};\n"
-                      "/* End PBXFrameworksBuildPhase section */")
-                  c = c.replace("/* End PBXSourcesBuildPhase section */", "/* End PBXSourcesBuildPhase section */\n" + fw_phase)
-                  c = re.sub(r"(/\* Sources \*/ \*/,)", r"\1\n\t\t\t\tCARP00000005 /* Frameworks */,", c)
-              else:
-                  c = re.sub(r"(isa = PBXFrameworksBuildPhase;[^}]*files = \()", r"\1\n\t\t\t\tCARP00000004 /* CarPlay.framework in Frameworks */,", c)
-
           with open(pbx_path, "w") as f:
               f.write(c)
-          print("Xcode project configured")
+          print("pbxproj patched")
           PYTHON
 
       - name: Configure Info.plist
@@ -130,14 +95,16 @@
 
       - name: Package IPA
         script: |
-          APP_PATH=$(find build/ios -name "*.app" -type d 2>/dev/null | head -1)
+          APP_PATH=$(find build/ios -name "Runner.app" -type d 2>/dev/null | head -1)
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find build -name "*.app" -type d 2>/dev/null | head -1)
+          fi
           if [ -z "$APP_PATH" ]; then
             echo "ERROR: .app not found"
-            find build -name "*.app" -type d 2>/dev/null
             exit 1
           fi
           echo "Found app: $APP_PATH"
-          echo "Frameworks in app bundle:"
+          echo "Frameworks:"
           ls "$APP_PATH/Frameworks/" 2>/dev/null || echo "  (none)"
           rm -rf Payload
           mkdir Payload
@@ -147,4 +114,3 @@
 
     artifacts:
       - Runner.ipa
-
