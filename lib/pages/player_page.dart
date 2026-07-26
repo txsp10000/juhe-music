@@ -49,6 +49,10 @@ class _PlayerPageState extends State<PlayerPage> {
         _position = pos;
         _duration = dur ?? Duration.zero;
       });
+      final song = _player.currentSong;
+      if (song != null && _coverBytes == null && song.cover.isNotEmpty && song.cover != _coverUrl) {
+        _loadCover(song);
+      }
     }
   }
 
@@ -79,10 +83,12 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   Future<void> _loadCover(Song song) async {
-    if (song.cover.isEmpty || song.cover == _coverUrl) return;
+    if (song.cover.isEmpty) return;
+    if (song.cover == _coverUrl && _coverBytes != null) return;
     _coverUrl = song.cover;
     try {
-      final resp = await http.get(Uri.parse(song.cover));
+      final resp = await http.get(Uri.parse(song.cover),
+          headers: {'User-Agent': 'Mozilla/5.0'});
       if (resp.statusCode == 200 && resp.bodyBytes.isNotEmpty && mounted) {
         setState(() => _coverBytes = resp.bodyBytes);
       }
