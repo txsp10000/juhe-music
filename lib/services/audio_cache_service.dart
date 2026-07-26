@@ -78,7 +78,14 @@ class AudioCacheService {
           sink.add(chunk);
           receivedBytes += chunk.length;
           if (totalBytes > 0) {
-            onProgress?.call(receivedBytes / totalBytes);
+            final progress = (receivedBytes / totalBytes).clamp(0.0, 1.0);
+            onProgress?.call(progress);
+          } else {
+            // No content-length: show indeterminate progress based on received MB
+            // Cap at 0.95 so user knows it's still downloading
+            final mbReceived = receivedBytes / (1024 * 1024);
+            final estimatedProgress = (mbReceived / 15.0).clamp(0.0, 0.95);
+            onProgress?.call(estimatedProgress);
           }
         }
         await sink.close();
@@ -93,3 +100,4 @@ class AudioCacheService {
     return null;
   }
 }
+

@@ -249,11 +249,8 @@ class PlayerService {
     }
     if (currentGen != _playGeneration) return;
 
-    if (localPath != null) {
-      await _player.open(Media('file://$localPath'), play: true);
-    } else {
-      await _player.open(Media(url), play: true);
-    }
+    if (localPath == null || localPath.isEmpty) return;
+    await _player.open(Media('file://$localPath'), play: true);
     if (currentGen != _playGeneration) return;
 
     _notifySongChange(song);
@@ -372,5 +369,6 @@ class _AudioPlayerTask extends BaseAudioHandler {
   @override
   Future<void> skipToPrevious() async => PlayerService().prev();
 }
+
 
 
