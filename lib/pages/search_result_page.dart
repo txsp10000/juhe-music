@@ -80,11 +80,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
       if (widget.fromPlayer) {
         Navigator.pop(context);
       } else {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const PlayerPage()),
-          (route) => route.isFirst,
-        );
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
       }
       return;
     }
@@ -94,11 +90,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
     if (widget.fromPlayer) {
       Navigator.pop(context);
     } else {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const PlayerPage()),
-        (route) => route.isFirst,
-      );
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
     }
   }
 
@@ -233,4 +225,5 @@ class _SearchResultPageState extends State<SearchResultPage> {
     );
   }
 }
+
 
