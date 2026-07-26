@@ -2,9 +2,11 @@
 import 'pages/home_page.dart';
 import 'services/player_service.dart';
 import 'services/carplay_service.dart';
+import 'services/settings_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SettingsService().load();
   await PlayerService.init();
   CarPlayService.init();
   runApp(const MusicApp());

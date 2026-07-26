@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../services/player_service.dart';
 import '../models/song.dart';
 import 'search_page.dart';
 import 'favorites_page.dart';
+import 'settings_page.dart';
 import 'player_page.dart';
 
 /// LRC 歌词行

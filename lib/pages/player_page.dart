@@ -436,31 +436,23 @@ class _PlayerPageState extends State<PlayerPage> {
 
   Widget _buildDownloadProgress() {
     if (_downloadProgress == null) return const SizedBox.shrink();
-    final percent = (_downloadProgress! * 100).toInt();
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-      child: Column(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.downloading, color: Color(0xFF6890F9), size: 16),
-              const SizedBox(width: 8),
-              Text(
-                '缓存中 %',
-                style: const TextStyle(color: Color(0xFF8F919A), fontSize: 12),
-              ),
-              const Spacer(),
-            ],
-          ),
-          const SizedBox(height: 4),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(2),
-            child: LinearProgressIndicator(
-              value: _downloadProgress!,
-              backgroundColor: const Color(0xFF2A2D3A),
-              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF6890F9)),
-              minHeight: 3,
+          const SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Color(0xFF6890F9),
             ),
+          ),
+          const SizedBox(width: 8),
+          const Text(
+            '缓存中',
+            style: TextStyle(color: Color(0xFF8F919A), fontSize: 12),
           ),
         ],
       ),

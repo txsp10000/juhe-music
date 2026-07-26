@@ -26,17 +26,52 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   }
 
   private func setupMethodChannel() {
-    guard let controller = UIApplication.shared.delegate?.window??.rootViewController as? FlutterViewController else { return }
+    // Try multiple ways to get the Flutter engine's binary messenger
+    var messenger: FlutterBinaryMessenger?
+
+    // Method 1: Get from the app delegate's window root view controller
+    if let appDelegate = UIApplication.shared.delegate as? FlutterAppDelegate,
+       let controller = appDelegate.window?.rootViewController as? FlutterViewController {
+      messenger = controller.binaryMessenger
+    }
+
+    // Method 2: Search connected scenes for the Flutter window scene
+    if messenger == nil {
+      for scene in UIApplication.shared.connectedScenes {
+        if let windowScene = scene as? UIWindowScene {
+          for window in windowScene.windows {
+            if let flutterVC = window.rootViewController as? FlutterViewController {
+              messenger = flutterVC.binaryMessenger
+              break
+            }
+          }
+        }
+        if messenger != nil { break }
+      }
+    }
+
+    guard let binaryMessenger = messenger else {
+      // Retry after a short delay if Flutter engine isn't ready yet
+      DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+        self?.setupMethodChannel()
+        if self?.methodChannel != nil {
+          self?.showRootTemplate()
+        }
+      }
+      return
+    }
+
     methodChannel = FlutterMethodChannel(
       name: "com.miaomiao.music/carplay",
-      binaryMessenger: controller.binaryMessenger
+      binaryMessenger: binaryMessenger
     )
   }
 
   private func showRootTemplate() {
-    // Use CPTabBarTemplate with list templates only (not CPNowPlayingTemplate)
-    let playlistTab = createPlaylistTab()
+    guard methodChannel != nil else { return }
+
     let favoritesTab = createFavoritesTab()
+    let playlistTab = createPlaylistTab()
 
     let tabBar = CPTabBarTemplate(templates: [favoritesTab, playlistTab])
     tabBar.delegate = self
@@ -114,7 +149,6 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
 @available(iOS 14.0, *)
 extension CarPlaySceneDelegate: CPTabBarTemplateDelegate {
   func tabBarTemplate(_ tabBarTemplate: CPTabBarTemplate, didSelect selectedTemplate: CPTemplate) {
-    // Refresh data when tab is selected
     if let listTemplate = selectedTemplate as? CPListTemplate {
       if listTemplate.tabTitle == "播放列表" {
         refreshPlaylist(template: listTemplate)
