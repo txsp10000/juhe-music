@@ -23,13 +23,64 @@
 
       - name: Install custom native files
         script: |
-          # Copy custom Swift source files (these get compiled by Xcode automatically
-          # since Flutter's generated project compiles all .swift files in Runner/)
           cp ios_native/AppDelegate.swift ios/Runner/AppDelegate.swift
           cp ios_native/CarPlaySceneDelegate.swift ios/Runner/CarPlaySceneDelegate.swift
           cp ios_native/Runner.entitlements ios/Runner/Runner.entitlements
 
-      - name: Configure Info.plist and icons
+      - name: First pod install (let CocoaPods set base configs)
+        script: |
+          cd ios && pod install && cd ..
+
+      - name: Patch project after pod install
+        script: |
+          python3 << 'PYTHON'
+          import re
+
+          pbx_path = "ios/Runner.xcodeproj/project.pbxproj"
+          with open(pbx_path, "r") as f:
+              c = f.read()
+
+          # 1. Bundle identifier (only in Runner target build settings)
+          c = re.sub(r"PRODUCT_BUNDLE_IDENTIFIER = [^;]+;", "PRODUCT_BUNDLE_IDENTIFIER = com.miaomiao.music;", c)
+
+          # 2. Add CODE_SIGN_ENTITLEMENTS to target build settings
+          if "CODE_SIGN_ENTITLEMENTS" not in c:
+              c = re.sub(
+                  r"(ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;)",
+                  r"\1\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;",
+                  c
+              )
+
+          # 3. Add CarPlaySceneDelegate.swift to compile sources and file group
+          if "CarPlaySceneDelegate" not in c:
+              # PBXFileReference
+              file_ref = '\t\tCARP00000001 /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };'
+              # PBXBuildFile
+              build_src = '\t\tCARP00000003 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CARP00000001 /* CarPlaySceneDelegate.swift */; };'
+
+              c = c.replace("/* End PBXFileReference section */", file_ref + "\n/* End PBXFileReference section */")
+              c = c.replace("/* End PBXBuildFile section */", build_src + "\n/* End PBXBuildFile section */")
+
+              # Add to Sources build phase
+              c = re.sub(
+                  r"(/\* Sources \*/ = \{[^}]*files = \()",
+                  r"\1\n\t\t\t\tCARP00000003 /* CarPlaySceneDelegate.swift in Sources */,",
+                  c
+              )
+
+              # Add to Runner file group
+              c = re.sub(
+                  r"(AppDelegate\.swift \*/,)",
+                  r"\1\n\t\t\t\tCARP00000001 /* CarPlaySceneDelegate.swift */,",
+                  c
+              )
+
+          with open(pbx_path, "w") as f:
+              f.write(c)
+          print("pbxproj patched: bundle ID, entitlements, CarPlaySceneDelegate")
+          PYTHON
+
+      - name: Configure Info.plist
         script: |
           PLIST="ios/Runner/Info.plist"
           /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 苗苗music" "$PLIST"
@@ -46,7 +97,8 @@
           /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UISceneConfigurations:CPTemplateApplicationSceneSessionRoleApplication:0:UISceneConfigurationName string CarPlay" "$PLIST" 2>/dev/null
           /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UISceneConfigurations:CPTemplateApplicationSceneSessionRoleApplication:0:UISceneDelegateClassName string Runner.CarPlaySceneDelegate" "$PLIST" 2>/dev/null
 
-          # App icons
+      - name: Generate app icons
+        script: |
           ICON_SRC="assets/icon.png"
           ICON_DIR="ios/Runner/Assets.xcassets/AppIcon.appiconset"
           if [ -f "$ICON_SRC" ]; then
@@ -58,12 +110,9 @@
 
       - name: Build iOS
         script: |
-          # Set bundle ID via build argument (no need to modify pbxproj)
-          flutter build ios --release --no-codesign \
-            --build-name=1.0.0 \
-            --build-number=1
+          flutter build ios --release --no-codesign
 
-      - name: Package IPA
+      - name: Package IPA with entitlements
         script: |
           APP_PATH=$(find build/ios -name "Runner.app" -type d 2>/dev/null | head -1)
           if [ -z "$APP_PATH" ]; then
@@ -74,16 +123,19 @@
             exit 1
           fi
           echo "Found app: $APP_PATH"
-
-          # Post-build: fix bundle ID in the built app's Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.miaomiao.music" "$APP_PATH/Info.plist"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 苗苗music" "$APP_PATH/Info.plist"
-
-          # Copy entitlements into app bundle (for TrollStore)
-          cp ios_native/Runner.entitlements "$APP_PATH/embedded.entitlements" 2>/dev/null || true
-
           echo "Frameworks:"
           ls "$APP_PATH/Frameworks/" 2>/dev/null || echo "  (none)"
+
+          # Sign with entitlements using ldid (TrollStore compatible)
+          # Install ldid if not present
+          which ldid || brew install ldid
+
+          # Apply entitlements to the main binary
+          ldid -Sios_native/Runner.entitlements "$APP_PATH/Runner"
+          echo "Entitlements applied with ldid"
+
+          # Verify
+          ldid -e "$APP_PATH/Runner" || true
 
           rm -rf Payload
           mkdir Payload
