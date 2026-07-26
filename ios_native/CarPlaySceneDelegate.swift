@@ -106,29 +106,39 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
 
   // MARK: - Data Loading
   private func refreshPlaylist(template: CPListTemplate) {
-    methodChannel?.invokeMethod("getPlaylist", arguments: nil) { result in
-      guard let songs = result as? [[String: Any]] else { return }
-      let items = self.buildListItems(from: songs, action: "playAtIndex")
-      let section = CPListSection(items: items, header: "当前播放列表", sectionIndexTitle: nil)
-      template.updateSections([section])
+    methodChannel?.invokeMethod("getCurrentSongId", arguments: nil) { currentId in
+      let songId = currentId as? String
+      self.methodChannel?.invokeMethod("getPlaylist", arguments: nil) { result in
+        guard let songs = result as? [[String: Any]] else { return }
+        let items = self.buildListItems(from: songs, action: "playAtIndex", currentSongId: songId)
+        let section = CPListSection(items: items, header: "当前播放列表", sectionIndexTitle: nil)
+        template.updateSections([section])
+      }
     }
   }
 
   private func refreshFavorites(template: CPListTemplate) {
-    methodChannel?.invokeMethod("getFavorites", arguments: nil) { result in
-      guard let songs = result as? [[String: Any]] else { return }
-      let items = self.buildListItems(from: songs, action: "playFavorite")
-      let section = CPListSection(items: items, header: "我的收藏", sectionIndexTitle: nil)
-      template.updateSections([section])
+    methodChannel?.invokeMethod("getCurrentSongId", arguments: nil) { currentId in
+      let songId = currentId as? String
+      self.methodChannel?.invokeMethod("getFavorites", arguments: nil) { result in
+        guard let songs = result as? [[String: Any]] else { return }
+        let items = self.buildListItems(from: songs, action: "playFavorite", currentSongId: songId)
+        let section = CPListSection(items: items, header: "我的收藏", sectionIndexTitle: nil)
+        template.updateSections([section])
+      }
     }
   }
 
-  private func buildListItems(from songs: [[String: Any]], action: String) -> [CPListItem] {
+  private func buildListItems(from songs: [[String: Any]], action: String, currentSongId: String? = nil) -> [CPListItem] {
     return songs.enumerated().map { (index, song) in
       let title = song["name"] as? String ?? "未知歌曲"
       let subtitle = song["singer"] as? String ?? "未知歌手"
+      let songId = song["id"] as? String ?? ""
 
       let item = CPListItem(text: title, detailText: subtitle)
+      if songId == currentSongId && !songId.isEmpty {
+        item.isPlaying = true
+      }
       item.handler = { [weak self] _, completion in
         self?.methodChannel?.invokeMethod(action, arguments: index)
         // Push now playing template

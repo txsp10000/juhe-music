@@ -26,6 +26,8 @@ class CarPlayService {
           final index = call.arguments as int;
           await _playFavorite(index);
           return null;
+        case 'getCurrentSongId':
+          return PlayerService().currentSong?.id ?? '';
         default:
           return null;
       }
