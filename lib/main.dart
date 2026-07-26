@@ -9,6 +9,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SettingsService().load();
   AudioCacheService().cleanupIncomplete();
+  AudioCacheService().migrateOldFiles();
   await PlayerService.init();
   CarPlayService.init();
   runApp(const MusicApp());
