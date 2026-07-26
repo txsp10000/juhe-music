@@ -85,14 +85,18 @@ class _PlayerPageState extends State<PlayerPage> {
   Future<void> _loadCover(Song song) async {
     if (song.cover.isEmpty) return;
     if (song.cover == _coverUrl && _coverBytes != null) return;
-    _coverUrl = song.cover;
+    final url = song.cover;
+    _coverUrl = url;
+    _coverBytes = null;
     try {
-      final resp = await http.get(Uri.parse(song.cover),
+      final resp = await http.get(Uri.parse(url),
           headers: {'User-Agent': 'Mozilla/5.0'});
-      if (resp.statusCode == 200 && resp.bodyBytes.isNotEmpty && mounted) {
+      if (resp.statusCode == 200 && resp.bodyBytes.isNotEmpty && mounted && _coverUrl == url) {
         setState(() => _coverBytes = resp.bodyBytes);
       }
-    } catch (_) {}
+    } catch (_) {
+      if (_coverUrl == url) _coverUrl = '';
+    }
   }
 
   Future<void> _checkFavorite() async {
