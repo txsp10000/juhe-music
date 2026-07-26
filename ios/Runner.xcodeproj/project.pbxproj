@@ -1,4 +1,4 @@
-// !$*UTF8*$!
+﻿// !$*UTF8*$!
 {
 	archiveVersion = 1;
 	classes = {
@@ -194,6 +194,7 @@
 				9740EEB11CF90186004384FC /* Flutter */,
 				97C146F01CF9000F007C117D /* Runner */,
 				97C146EF1CF9000F007C117D /* Products */,
+				A1B2C3D91234567800AABBCC /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -203,6 +204,7 @@
 			buildConfigurationList = 97C147021CF9000F007C117D /* Build configuration list */;
 			buildPhases = (
 				9740EEB61CF901F6004384FC /* Flutter */,
+				A1B2C3D81234567800AABBCC /* Frameworks */,
 				97C146EA1CF9000F007C117D /* Sources */,
 				97C146EC1CF9000F007C117D /* Resources */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
@@ -227,10 +229,19 @@
 			defaultConfigurationName = Release;
 		};
 
-		97C146EA1CF9000F007C117D /* Sources */ = {
+				A1B2C3D81234567800AABBCC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1B2C3D71234567800AABBCC /* CarPlay.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+97C146EA1CF9000F007C117D /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3D61234567800AABBCC /* CarPlaySceneDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -257,7 +268,26 @@
 			fileRef = 97C146F91CF9000F007C117D /* Assets.xcassets */;
 		};
 
-		97C146EF1CF9000F007C117D /* Products */ = {
+		A1B2C3D61234567800AABBCC /* CarPlaySceneDelegate.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = A1B2C3D41234567800AABBCC /* CarPlaySceneDelegate.swift */;
+		};
+
+		A1B2C3D71234567800AABBCC /* CarPlay.framework in Frameworks */ = {
+			isa = PBXBuildFile;
+			fileRef = A1B2C3D51234567800AABBCC /* CarPlay.framework */;
+		};
+
+
+				A1B2C3D91234567800AABBCC /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D51234567800AABBCC /* CarPlay.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+97C146EF1CF9000F007C117D /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				97C146EE1CF9000F007C117D /* Runner.app */,
@@ -269,6 +299,7 @@
 		97C146F01CF9000F007C117D /* Runner */ = {
 			isa = PBXGroup;
 			children = (
+				A1B2C3D41234567800AABBCC /* CarPlaySceneDelegate.swift */,
 				97C146F11CF9000F007C117D /* AppDelegate.swift */,
 				97C146F91CF9000F007C117D /* Assets.xcassets */,
 				97C146F51CF9000F007C117D /* Info.plist */,
@@ -283,6 +314,22 @@
 			path = AppDelegate.swift;
 			sourceTree = "<group>";
 		};
+
+		A1B2C3D41234567800AABBCC /* CarPlaySceneDelegate.swift */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.swift;
+			path = CarPlaySceneDelegate.swift;
+			sourceTree = "<group>";
+		};
+
+		A1B2C3D51234567800AABBCC /* CarPlay.framework */ = {
+			isa = PBXFileReference;
+			lastKnownFileType = wrapper.framework;
+			name = CarPlay.framework;
+			path = System/Library/Frameworks/CarPlay.framework;
+			sourceTree = SDKROOT;
+		};
+
 
 		97C146F51CF9000F007C117D /* Info.plist */ = {
 			isa = PBXFileReference;
@@ -350,3 +397,4 @@
 	};
 	rootObject = 97C146E61CF9000F007C117D /* Project object */;
 }
+

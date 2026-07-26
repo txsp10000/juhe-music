@@ -1,4 +1,4 @@
-workflows:
+﻿workflows:
   ios-build:
     name: iOS Build
     max_build_duration: 60
@@ -14,49 +14,149 @@ workflows:
         - pattern: main
           include: true
     scripts:
-      - name: Disable SPM and recreate iOS project
+      - name: Setup Flutter and recreate iOS project
         script: |
           flutter config --no-enable-swift-package-manager
           rm -rf ios
           flutter create --platforms=ios .
           flutter pub get
-      - name: Disable code signing
+
+      - name: Install custom native files
         script: |
-          echo "" >> ios/Flutter/Release.xcconfig
-          cat >> ios/Flutter/Release.xcconfig << 'EOF'
-          CODE_SIGNING_ALLOWED = NO
-          CODE_SIGNING_REQUIRED = NO
-          CODE_SIGN_IDENTITY =
-          DEVELOPMENT_TEAM =
-          PROVISIONING_PROFILE_SPECIFIER =
-          EOF
-          echo "" >> ios/Flutter/Debug.xcconfig
-          cat >> ios/Flutter/Debug.xcconfig << 'EOF'
-          CODE_SIGNING_ALLOWED = NO
-          CODE_SIGNING_REQUIRED = NO
-          CODE_SIGN_IDENTITY =
-          DEVELOPMENT_TEAM =
-          PROVISIONING_PROFILE_SPECIFIER =
-          EOF
-          python3 -c '
+          # Copy custom Swift files from repo into generated ios project
+          cp ios_native/AppDelegate.swift ios/Runner/AppDelegate.swift
+          cp ios_native/CarPlaySceneDelegate.swift ios/Runner/CarPlaySceneDelegate.swift
+          cp ios_native/Runner.entitlements ios/Runner/Runner.entitlements
+
+      - name: Configure Xcode project
+        script: |
+          python3 << 'PYTHON'
           import re
-          with open("ios/Runner.xcodeproj/project.pbxproj","r") as f:
-            c = f.read()
-          c = re.sub(r"DEVELOPMENT_TEAM = \"[^\"]*\";","DEVELOPMENT_TEAM = \"\";",c)
-          c = re.sub(r"DEVELOPMENT_TEAM = [A-Z0-9]+;","DEVELOPMENT_TEAM = \"\";",c)
-          c = re.sub(r"CODE_SIGN_STYLE = Automatic;","CODE_SIGN_STYLE = Manual;",c)
-          c = re.sub(r"CODE_SIGN_IDENTITY = \"[^\"]*\";","CODE_SIGN_IDENTITY = \"\";",c)
-          c = re.sub(r"PROVISIONING_PROFILE_SPECIFIER = \"[^\"]*\";","PROVISIONING_PROFILE_SPECIFIER = \"\";",c)
-          with open("ios/Runner.xcodeproj/project.pbxproj","w") as f:
-            f.write(c)
-          print("pbxproj signing disabled")
-          '
-      - name: Configure app
+
+          pbx_path = "ios/Runner.xcodeproj/project.pbxproj"
+          with open(pbx_path, "r") as f:
+              c = f.read()
+
+          # --- 1. Bundle identifier ---
+          c = re.sub(
+              r"PRODUCT_BUNDLE_IDENTIFIER = [^;]+;",
+              "PRODUCT_BUNDLE_IDENTIFIER = com.miaomiao.music;",
+              c
+          )
+
+          # --- 2. Disable code signing ---
+          c = re.sub(r'DEVELOPMENT_TEAM = "[^"]*";', 'DEVELOPMENT_TEAM = "";', c)
+          c = re.sub(r"DEVELOPMENT_TEAM = [A-Z0-9]+;", 'DEVELOPMENT_TEAM = "";', c)
+          c = re.sub(r"CODE_SIGN_STYLE = Automatic;", "CODE_SIGN_STYLE = Manual;", c)
+          c = re.sub(r'CODE_SIGN_IDENTITY = "[^"]*";', 'CODE_SIGN_IDENTITY = "";', c)
+          c = re.sub(r'PROVISIONING_PROFILE_SPECIFIER = "[^"]*";', 'PROVISIONING_PROFILE_SPECIFIER = "";', c)
+
+          # --- 3. Add CODE_SIGN_ENTITLEMENTS ---
+          if "CODE_SIGN_ENTITLEMENTS" not in c:
+              c = re.sub(
+                  r"(ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;)",
+                  r"\1\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;",
+                  c
+              )
+
+          # --- 4. Add CarPlaySceneDelegate.swift + CarPlay.framework ---
+          if "CarPlaySceneDelegate" not in c:
+              # File references
+              file_ref = '\t\tCARP00000001 /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };'
+              fw_ref = '\t\tCARP00000002 /* CarPlay.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CarPlay.framework; path = System/Library/Frameworks/CarPlay.framework; sourceTree = SDKROOT; };'
+
+              # Build files
+              build_src = '\t\tCARP00000003 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CARP00000001 /* CarPlaySceneDelegate.swift */; };'
+              build_fw = '\t\tCARP00000004 /* CarPlay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CARP00000002 /* CarPlay.framework */; };'
+
+              # Insert into sections
+              c = c.replace(
+                  "/* End PBXFileReference section */",
+                  file_ref + "\n" + fw_ref + "\n/* End PBXFileReference section */"
+              )
+              c = c.replace(
+                  "/* End PBXBuildFile section */",
+                  build_src + "\n" + build_fw + "\n/* End PBXBuildFile section */"
+              )
+
+              # Add to Sources phase
+              c = re.sub(
+                  r"(/\* Sources \*/ = \{[^}]*files = \()",
+                  r"\1\n\t\t\t\tCARP00000003 /* CarPlaySceneDelegate.swift in Sources */,",
+                  c
+              )
+
+              # Add to Runner group
+              c = re.sub(
+                  r"(AppDelegate\.swift \*/,)",
+                  r"\1\n\t\t\t\tCARP00000001 /* CarPlaySceneDelegate.swift */,",
+                  c
+              )
+
+              # Add Frameworks build phase
+              if "PBXFrameworksBuildPhase" not in c:
+                  fw_phase = (
+                      "/* Begin PBXFrameworksBuildPhase section */\n"
+                      "\t\tCARP00000005 /* Frameworks */ = {\n"
+                      "\t\t\tisa = PBXFrameworksBuildPhase;\n"
+                      "\t\t\tbuildActionMask = 2147483647;\n"
+                      "\t\t\tfiles = (\n"
+                      "\t\t\t\tCARP00000004 /* CarPlay.framework in Frameworks */,\n"
+                      "\t\t\t);\n"
+                      "\t\t\trunOnlyForDeploymentPostprocessing = 0;\n"
+                      "\t\t};\n"
+                      "/* End PBXFrameworksBuildPhase section */"
+                  )
+                  c = c.replace(
+                      "/* End PBXSourcesBuildPhase section */",
+                      "/* End PBXSourcesBuildPhase section */\n" + fw_phase
+                  )
+                  # Add phase to target buildPhases (after Sources)
+                  c = re.sub(
+                      r"(/\* Sources \*/ \*/,)",
+                      r"\1\n\t\t\t\tCARP00000005 /* Frameworks */,",
+                      c
+                  )
+              else:
+                  c = re.sub(
+                      r"(isa = PBXFrameworksBuildPhase;[^}]*files = \()",
+                      r"\1\n\t\t\t\tCARP00000004 /* CarPlay.framework in Frameworks */,",
+                      c
+                  )
+
+          with open(pbx_path, "w") as f:
+              f.write(c)
+
+          print("Xcode project configured: bundle ID, signing, CarPlay")
+          PYTHON
+
+      - name: Configure Info.plist
         script: |
-          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 苗苗music" ios/Runner/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleName 苗苗music" ios/Runner/Info.plist
-          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" ios/Runner/Info.plist 2>/dev/null
-          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" ios/Runner/Info.plist 2>/dev/null
+          PLIST="ios/Runner/Info.plist"
+
+          # Basic app info
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 苗苗music" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleName 苗苗music" "$PLIST"
+
+          # Background audio
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" "$PLIST" 2>/dev/null
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" "$PLIST" 2>/dev/null
+
+          # Allow HTTP
+          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" "$PLIST" 2>/dev/null
+          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PLIST" 2>/dev/null
+
+          # CarPlay scene configuration
+          /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest dict" "$PLIST" 2>/dev/null
+          /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UIApplicationSupportsMultipleScenes bool false" "$PLIST" 2>/dev/null
+          /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UISceneConfigurations dict" "$PLIST" 2>/dev/null
+          /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UISceneConfigurations:CPTemplateApplicationSceneSessionRoleApplication array" "$PLIST" 2>/dev/null
+          /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UISceneConfigurations:CPTemplateApplicationSceneSessionRoleApplication:0 dict" "$PLIST" 2>/dev/null
+          /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UISceneConfigurations:CPTemplateApplicationSceneSessionRoleApplication:0:UISceneConfigurationName string CarPlay" "$PLIST" 2>/dev/null
+          /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UISceneConfigurations:CPTemplateApplicationSceneSessionRoleApplication:0:UISceneDelegateClassName string Runner.CarPlaySceneDelegate" "$PLIST" 2>/dev/null
+
+      - name: Generate app icons
+        script: |
           ICON_SRC="assets/icon.png"
           ICON_DIR="ios/Runner/Assets.xcassets/AppIcon.appiconset"
           if [ -f "$ICON_SRC" ]; then
@@ -89,6 +189,20 @@ workflows:
           }
           ICONJSON
           fi
+
+      - name: Disable signing in xcconfig
+        script: |
+          for CFG in ios/Flutter/Release.xcconfig ios/Flutter/Debug.xcconfig; do
+            echo "" >> "$CFG"
+            cat >> "$CFG" << 'EOF'
+          CODE_SIGNING_ALLOWED = NO
+          CODE_SIGNING_REQUIRED = NO
+          CODE_SIGN_IDENTITY =
+          DEVELOPMENT_TEAM =
+          PROVISIONING_PROFILE_SPECIFIER =
+          EOF
+          done
+
       - name: Build iOS
         script: |
           cd ios
@@ -104,22 +218,25 @@ workflows:
             DEVELOPMENT_TEAM="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             -derivedDataPath ../build/ios
+
       - name: Package IPA
         script: |
           APP_PATH=""
-          for DIR in build/ios/iphoneos build/ios/Release-iphoneos build/ios/Build/Products/Release-iphoneos; do
+          for DIR in build/ios/Build/Products/Release-iphoneos build/ios/Release-iphoneos build/ios/iphoneos; do
             FOUND=$(find "$DIR" -name "*.app" -type d 2>/dev/null | head -1)
             if [ -n "$FOUND" ]; then APP_PATH="$FOUND"; break; fi
           done
           if [ -z "$APP_PATH" ]; then
-            echo "ERROR: .app not found!"
+            echo "ERROR: .app not found"
+            find build/ios -name "*.app" -type d 2>/dev/null
             exit 1
           fi
-          echo "App: $APP_PATH"
+          echo "Found app: $APP_PATH"
           rm -rf Payload
           mkdir Payload
           cp -R "$APP_PATH" Payload/
           zip -r Runner.ipa Payload
           du -sh Runner.ipa
+
     artifacts:
       - Runner.ipa

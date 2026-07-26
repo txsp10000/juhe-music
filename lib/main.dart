@@ -1,10 +1,12 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'pages/home_page.dart';
 import 'services/player_service.dart';
+import 'services/carplay_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await PlayerService.init();
+  CarPlayService.init();
   runApp(const MusicApp());
 }
 

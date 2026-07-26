@@ -190,8 +190,15 @@ class PlayerService {
     }
     final coverCache = CoverCacheService();
     final localCover = await coverCache.getLocalPath(picId);
-    if (localCover != null || (coverUrl != null && coverUrl.isNotEmpty)) {
-      final uri = localCover != null ? Uri.file(localCover) : Uri.parse(coverUrl!);
+    if (localCover != null) {
+      if (song.cover.isEmpty) song.cover = 'file://$localCover';
+      final uri = Uri.file(localCover);
+      _currentMediaItem = _currentMediaItem!.copyWith(artUri: uri);
+      try {
+        AudioService.updateMediaItem(_currentMediaItem!);
+      } catch (_) {}
+    } else if (coverUrl != null && coverUrl.isNotEmpty) {
+      final uri = Uri.parse(coverUrl);
       _currentMediaItem = _currentMediaItem!.copyWith(artUri: uri);
       try {
         AudioService.updateMediaItem(_currentMediaItem!);

@@ -95,6 +95,7 @@ class _PlayerPageState extends State<PlayerPage> {
       setState(() => _coverBytes = cached);
       return;
     }
+    if (url.startsWith('file://')) return;
     final downloaded = await coverCache.download(picId, url);
     if (downloaded != null && mounted && _coverUrl == url) {
       setState(() => _coverBytes = downloaded);
