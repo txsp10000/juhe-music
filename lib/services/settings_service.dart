@@ -7,7 +7,8 @@ enum AudioQuality {
   low128(128, '128kbps (流畅)'),
   medium192(192, '192kbps (标准)'),
   high320(320, '320kbps (高品质)'),
-  lossless999(999, '无损FLAC (最高)');
+  lossless740(740, '16bit无损'),
+  lossless999(999, '24bit无损 (最高)');
 
   final int br;
   final String label;

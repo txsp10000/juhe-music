@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'settings_service.dart';
 
 /// Quality tiers ordered from lowest to highest
-const List<int> _qualityOrder = [128, 192, 320, 999];
+const List<int> _qualityOrder = [128, 192, 320, 740, 999];
 
 class AudioCacheService {
   static final AudioCacheService _instance = AudioCacheService._();

@@ -608,7 +608,8 @@ class _PlayerPageState extends State<PlayerPage> {
       case AudioQuality.low128: return '128k';
       case AudioQuality.medium192: return '192k';
       case AudioQuality.high320: return '320k';
-      case AudioQuality.lossless999: return '无损';
+      case AudioQuality.lossless740: return '16bit';
+      case AudioQuality.lossless999: return '24bit';
     }
   }
 
