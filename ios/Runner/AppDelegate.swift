@@ -59,7 +59,6 @@ import MediaPlayer
 
           if let artUri = args["artUri"] as? String, !artUri.isEmpty, artUri != self.lastArtUri {
             self.lastArtUri = artUri
-            print("[NowPlaying] New artUri: \(artUri)")
             self.loadArtwork(from: artUri)
           }
           result(nil)
@@ -71,27 +70,28 @@ import MediaPlayer
   }
 
   private func loadArtwork(from urlString: String) {
-    guard let url = URL(string: urlString) else {
-      print("[Artwork] Invalid URL: \(urlString)")
+    if urlString.hasPrefix("file://") || urlString.hasPrefix("/") {
+      let path = urlString.hasPrefix("file://")
+        ? String(urlString.dropFirst(7))
+        : urlString
+      guard let data = FileManager.default.contents(atPath: path),
+            let image = UIImage(data: data) else { return }
+      let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+      DispatchQueue.main.async {
+        self.cachedArtwork = artwork
+        if var info = MPNowPlayingInfoCenter.default().nowPlayingInfo {
+          info[MPMediaItemPropertyArtwork] = artwork
+          MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        }
+      }
       return
     }
-    print("[Artwork] Downloading: \(urlString)")
+    guard let url = URL(string: urlString) else { return }
     var request = URLRequest(url: url)
     request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
     URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-      if let error = error {
-        print("[Artwork] Error: \(error)")
-        return
-      }
-      guard let self = self, let data = data, !data.isEmpty else {
-        print("[Artwork] No data received")
-        return
-      }
-      guard let image = UIImage(data: data) else {
-        print("[Artwork] Failed to create image from data (\(data.count) bytes)")
-        return
-      }
-      print("[Artwork] Success: \(image.size), \(data.count) bytes")
+      guard let self = self, let data = data, !data.isEmpty,
+            let image = UIImage(data: data) else { return }
       let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
       DispatchQueue.main.async {
         self.cachedArtwork = artwork

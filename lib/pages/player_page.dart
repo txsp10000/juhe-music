@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import '../services/player_service.dart';
 import '../services/favorites_service.dart';
+import '../services/cover_cache_service.dart';
 import '../models/song.dart';
 import '../utils/toast.dart';
 import 'playlist_page.dart';
 import 'search_result_page.dart';
 import 'dart:typed_data';
-import 'package:http/http.dart' as http;
 
 /// LRC 歌词行
 class _LrcLine {
@@ -83,24 +83,22 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   Future<void> _loadCover(Song song) async {
-    if (song.cover.isEmpty) {
-      print('[Cover] song.cover is empty for: ${song.name}');
-      return;
-    }
+    if (song.cover.isEmpty) return;
     if (song.cover == _coverUrl && _coverBytes != null) return;
     final url = song.cover;
     _coverUrl = url;
     _coverBytes = null;
-    print('[Cover] Loading cover for: ${song.name}, url: $url');
-    try {
-      final resp = await http.get(Uri.parse(url),
-          headers: {'User-Agent': 'Mozilla/5.0'});
-      print('[Cover] Response status: ${resp.statusCode}, bytes: ${resp.bodyBytes.length}');
-      if (resp.statusCode == 200 && resp.bodyBytes.isNotEmpty && mounted && _coverUrl == url) {
-        setState(() => _coverBytes = resp.bodyBytes);
-      }
-    } catch (e) {
-      print('[Cover] Error: $e');
+    final picId = song.picId.isNotEmpty ? song.picId : song.id;
+    final coverCache = CoverCacheService();
+    final cached = await coverCache.load(picId);
+    if (cached != null && mounted && _coverUrl == url) {
+      setState(() => _coverBytes = cached);
+      return;
+    }
+    final downloaded = await coverCache.download(picId, url);
+    if (downloaded != null && mounted && _coverUrl == url) {
+      setState(() => _coverBytes = downloaded);
+    } else {
       if (_coverUrl == url) _coverUrl = '';
     }
   }

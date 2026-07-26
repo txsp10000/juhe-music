@@ -6,6 +6,7 @@ import '../models/song.dart';
 import '../api/music_api.dart';
 import 'lyric_cache_service.dart';
 import 'audio_cache_service.dart';
+import 'cover_cache_service.dart';
 
 class PlayerService {
   static final PlayerService _instance = PlayerService._();
@@ -175,16 +176,17 @@ class PlayerService {
 
     final results = await Future.wait([
       _fetchPlayUrl(song),
-      MusicApi.getCover(picId),
+      _fetchCover(picId),
     ]);
     final url = results[0] as String?;
     final coverUrl = results[1] as String?;
 
     if (coverUrl != null && coverUrl.isNotEmpty) {
       song.cover = coverUrl;
-      _currentMediaItem = _currentMediaItem!.copyWith(
-        artUri: Uri.parse(coverUrl),
-      );
+      final coverCache = CoverCacheService();
+      final localPath = await coverCache.getLocalPath(picId);
+      final uri = localPath != null ? Uri.file(localPath) : Uri.parse(coverUrl);
+      _currentMediaItem = _currentMediaItem!.copyWith(artUri: uri);
       try {
         AudioService.updateMediaItem(_currentMediaItem!);
       } catch (_) {}
@@ -212,6 +214,20 @@ class PlayerService {
     } catch (_) {
       return null;
     }
+  }
+
+  Future<String?> _fetchCover(String picId) async {
+    final coverCache = CoverCacheService();
+    final cached = await coverCache.getLocalPath(picId);
+    if (cached != null) return 'cached';
+    try {
+      final url = await MusicApi.getCover(picId);
+      if (url.isNotEmpty) {
+        await coverCache.download(picId, url);
+        return url;
+      }
+    } catch (_) {}
+    return null;
   }
 
   void dispose() {
