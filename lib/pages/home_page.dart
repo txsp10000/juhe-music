@@ -29,6 +29,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   List<_LrcLine> _parsedLrc = [];
+  bool _isDragging = false;
+  double _dragValue = 0.0;
 
   @override
   void initState() {
@@ -128,6 +130,61 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   String _fmt(Duration d) {
     final s = d.inSeconds;
     return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildProgressBar() {
+    final max = _duration.inMilliseconds.toDouble();
+    final current = _isDragging
+        ? _dragValue
+        : _position.inMilliseconds.toDouble().clamp(0.0, max);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: Column(
+        children: [
+          SliderTheme(
+            data: SliderThemeData(
+              trackHeight: 3,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+              activeTrackColor: const Color(0xFF6890F9),
+              inactiveTrackColor: const Color(0xFF2A2D3A),
+              thumbColor: const Color(0xFF6890F9),
+              overlayColor: const Color(0xFF6890F9).withOpacity(0.2),
+            ),
+            child: Slider(
+              min: 0,
+              max: max > 0 ? max : 1,
+              value: max > 0 ? current.clamp(0.0, max) : 0,
+              onChangeStart: (v) {
+                _isDragging = true;
+                _dragValue = v;
+              },
+              onChanged: (v) {
+                setState(() => _dragValue = v);
+              },
+              onChangeEnd: (v) {
+                _isDragging = false;
+                _player.seek(Duration(milliseconds: v.toInt()));
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _fmt(_isDragging ? Duration(milliseconds: _dragValue.toInt()) : _position),
+                  style: const TextStyle(color: Color(0xFF8F919A), fontSize: 11),
+                ),
+                Text(_fmt(_duration),
+                    style: const TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildLyricArea() {
@@ -284,19 +341,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
               ),
               if (hasSong)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12, bottom: 4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(_fmt(_position), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
-                      const SizedBox(width: 10),
-                      const Text('/', style: TextStyle(color: Color(0xFF5A5D6E), fontSize: 12)),
-                      const SizedBox(width: 10),
-                      Text(_fmt(_duration), style: const TextStyle(color: Color(0xFFF5F5F8), fontSize: 12)),
-                    ],
-                  ),
-                ),
+                _buildProgressBar(),
               if (hasSong)
                 Padding(
                   padding: const EdgeInsets.only(top: 12, bottom: 8),
