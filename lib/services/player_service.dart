@@ -133,6 +133,7 @@ class PlayerService {
   }
 
   void _onComplete() {
+    if (_isSeeking) return;
     if (_currentIndex < playlist.length - 1) {
       playAt(_currentIndex + 1);
     } else if (playlist.isNotEmpty) {
@@ -156,8 +157,15 @@ class PlayerService {
     _player.playOrPause();
   }
 
+  bool _isSeeking = false;
+
   Future<void> seek(Duration position) async {
+    _isSeeking = true;
     _player.seek(position);
+    // Delay to let media_kit settle after seek, ignore spurious completed events
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _isSeeking = false;
+    });
   }
 
   Future<void> playAt(int index) async {
@@ -364,4 +372,5 @@ class _AudioPlayerTask extends BaseAudioHandler {
   @override
   Future<void> skipToPrevious() async => PlayerService().prev();
 }
+
 
