@@ -221,11 +221,14 @@ class PlayerService {
       try { AudioService.updateMediaItem(_currentMediaItem!); } catch (_) {}
     }
 
-    // If audio is already cached locally, play directly without network
+    // Stop current playback immediately and show new song info
+    await _player.stop();
+    _notifySongChange(song);
+
+    // If audio is already cached locally at sufficient quality, play directly
     if (hasCachedAudio) {
       await _player.open(Media('file://$cachedPath'), play: true);
       if (currentGen != _playGeneration) return;
-      _notifySongChange(song);
       return;
     }
 
@@ -242,7 +245,6 @@ class PlayerService {
     if (coverUrl != null && coverUrl.isNotEmpty) {
       song.cover = coverUrl;
     }
-    // Update cover if fetched from network
     if (localCover == null) {
       final networkCover = await coverCache.getLocalPath(picId);
       if (networkCover != null) {
@@ -257,7 +259,6 @@ class PlayerService {
     }
 
     if (url == null || url.isEmpty) {
-      // No URL available (offline and not cached) - skip to next
       if (_currentIndex < playlist.length - 1) {
         playAt(_currentIndex + 1);
       }
@@ -278,16 +279,56 @@ class PlayerService {
     if (currentGen != _playGeneration) return;
 
     if (localPath == null || localPath.isEmpty) {
-      // Cache failed, auto skip to next song
       if (_currentIndex < playlist.length - 1) {
         playAt(_currentIndex + 1);
       }
       return;
     }
+    // Download complete, start playback
     await _player.open(Media('file://$localPath'), play: true);
     if (currentGen != _playGeneration) return;
+  }
 
-    _notifySongChange(song);
+  /// Re-download current song at new quality setting.
+  /// Stops playback, downloads at new quality, then resumes.
+  Future<void> redownloadCurrentAtNewQuality() async {
+    final song = currentSong;
+    if (song == null) return;
+    final currentGen = ++_playGeneration;
+
+    // Stop playback
+    await _player.stop();
+    _isPlaying = false;
+    onPlayStateChanged?.call(false);
+
+    // Check if we already have the right quality cached
+    final audioCache = AudioCacheService();
+    final cached = await audioCache.findCachedFile(song.id);
+    if (cached != null) {
+      // Already have sufficient quality
+      await _player.open(Media('file://$cached'), play: true);
+      return;
+    }
+
+    // Need to re-download
+    if (currentGen != _playGeneration) return;
+    final url = await _fetchPlayUrl(song);
+    if (url == null || url.isEmpty) return;
+    if (currentGen != _playGeneration) return;
+
+    _notifyDownloadProgress(0.0);
+    final localPath = await audioCache.download(song.id, url, onProgress: (p) {
+      if (currentGen == _playGeneration) {
+        _notifyDownloadProgress(p);
+      }
+    });
+    if (currentGen == _playGeneration) {
+      _notifyDownloadProgress(null);
+    }
+    if (currentGen != _playGeneration) return;
+
+    if (localPath == null || localPath.isEmpty) return;
+    await _player.open(Media('file://$localPath'), play: true);
   }
 
   Future<String?> _fetchPlayUrl(Song song) async {
@@ -403,4 +444,3 @@ class _AudioPlayerTask extends BaseAudioHandler {
   @override
   Future<void> skipToPrevious() async => PlayerService().prev();
 }
-

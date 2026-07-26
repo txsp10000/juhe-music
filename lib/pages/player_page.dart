@@ -629,9 +629,13 @@ class _PlayerPageState extends State<PlayerPage> {
                 title: Text(q.label, style: TextStyle(color: selected ? const Color(0xFF6890F9) : Colors.white, fontSize: 15)),
                 trailing: selected ? const Icon(Icons.check_circle, color: Color(0xFF6890F9), size: 20) : null,
                 onTap: () async {
+                  final oldBr = SettingsService().quality.br;
                   await SettingsService().setQuality(q);
                   Navigator.pop(ctx);
                   if (mounted) setState(() {});
+                  if (q.br > oldBr) {
+                    PlayerService().redownloadCurrentAtNewQuality();
+                  }
                 },
               );
             }).toList(),
@@ -651,7 +655,6 @@ class _PlayerPageState extends State<PlayerPage> {
         .trim();
   }
 }
-
 
 
 
