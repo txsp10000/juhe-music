@@ -1,11 +1,11 @@
 ﻿import UIKit
 import CarPlay
 import MediaPlayer
+import Flutter
 
+@available(iOS 14.0, *)
 class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   var interfaceController: CPInterfaceController?
-  private var nowPlayingObserver: Any?
-  private let channel = "com.miaomiao.music/carplay"
   private var methodChannel: FlutterMethodChannel?
   
   func templateApplicationScene(
@@ -28,7 +28,7 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   private func setupMethodChannel() {
     guard let controller = UIApplication.shared.delegate?.window??.rootViewController as? FlutterViewController else { return }
     methodChannel = FlutterMethodChannel(
-      name: channel,
+      name: "com.miaomiao.music/carplay",
       binaryMessenger: controller.binaryMessenger
     )
   }
@@ -52,7 +52,6 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     nowPlaying.tabImage = tabImage
     nowPlaying.tabTitle = "正在播放"
     
-    // Up Next button shows current playlist
     nowPlaying.upNextTitle = "播放列表"
     
     return nowPlaying
@@ -66,7 +65,6 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     template.emptyViewTitleVariants = ["暂无播放列表"]
     template.emptyViewSubtitleVariants = ["在手机上播放音乐后这里会显示"]
     
-    // Request playlist data from Flutter
     refreshPlaylist(template: template)
     
     return template
@@ -80,7 +78,6 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     template.emptyViewTitleVariants = ["暂无收藏"]
     template.emptyViewSubtitleVariants = ["收藏歌曲后会在这里显示"]
     
-    // Request favorites data from Flutter
     refreshFavorites(template: template)
     
     return template
@@ -113,7 +110,6 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
       let item = CPListItem(text: title, detailText: subtitle)
       item.handler = { [weak self] _, completion in
         self?.methodChannel?.invokeMethod(action, arguments: index)
-        // Switch to now playing after selecting a song
         if let intf = self?.interfaceController {
           let nowPlaying = CPNowPlayingTemplate.shared
           intf.pushTemplate(nowPlaying, animated: true, completion: nil)
@@ -121,7 +117,6 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
         completion()
       }
       
-      // Load artwork async
       if let coverUrl = song["cover"] as? String, !coverUrl.isEmpty {
         self.loadImage(from: coverUrl) { image in
           if let img = image {
@@ -136,9 +131,10 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   
   // MARK: - Image Loading
   private func loadImage(from urlString: String, completion: @escaping (UIImage?) -> Void) {
-    let path: String
-    if urlString.hasPrefix("file://") {
-      path = String(urlString.dropFirst(7))
+    if urlString.hasPrefix("file://") || urlString.hasPrefix("/") {
+      let path = urlString.hasPrefix("file://")
+        ? String(urlString.dropFirst(7))
+        : urlString
       let image = UIImage(contentsOfFile: path)
       DispatchQueue.main.async { completion(image) }
       return
