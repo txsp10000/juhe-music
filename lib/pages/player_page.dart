@@ -613,35 +613,27 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   void _showQualityPicker() {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      backgroundColor: const Color(0xFF1E2030),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
       builder: (ctx) {
-        return SafeArea(
-          child: Column(
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E2030),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('音质选择', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+          content: Column(
             mainAxisSize: MainAxisSize.min,
-            children: [
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text('音质选择', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
-              ),
-              ...AudioQuality.values.map((q) {
-                final selected = SettingsService().quality == q;
-                return ListTile(
-                  title: Text(q.label, style: TextStyle(color: selected ? const Color(0xFF6890F9) : Colors.white, fontSize: 15)),
-                  trailing: selected ? const Icon(Icons.check_circle, color: Color(0xFF6890F9), size: 20) : null,
-                  onTap: () async {
-                    await SettingsService().setQuality(q);
-                    Navigator.pop(ctx);
-                    if (mounted) setState(() {});
-                  },
-                );
-              }),
-              const SizedBox(height: 8),
-            ],
+            children: AudioQuality.values.map((q) {
+              final selected = SettingsService().quality == q;
+              return ListTile(
+                title: Text(q.label, style: TextStyle(color: selected ? const Color(0xFF6890F9) : Colors.white, fontSize: 15)),
+                trailing: selected ? const Icon(Icons.check_circle, color: Color(0xFF6890F9), size: 20) : null,
+                onTap: () async {
+                  await SettingsService().setQuality(q);
+                  Navigator.pop(ctx);
+                  if (mounted) setState(() {});
+                },
+              );
+            }).toList(),
           ),
         );
       },

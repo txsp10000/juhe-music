@@ -344,8 +344,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
               ),
               if (hasSong)
-                _buildProgressBar(),
-              if (hasSong)
                 Padding(
                   padding: const EdgeInsets.only(top: 12, bottom: 8),
                   child: AnimatedBuilder(
@@ -367,6 +365,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
+              if (hasSong)
+                _buildProgressBar(),
               if (hasSong)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 6),
