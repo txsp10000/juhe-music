@@ -276,6 +276,7 @@ class _AudioPlayerTask extends BaseAudioHandler {
       'duration': ps._duration.inMilliseconds / 1000.0,
       'elapsedTime': ps._position.inMilliseconds / 1000.0,
       'playbackRate': ps._isPlaying ? 1.0 : 0.0,
+      'artUri': item.artUri?.toString() ?? '',
     });
   }
 

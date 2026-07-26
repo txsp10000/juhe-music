@@ -5,6 +5,8 @@ import '../models/song.dart';
 import '../utils/toast.dart';
 import 'playlist_page.dart';
 import 'search_result_page.dart';
+import 'dart:typed_data';
+import 'package:http/http.dart' as http;
 
 /// LRC 歌词行
 class _LrcLine {
@@ -28,6 +30,8 @@ class _PlayerPageState extends State<PlayerPage> {
   List<_LrcLine> _parsedLrc = [];
   bool _isDragging = false;
   double _dragValue = 0.0;
+  String _coverUrl = '';
+  Uint8List? _coverBytes;
 
   @override
   void initState() {
@@ -53,6 +57,7 @@ class _PlayerPageState extends State<PlayerPage> {
       _parsedLrc = _parseLrc(s.lyric);
       setState(() {});
       _checkFavorite();
+      _loadCover(s);
     }
   }
 
@@ -70,6 +75,18 @@ class _PlayerPageState extends State<PlayerPage> {
     if (song != null && _parsedLrc.isEmpty) {
       _parsedLrc = _parseLrc(song.lyric);
     }
+    if (song != null) _loadCover(song);
+  }
+
+  Future<void> _loadCover(Song song) async {
+    if (song.cover.isEmpty || song.cover == _coverUrl) return;
+    _coverUrl = song.cover;
+    try {
+      final resp = await http.get(Uri.parse(song.cover));
+      if (resp.statusCode == 200 && resp.bodyBytes.isNotEmpty && mounted) {
+        setState(() => _coverBytes = resp.bodyBytes);
+      }
+    } catch (_) {}
   }
 
   Future<void> _checkFavorite() async {
@@ -342,6 +359,36 @@ class _PlayerPageState extends State<PlayerPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          if (_coverBytes != null)
+            Container(
+              width: 180,
+              height: 180,
+              margin: const EdgeInsets.only(bottom: 24),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF6890F9).withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Image.memory(_coverBytes!, fit: BoxFit.cover),
+            )
+          else
+            Container(
+              width: 180,
+              height: 180,
+              margin: const EdgeInsets.only(bottom: 24),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFF1E2030),
+              ),
+              child: const Icon(Icons.music_note,
+                  color: Color(0xFF6890F9), size: 64),
+            ),
           if (_parsedLrc.isNotEmpty)
             _buildLyricArea()
           else if (lyricText != null)
