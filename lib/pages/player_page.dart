@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../services/player_service.dart';
 import '../services/favorites_service.dart';
 import '../services/cover_cache_service.dart';
@@ -30,6 +30,7 @@ class _PlayerPageState extends State<PlayerPage> {
   List<_LrcLine> _parsedLrc = [];
   bool _isDragging = false;
   double _dragValue = 0.0;
+  double? _downloadProgress;
   String _coverUrl = '';
   Uint8List? _coverBytes;
 
@@ -38,6 +39,7 @@ class _PlayerPageState extends State<PlayerPage> {
     super.initState();
     _player.addProgressListener(_onProgressUpdate);
     _player.addSongChangeListener(_onSongChange);
+    _player.addDownloadProgressListener(_onDownloadProgress);
     _player.onPlayStateChanged = (_) => mounted ? setState(() {}) : null;
     _syncState();
     _checkFavorite();
@@ -65,10 +67,19 @@ class _PlayerPageState extends State<PlayerPage> {
     }
   }
 
+  void _onDownloadProgress(double? progress) {
+    if (mounted) {
+      setState(() {
+        _downloadProgress = progress;
+      });
+    }
+  }
+
   @override
   void dispose() {
     _player.removeProgressListener(_onProgressUpdate);
     _player.removeSongChangeListener(_onSongChange);
+    _player.removeDownloadProgressListener(_onDownloadProgress);
     super.dispose();
   }
 
@@ -304,6 +315,7 @@ class _PlayerPageState extends State<PlayerPage> {
             children: [
               _buildTopBar(song),
               Expanded(child: _buildCenterContent(lyricText)),
+              _buildDownloadProgress(),
               _buildTimeBar(),
               _buildBottomActions(),
               _buildControls(),
@@ -417,6 +429,39 @@ class _PlayerPageState extends State<PlayerPage> {
           else
             const Text('歌词加载中...',
                 style: TextStyle(color: Color(0xFF8F919A), fontSize: 18)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDownloadProgress() {
+    if (_downloadProgress == null) return const SizedBox.shrink();
+    final percent = (_downloadProgress! * 100).toInt();
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.downloading, color: Color(0xFF6890F9), size: 16),
+              const SizedBox(width: 8),
+              Text(
+                '缓存中 %',
+                style: const TextStyle(color: Color(0xFF8F919A), fontSize: 12),
+              ),
+              const Spacer(),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: LinearProgressIndicator(
+              value: _downloadProgress!,
+              backgroundColor: const Color(0xFF2A2D3A),
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF6890F9)),
+              minHeight: 3,
+            ),
+          ),
         ],
       ),
     );
@@ -562,3 +607,6 @@ class _PlayerPageState extends State<PlayerPage> {
         .trim();
   }
 }
+
+
+

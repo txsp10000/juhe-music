@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 
@@ -44,12 +44,20 @@ class AudioCacheService {
     return File(path).exists();
   }
 
-  Future<String?> download(String songId, String url) async {
+  /// Download with progress callback. Returns local file path on success.
+  Future<String?> download(
+    String songId,
+    String url, {
+    void Function(double progress)? onProgress,
+  }) async {
     try {
       final path = await getFilePath(songId, url);
       final file = File(path);
 
-      if (await file.exists()) return path;
+      if (await file.exists()) {
+        onProgress?.call(1.0);
+        return path;
+      }
 
       final dir = await _getCacheDir();
       final oldMp3 = File('${dir.path}/$songId.mp3');
@@ -62,10 +70,23 @@ class AudioCacheService {
       final response = await _client.send(request);
 
       if (response.statusCode == 200) {
+        final totalBytes = response.contentLength ?? 0;
+        int receivedBytes = 0;
+
         final sink = file.openWrite();
-        await response.stream.pipe(sink);
+        await for (final chunk in response.stream) {
+          sink.add(chunk);
+          receivedBytes += chunk.length;
+          if (totalBytes > 0) {
+            onProgress?.call(receivedBytes / totalBytes);
+          }
+        }
         await sink.close();
-        if (await file.length() > 0) return path;
+
+        if (await file.length() > 0) {
+          onProgress?.call(1.0);
+          return path;
+        }
         await file.delete();
       }
     } catch (_) {}

@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:audio_service/audio_service.dart';
@@ -34,6 +34,26 @@ class PlayerService {
   Duration? get duration => _duration;
 
   void Function(bool playing)? onPlayStateChanged;
+
+  // Download progress: 0.0 to 1.0, null means not downloading
+  double? _downloadProgress;
+  double? get downloadProgress => _downloadProgress;
+  final List<void Function(double?)> _downloadProgressListeners = [];
+
+  void addDownloadProgressListener(void Function(double?) listener) {
+    _downloadProgressListeners.add(listener);
+  }
+
+  void removeDownloadProgressListener(void Function(double?) listener) {
+    _downloadProgressListeners.remove(listener);
+  }
+
+  void _notifyDownloadProgress(double? progress) {
+    _downloadProgress = progress;
+    for (final l in _downloadProgressListeners) {
+      l(progress);
+    }
+  }
 
   final List<void Function(Duration, Duration?)> _progressListeners = [];
   final List<void Function(Song)> _songChangeListeners = [];
@@ -210,7 +230,15 @@ class PlayerService {
     _currentUrl = url;
 
     final audioCache = AudioCacheService();
-    String? localPath = await audioCache.download(song.id, url);
+    _notifyDownloadProgress(0.0);
+    String? localPath = await audioCache.download(song.id, url, onProgress: (p) {
+      if (currentGen == _playGeneration) {
+        _notifyDownloadProgress(p);
+      }
+    });
+    if (currentGen == _playGeneration) {
+      _notifyDownloadProgress(null);
+    }
     if (currentGen != _playGeneration) return;
 
     if (localPath != null) {
@@ -336,3 +364,4 @@ class _AudioPlayerTask extends BaseAudioHandler {
   @override
   Future<void> skipToPrevious() async => PlayerService().prev();
 }
+
