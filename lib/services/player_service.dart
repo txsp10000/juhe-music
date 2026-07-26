@@ -208,9 +208,8 @@ class PlayerService {
 
     // Check local audio cache first (offline support)
     final audioCache = AudioCacheService();
-    final cachedPath = await audioCache.getFilePath(song.id);
-    final cachedFile = File(cachedPath);
-    final hasCachedAudio = await cachedFile.exists() && (await cachedFile.length()) > 0;
+    final cachedPath = await audioCache.findCachedFile(song.id);
+    final hasCachedAudio = cachedPath != null;
 
     // Load cover from local cache
     final coverCache = CoverCacheService();
@@ -404,5 +403,4 @@ class _AudioPlayerTask extends BaseAudioHandler {
   @override
   Future<void> skipToPrevious() async => PlayerService().prev();
 }
-
 

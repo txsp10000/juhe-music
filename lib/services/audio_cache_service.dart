@@ -25,6 +25,25 @@ class AudioCacheService {
     final ext = _extractExt(url);
     return '${dir.path}/$songId.$ext';
   }
+  /// Find any cached audio file for this songId regardless of extension
+  Future<String?> findCachedFile(String songId) async {
+    final dir = await _getCacheDir();
+    if (!await dir.exists()) return null;
+    final prefix = '$songId.';
+    try {
+      await for (final entity in dir.list()) {
+        if (entity is File) {
+          final name = entity.path.split('/').last.split('\\').last;
+          if (name.startsWith(prefix)) {
+            if (await entity.length() > 0) {
+              return entity.path;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
 
   String _extractExt(String? url) {
     if (url == null || url.isEmpty) return 'mp3';
@@ -100,4 +119,3 @@ class AudioCacheService {
     return null;
   }
 }
-
