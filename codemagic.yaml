@@ -21,12 +21,34 @@
           flutter create --platforms=ios .
           flutter pub get
 
-      - name: Install custom native files
+      - name: Install custom native files and Podfile
         script: |
-          # Copy custom Swift files from repo into generated ios project
+          # Copy custom Swift files
           cp ios_native/AppDelegate.swift ios/Runner/AppDelegate.swift
           cp ios_native/CarPlaySceneDelegate.swift ios/Runner/CarPlaySceneDelegate.swift
           cp ios_native/Runner.entitlements ios/Runner/Runner.entitlements
+
+          # Overwrite Podfile with our custom one that sets platform to 14.0
+          cat > ios/Podfile << 'PODFILE'
+          platform :ios, '14.0'
+
+          target 'Runner' do
+            use_frameworks!
+            use_modular_headers!
+
+            flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+            target 'RunnerTests' do
+              inherit! :search_paths
+            end
+          end
+
+          post_install do |installer|
+            installer.pods_project.targets.each do |target|
+              flutter_additional_ios_build_settings(target)
+            end
+          end
+          PODFILE
 
       - name: Configure Xcode project
         script: |
@@ -51,7 +73,10 @@
           c = re.sub(r'CODE_SIGN_IDENTITY = "[^"]*";', 'CODE_SIGN_IDENTITY = "";', c)
           c = re.sub(r'PROVISIONING_PROFILE_SPECIFIER = "[^"]*";', 'PROVISIONING_PROFILE_SPECIFIER = "";', c)
 
-          # --- 3. Add CODE_SIGN_ENTITLEMENTS ---
+          # --- 3. Set deployment target to 14.0 ---
+          c = re.sub(r"IPHONEOS_DEPLOYMENT_TARGET = [^;]+;", "IPHONEOS_DEPLOYMENT_TARGET = 14.0;", c)
+
+          # --- 4. Add CODE_SIGN_ENTITLEMENTS ---
           if "CODE_SIGN_ENTITLEMENTS" not in c:
               c = re.sub(
                   r"(ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;)",
@@ -59,17 +84,13 @@
                   c
               )
 
-          # --- 4. Add CarPlaySceneDelegate.swift + CarPlay.framework ---
+          # --- 5. Add CarPlaySceneDelegate.swift + CarPlay.framework ---
           if "CarPlaySceneDelegate" not in c:
-              # File references
               file_ref = '\t\tCARP00000001 /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };'
               fw_ref = '\t\tCARP00000002 /* CarPlay.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CarPlay.framework; path = System/Library/Frameworks/CarPlay.framework; sourceTree = SDKROOT; };'
-
-              # Build files
               build_src = '\t\tCARP00000003 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CARP00000001 /* CarPlaySceneDelegate.swift */; };'
               build_fw = '\t\tCARP00000004 /* CarPlay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CARP00000002 /* CarPlay.framework */; };'
 
-              # Insert into sections
               c = c.replace(
                   "/* End PBXFileReference section */",
                   file_ref + "\n" + fw_ref + "\n/* End PBXFileReference section */"
@@ -78,22 +99,17 @@
                   "/* End PBXBuildFile section */",
                   build_src + "\n" + build_fw + "\n/* End PBXBuildFile section */"
               )
-
-              # Add to Sources phase
               c = re.sub(
                   r"(/\* Sources \*/ = \{[^}]*files = \()",
                   r"\1\n\t\t\t\tCARP00000003 /* CarPlaySceneDelegate.swift in Sources */,",
                   c
               )
-
-              # Add to Runner group
               c = re.sub(
                   r"(AppDelegate\.swift \*/,)",
                   r"\1\n\t\t\t\tCARP00000001 /* CarPlaySceneDelegate.swift */,",
                   c
               )
 
-              # Add Frameworks build phase
               if "PBXFrameworksBuildPhase" not in c:
                   fw_phase = (
                       "/* Begin PBXFrameworksBuildPhase section */\n"
@@ -111,7 +127,6 @@
                       "/* End PBXSourcesBuildPhase section */",
                       "/* End PBXSourcesBuildPhase section */\n" + fw_phase
                   )
-                  # Add phase to target buildPhases (after Sources)
                   c = re.sub(
                       r"(/\* Sources \*/ \*/,)",
                       r"\1\n\t\t\t\tCARP00000005 /* Frameworks */,",
@@ -127,14 +142,13 @@
           with open(pbx_path, "w") as f:
               f.write(c)
 
-          print("Xcode project configured: bundle ID, signing, CarPlay")
+          print("Xcode project configured successfully")
           PYTHON
 
       - name: Configure Info.plist
         script: |
           PLIST="ios/Runner/Info.plist"
 
-          # Basic app info
           /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 苗苗music" "$PLIST"
           /usr/libexec/PlistBuddy -c "Set :CFBundleName 苗苗music" "$PLIST"
 
@@ -146,7 +160,7 @@
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" "$PLIST" 2>/dev/null
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PLIST" 2>/dev/null
 
-          # CarPlay scene configuration
+          # CarPlay scene
           /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest dict" "$PLIST" 2>/dev/null
           /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UIApplicationSupportsMultipleScenes bool false" "$PLIST" 2>/dev/null
           /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UISceneConfigurations dict" "$PLIST" 2>/dev/null
@@ -232,6 +246,25 @@
             exit 1
           fi
           echo "Found app: $APP_PATH"
+
+          # Ensure Frameworks are embedded (critical for TrollStore)
+          if [ ! -d "$APP_PATH/Frameworks" ]; then
+            echo "WARNING: Frameworks directory missing, searching for frameworks to embed..."
+            mkdir -p "$APP_PATH/Frameworks"
+            # Find and copy Flutter.framework and App.framework
+            find build/ios -name "Flutter.framework" -type d | head -1 | xargs -I{} cp -R {} "$APP_PATH/Frameworks/"
+            find build/ios -name "App.framework" -type d | head -1 | xargs -I{} cp -R {} "$APP_PATH/Frameworks/"
+            # Copy any pod frameworks
+            PODS_FW_DIR=$(find build/ios -path "*/Release-iphoneos/*.framework" -type d 2>/dev/null | head -1 | xargs -I{} dirname {})
+            if [ -n "$PODS_FW_DIR" ] && [ -d "$PODS_FW_DIR" ]; then
+              find "$PODS_FW_DIR" -name "*.framework" -type d -exec cp -R {} "$APP_PATH/Frameworks/" \;
+            fi
+          fi
+
+          # List what's in Frameworks for debugging
+          echo "Frameworks in app bundle:"
+          ls -la "$APP_PATH/Frameworks/" 2>/dev/null || echo "  (none)"
+
           rm -rf Payload
           mkdir Payload
           cp -R "$APP_PATH" Payload/
