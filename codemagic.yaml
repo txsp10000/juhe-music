@@ -26,7 +26,8 @@
           cp ios_native/AppDelegate.swift ios/Runner/AppDelegate.swift
           cp ios_native/CarPlaySceneDelegate.swift ios/Runner/CarPlaySceneDelegate.swift
           cp ios_native/Runner.entitlements ios/Runner/Runner.entitlements
-          cp ios_native/Podfile ios/Podfile
+          # Fix platform version in generated Podfile
+          sed -i '' "s/platform :ios, '.*'/platform :ios, '14.0'/" ios/Podfile
 
       - name: Configure Xcode project
         script: |
@@ -146,3 +147,4 @@
 
     artifacts:
       - Runner.ipa
+
