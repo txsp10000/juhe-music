@@ -116,7 +116,31 @@
 
       - name: Build iOS
         script: |
-          flutter build ios --release --no-codesign
+          flutter build ios --release --no-codesign 2>&1 || true
+          # If flutter build fails due to signing, fall back to xcodebuild directly
+          if [ ! -d "build/ios/iphoneos/Runner.app" ]; then
+            echo "Flutter build did not produce .app, using xcodebuild directly..."
+            cd ios
+            pod install
+            xcodebuild -workspace Runner.xcworkspace \
+              -scheme Runner \
+              -configuration Release \
+              -sdk iphoneos \
+              -destination 'generic/platform=iOS' \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY="" \
+              DEVELOPMENT_TEAM="" \
+              PROVISIONING_PROFILE_SPECIFIER="" \
+              -derivedDataPath ../build/ios
+            cd ..
+            # Copy the .app to expected location
+            APP=$(find build/ios -name "Runner.app" -type d | head -1)
+            if [ -n "$APP" ]; then
+              mkdir -p build/ios/iphoneos
+              cp -R "$APP" build/ios/iphoneos/Runner.app 2>/dev/null || true
+            fi
+          fi
 
       - name: Package IPA with entitlements
         script: |
