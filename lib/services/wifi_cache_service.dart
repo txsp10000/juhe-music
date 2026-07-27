@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../api/music_api.dart';
 import '../models/song.dart';
 import 'favorites_service.dart';
@@ -13,32 +13,25 @@ class WifiCacheService {
   WifiCacheService._();
 
   bool _running = false;
-  Timer? _timer;
+  StreamSubscription? _connectivitySub;
 
   void init() {
-    // 启动后延迟5秒开始检测，之后每60秒检测一次
-    _timer = Timer.periodic(const Duration(seconds: 60), (_) => _checkAndCache());
-    Future.delayed(const Duration(seconds: 5), _checkAndCache);
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
+      final isWifi = results.contains(ConnectivityResult.wifi);
+      if (isWifi && !_running) {
+        _startCaching();
+      }
+    });
+    // 启动时立即检测一次
+    Connectivity().checkConnectivity().then((results) {
+      if (results.contains(ConnectivityResult.wifi)) {
+        _startCaching();
+      }
+    });
   }
 
   void dispose() {
-    _timer?.cancel();
-  }
-
-  Future<bool> _isOnWifi() async {
-    try {
-      final interfaces = await NetworkInterface.list();
-      // iOS: en0 is WiFi interface
-      return interfaces.any((i) => i.name == 'en0' && i.addresses.isNotEmpty);
-    } catch (_) {
-      return false;
-    }
-  }
-
-  Future<void> _checkAndCache() async {
-    if (_running) return;
-    if (!await _isOnWifi()) return;
-    _startCaching();
+    _connectivitySub?.cancel();
   }
 
   Future<void> _startCaching() async {
@@ -51,14 +44,15 @@ class WifiCacheService {
       final br = SettingsService().quality.br;
 
       for (final song in songs) {
-        // Re-check WiFi before each download
-        if (!await _isOnWifi()) break;
+        // 每首歌下载前重新检测是否还在WiFi
+        final results = await Connectivity().checkConnectivity();
+        if (!results.contains(ConnectivityResult.wifi)) break;
 
-        // Check if already cached
+        // 检查是否已缓存
         final cached = await cache.findCachedFile(song.id, requestedBr: br);
         if (cached != null) continue;
 
-        // Get play URL and download
+        // 获取播放地址并下载
         try {
           final url = await MusicApi.getPlayUrl(song.id);
           if (url.isEmpty) continue;
