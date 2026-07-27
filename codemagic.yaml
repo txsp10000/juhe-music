@@ -109,6 +109,12 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add $CP:0:UISceneClassName string CPTemplateApplicationScene" "$PLIST"
           /usr/libexec/PlistBuddy -c "Add $CP:0:UISceneConfigurationName string CarPlay" "$PLIST"
           /usr/libexec/PlistBuddy -c "Add $CP:0:UISceneDelegateClassName string Runner.CarPlaySceneDelegate" "$PLIST"
+          WS="$CFG:UIWindowSceneSessionRoleApplication"
+          /usr/libexec/PlistBuddy -c "Add $WS array" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add $WS:0 dict" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add $WS:0:UISceneClassName string UIWindowScene" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add $WS:0:UISceneConfigurationName string Default" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add $WS:0:UISceneDelegateClassName string Runner.MainSceneDelegate" "$PLIST"
           echo "=== Scene manifest ==="
           /usr/libexec/PlistBuddy -c "Print $SM" "$PLIST"
 

@@ -5,6 +5,8 @@ import MediaPlayer
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
+  static var flutterEngine: FlutterEngine?
+
   private var lastArtUri: String = ""
   private var cachedArtwork: MPMediaItemArtwork?
   private var nowPlayingChannel: FlutterMethodChannel?
@@ -13,7 +15,10 @@ import MediaPlayer
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    GeneratedPluginRegistrant.register(with: self)
+    let engine = FlutterEngine(name: "miaomiao.main")
+    engine.run()
+    GeneratedPluginRegistrant.register(with: engine)
+    AppDelegate.flutterEngine = engine
 
     let session = AVAudioSession.sharedInstance()
     do {
@@ -33,6 +38,9 @@ import MediaPlayer
   }
 
   static func resolveBinaryMessenger() -> FlutterBinaryMessenger? {
+    if let engine = AppDelegate.flutterEngine {
+      return engine.binaryMessenger
+    }
     if let appDelegate = UIApplication.shared.delegate as? FlutterAppDelegate,
        let controller = appDelegate.window?.rootViewController as? FlutterViewController {
       return controller.binaryMessenger
@@ -130,5 +138,32 @@ import MediaPlayer
         }
       }
     }.resume()
+  }
+}
+
+@available(iOS 13.0, *)
+@objc class MainSceneDelegate: UIResponder, UIWindowSceneDelegate {
+  var window: UIWindow?
+
+  func scene(
+    _ scene: UIScene,
+    willConnectTo session: UISceneSession,
+    options connectionOptions: UIScene.ConnectionOptions
+  ) {
+    guard let windowScene = scene as? UIWindowScene else { return }
+
+    let engine = AppDelegate.flutterEngine ?? {
+      let e = FlutterEngine(name: "miaomiao.fallback")
+      e.run()
+      GeneratedPluginRegistrant.register(with: e)
+      AppDelegate.flutterEngine = e
+      return e
+    }()
+
+    let controller = FlutterViewController(engine: engine, nibName: nil, bundle: nil)
+    let win = UIWindow(windowScene: windowScene)
+    win.rootViewController = controller
+    self.window = win
+    win.makeKeyAndVisible()
   }
 }
