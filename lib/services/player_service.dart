@@ -241,6 +241,15 @@ class PlayerService {
         if (currentGen != _playGeneration) return;
         if (coverUrl != null && coverUrl.isNotEmpty) {
           song.cover = coverUrl;
+          // 更新锁屏/通知中心/控制中心的封面
+          final coverCache = CoverCacheService();
+          final cachedCover = await coverCache.getLocalPath(picId);
+          if (cachedCover != null) {
+            _currentMediaItem = _currentMediaItem!.copyWith(artUri: Uri.file(cachedCover));
+          } else {
+            _currentMediaItem = _currentMediaItem!.copyWith(artUri: Uri.parse(coverUrl));
+          }
+          try { AudioService.updateMediaItem(_currentMediaItem!); } catch (_) {}
           _notifySongChange(song);
         }
       }
