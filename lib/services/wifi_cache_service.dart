@@ -16,15 +16,14 @@ class WifiCacheService {
   StreamSubscription? _connectivitySub;
 
   void init() {
-    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
-      final isWifi = results.contains(ConnectivityResult.wifi);
-      if (isWifi && !_running) {
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((result) {
+      if (_isWifiResult(result) && !_running) {
         _startCaching();
       }
     });
     // 启动时立即检测一次
-    Connectivity().checkConnectivity().then((results) {
-      if (results.contains(ConnectivityResult.wifi)) {
+    Connectivity().checkConnectivity().then((result) {
+      if (_isWifiResult(result)) {
         _startCaching();
       }
     });
@@ -32,6 +31,18 @@ class WifiCacheService {
 
   void dispose() {
     _connectivitySub?.cancel();
+  }
+
+  bool _isWifiResult(dynamic result) {
+    if (result is List) {
+      return result.contains(ConnectivityResult.wifi);
+    }
+    return result == ConnectivityResult.wifi;
+  }
+
+  Future<bool> _isOnWifi() async {
+    final result = await Connectivity().checkConnectivity();
+    return _isWifiResult(result);
   }
 
   Future<void> _startCaching() async {
@@ -45,8 +56,7 @@ class WifiCacheService {
 
       for (final song in songs) {
         // 每首歌下载前重新检测是否还在WiFi
-        final results = await Connectivity().checkConnectivity();
-        if (!results.contains(ConnectivityResult.wifi)) break;
+        if (!await _isOnWifi()) break;
 
         // 检查是否已缓存
         final cached = await cache.findCachedFile(song.id, requestedBr: br);
