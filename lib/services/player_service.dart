@@ -235,6 +235,15 @@ class PlayerService {
       _currentPlayingBr = _extractBrFromPath(cachedPath!);
       await _player.open(Media('file://$cachedPath'), play: true);
       if (currentGen != _playGeneration) return;
+      // 本地播放后仍需获取封面（如果还没有的话）
+      if (song.cover.isEmpty || localCover == null) {
+        final coverUrl = await _fetchCover(picId);
+        if (currentGen != _playGeneration) return;
+        if (coverUrl != null && coverUrl.isNotEmpty) {
+          song.cover = coverUrl;
+          _notifySongChange(song);
+        }
+      }
       return;
     }
 
