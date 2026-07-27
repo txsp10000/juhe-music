@@ -9,6 +9,7 @@ import MediaPlayer
   private var cachedArtwork: MPMediaItemArtwork?
   private var nowPlayingChannel: FlutterMethodChannel?
   private var wasInterrupted: Bool = false
+  private var wasOverriddenBySystem: Bool = false
 
   override func application(
     _ application: UIApplication,
@@ -150,12 +151,34 @@ import MediaPlayer
       }
 
     case .override:
-      // 系统结束音频覆盖，尝试恢复
-      if wasInterrupted {
+      // Siri / 系统覆盖音频通道（CarPlay 场景 Siri 走此路径，非 interruption）
+      if wasOverriddenBySystem {
+        // 覆盖结束，重新激活并恢复
+        wasOverriddenBySystem = false
         try? session.setActive(true)
-        wasInterrupted = false
         DispatchQueue.main.async {
           self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": false])
+        }
+      } else {
+        // 覆盖开始（Siri 启动），暂停播放
+        wasOverriddenBySystem = true
+        DispatchQueue.main.async {
+          self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": true])
+        }
+      }
+
+    case .categoryChange:
+      // 音频类别变更（某些 iOS 版本 Siri 走此路径）
+      if wasOverriddenBySystem {
+        wasOverriddenBySystem = false
+        try? session.setActive(true)
+        DispatchQueue.main.async {
+          self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": false])
+        }
+      } else {
+        wasOverriddenBySystem = true
+        DispatchQueue.main.async {
+          self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": true])
         }
       }
 
