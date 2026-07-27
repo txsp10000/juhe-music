@@ -11,14 +11,23 @@ import Flutter
   private var probeCount = 0
   private let maxProbes = 40
   private var rootList: CPListTemplate?
+  private var dartReady = false
+  private var refreshScheduled = false
+  private var sessionConfig: CPSessionConfiguration?
 
   func templateApplicationScene(
     _ templateApplicationScene: CPTemplateApplicationScene,
     didConnect interfaceController: CPInterfaceController
   ) {
     DiagLog.log("车机", "★ didConnect 触发, CarPlay 场景已连接")
+    DiagLog.log("车机", "场景状态=\(templateApplicationScene.activationState.rawValue)")
+    sessionConfig = CPSessionConfiguration(delegate: self)
+    if let cfg = sessionConfig {
+      DiagLog.log("车机", "限制=\(cfg.limitedUserInterfaces.rawValue) 内容样式=\(cfg.contentStyle.rawValue)")
+    }
     self.interfaceController = interfaceController
     probeCount = 0
+    dartReady = false
     showRootTemplate()
   }
 
@@ -27,7 +36,7 @@ import Flutter
     if methodChannel == nil {
       setupMethodChannel()
     } else {
-      refreshAll()
+      scheduleRefresh()
     }
   }
 
@@ -43,6 +52,7 @@ import Flutter
     self.interfaceController = nil
     self.methodChannel = nil
     self.rootList = nil
+    dartReady = false
     retryTimer?.invalidate()
     retryTimer = nil
   }
@@ -66,9 +76,9 @@ import Flutter
 
     channel.setMethodCallHandler { [weak self] call, result in
       if call.method == "dartReady" {
-        DiagLog.log("车机", "收到 Dart 就绪通知, 立即刷新")
-        self?.probeCount = self?.maxProbes ?? 0
-        self?.refreshAll()
+        DiagLog.log("车机", "收到 Dart 就绪通知")
+        self?.dartReady = true
+        self?.scheduleRefresh()
       }
       result(nil)
     }
@@ -77,6 +87,7 @@ import Flutter
   }
 
   private func probeDartReady() {
+    if dartReady { return }
     guard let channel = methodChannel else { return }
     guard probeCount < maxProbes else {
       DiagLog.log("车机", "探测超时, Dart 侧始终未就绪")
@@ -86,15 +97,26 @@ import Flutter
 
     channel.invokeMethod("ping", arguments: nil) { [weak self] reply in
       guard let self = self else { return }
+      if self.dartReady { return }
       guard (reply as? String) == "ok" else {
-        DiagLog.log("车机", "ping 第 \(self.probeCount) 次未就绪 (\(Self.describe(reply))), 0.5 秒后重试")
+        DiagLog.log("车机", "ping 第 \(self.probeCount) 次未就绪, 0.5 秒后重试")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
           self.probeDartReady()
         }
         return
       }
       DiagLog.log("车机", "ping 成功, Dart 已就绪")
-      self.refreshAll()
+      self.dartReady = true
+      self.scheduleRefresh()
+    }
+  }
+
+  private func scheduleRefresh() {
+    if refreshScheduled { return }
+    refreshScheduled = true
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+      self?.refreshScheduled = false
+      self?.refreshAll()
     }
   }
 
@@ -130,6 +152,8 @@ import Flutter
       }
     }
     DiagLog.log("车机", "setRootTemplate 已调用, rootTemplate=\(String(describing: type(of: intf.rootTemplate)))")
+    DiagLog.log("车机", "模板栈深度=\(intf.templates.count)")
+    DiagLog.log("车机", "host 上限: 分区=\(CPListTemplate.maximumSectionCount) 条目=\(CPListTemplate.maximumItemCount)")
 
     setupMethodChannel()
   }
@@ -233,6 +257,16 @@ import Flutter
 
       return item
     }
+  }
+}
+
+@available(iOS 14.0, *)
+extension CarPlaySceneDelegate: CPSessionConfigurationDelegate {
+  func sessionConfiguration(
+    _ sessionConfiguration: CPSessionConfiguration,
+    limitedUserInterfacesChanged limitedUserInterfaces: CPLimitableUserInterface
+  ) {
+    DiagLog.log("车机", "限制变化: \(limitedUserInterfaces.rawValue)")
   }
 }
 
