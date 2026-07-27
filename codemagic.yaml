@@ -23,19 +23,14 @@
 
       - name: Patch Podfile to disable codesigning for all targets
         script: |
-          cat >> ios/Podfile << 'EOF'
-
-          post_install do |installer|
-            installer.pods_project.targets.each do |target|
-              target.build_configurations.each do |config|
-                config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
-                config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
-                config.build_settings['CODE_SIGN_IDENTITY'] = ''
-              end
-            end
-          end
-          EOF
-
+          # Flutter Podfile already has post_install - inject our code before its last 'end'
+          ruby -e '
+            content = File.read("ios/Podfile")
+            inject = "  installer.pods_project.targets.each do |target|\n    target.build_configurations.each do |config|\n      config.build_settings[\"CODE_SIGNING_ALLOWED\"] = \"NO\"\n      config.build_settings[\"CODE_SIGNING_REQUIRED\"] = \"NO\"\n      config.build_settings[\"CODE_SIGN_IDENTITY\"] = \"\"\n    end\n  end\n"
+            content.sub!(/^end\s*\Z/m, inject + "end")
+            File.write("ios/Podfile", content)
+            puts "Podfile patched"
+          '
       - name: Install custom native files
         script: |
           cp ios_native/AppDelegate.swift ios/Runner/AppDelegate.swift
