@@ -1,10 +1,11 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'pages/home_page.dart';
 import 'services/player_service.dart';
 import 'services/carplay_service.dart';
 import 'services/settings_service.dart';
 import 'services/audio_cache_service.dart';
 import 'services/wifi_cache_service.dart';
+import 'services/diag_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,8 +13,10 @@ Future<void> main() async {
   AudioCacheService().cleanupIncomplete();
   AudioCacheService().migrateOldFiles();
   await PlayerService.init();
+  DiagService.log('Dart', 'PlayerService.init 完成');
   CarPlayService.init();
   WifiCacheService().init();
+  DiagService.log('Dart', 'runApp 前, 初始化全部完成');
   runApp(const MusicApp());
 }
 

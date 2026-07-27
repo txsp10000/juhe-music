@@ -48,6 +48,7 @@ workflows:
         script: |
           cp ios_native/AppDelegate.swift ios/Runner/AppDelegate.swift
           cp ios_native/CarPlaySceneDelegate.swift ios/Runner/CarPlaySceneDelegate.swift
+          cp ios_native/DiagLog.swift ios/Runner/DiagLog.swift
           cp ios_native/Runner.entitlements ios/Runner/Runner.entitlements
 
       - name: Configure Xcode project with Ruby (xcodeproj gem)
@@ -74,12 +75,13 @@ workflows:
             config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
           end
 
-          # 2. Add CarPlaySceneDelegate.swift to project
+          # 2. Add custom Swift files to project
           runner_group = project.main_group.find_subpath('Runner', false)
-          unless runner_group.files.any? { |f| f.path == 'CarPlaySceneDelegate.swift' }
-            file_ref = runner_group.new_file('CarPlaySceneDelegate.swift')
+          ['CarPlaySceneDelegate.swift', 'DiagLog.swift'].each do |name|
+            next if runner_group.files.any? { |f| f.path == name }
+            file_ref = runner_group.new_file(name)
             target.source_build_phase.add_file_reference(file_ref)
-            puts "Added CarPlaySceneDelegate.swift to project and sources"
+            puts "Added #{name} to project and sources"
           end
 
           project.save
@@ -94,6 +96,10 @@ workflows:
           /usr/libexec/PlistBuddy -c "Delete :UIBackgroundModes" "$PLIST" 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" "$PLIST"
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Delete :UIFileSharingEnabled" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :UIFileSharingEnabled bool true" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Delete :LSSupportsOpeningDocumentsInPlace" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :LSSupportsOpeningDocumentsInPlace bool true" "$PLIST"
           /usr/libexec/PlistBuddy -c "Delete :NSAppTransportSecurity" "$PLIST" 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" "$PLIST"
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PLIST"

@@ -13,11 +13,13 @@ import Flutter
     _ templateApplicationScene: CPTemplateApplicationScene,
     didConnect interfaceController: CPInterfaceController
   ) {
+    DiagLog.log("车机", "★ didConnect 触发, CarPlay 场景已连接")
     self.interfaceController = interfaceController
     showRootTemplate()
   }
 
   func sceneDidBecomeActive(_ scene: UIScene) {
+    DiagLog.log("车机", "sceneDidBecomeActive, 通道=\(methodChannel == nil ? "无" : "有")")
     if methodChannel == nil {
       setupMethodChannel()
     } else {
@@ -25,10 +27,15 @@ import Flutter
     }
   }
 
+  func sceneWillEnterForeground(_ scene: UIScene) {
+    DiagLog.log("车机", "sceneWillEnterForeground")
+  }
+
   func templateApplicationScene(
     _ templateApplicationScene: CPTemplateApplicationScene,
     didDisconnect interfaceController: CPInterfaceController
   ) {
+    DiagLog.log("车机", "didDisconnect, 场景已断开")
     self.interfaceController = nil
     self.methodChannel = nil
     retryTimer?.invalidate()
@@ -37,6 +44,7 @@ import Flutter
 
   private func setupMethodChannel() {
     guard let binaryMessenger = AppDelegate.resolveBinaryMessenger() else {
+      DiagLog.log("车机", "messenger 未就绪, 启动 2 秒重试")
       startRetryTimer()
       return
     }
@@ -48,6 +56,7 @@ import Flutter
       name: "com.miaomiao.music/carplay",
       binaryMessenger: binaryMessenger
     )
+    DiagLog.log("车机", "通道已建立 com.miaomiao.music/carplay")
 
     refreshAllTabs()
   }
@@ -79,11 +88,19 @@ import Flutter
 
     let tabBar = CPTabBarTemplate(templates: [favoritesTab, playlistTab])
     tabBar.delegate = self
-    interfaceController?.setRootTemplate(tabBar, animated: true) { [weak self] success, error in
+    DiagLog.log("车机", "准备 setRootTemplate, 页签数=\(tabBar.templates.count)")
+
+    guard let intf = interfaceController else {
+      DiagLog.log("车机", "错误: interfaceController 为空, 无法设置模板")
+      return
+    }
+
+    intf.setRootTemplate(tabBar, animated: true) { [weak self] success, error in
       if let error = error {
-        NSLog("CarPlay setRootTemplate 失败: \(error.localizedDescription)")
+        DiagLog.log("车机", "★ setRootTemplate 失败: \(error.localizedDescription)")
         return
       }
+      DiagLog.log("车机", "★ setRootTemplate 成功=\(success)")
       guard success else { return }
       DispatchQueue.main.async {
         self?.setupMethodChannel()
@@ -123,7 +140,11 @@ import Flutter
   }
 
   private func showChannelWaiting(template: CPListTemplate) {
-    guard isRootAttached else { return }
+    DiagLog.log("车机", "通道未就绪, 显示等待提示 (\(template.tabTitle ?? "?"))")
+    guard isRootAttached else {
+      DiagLog.log("车机", "根模板未挂载, 跳过 updateSections")
+      return
+    }
     let item = CPListItem(text: "等待手机端连接", detailText: "请在手机上打开苗苗music")
     template.updateSections([CPListSection(items: [item])])
   }
@@ -133,18 +154,26 @@ import Flutter
       showChannelWaiting(template: template)
       return
     }
+    DiagLog.log("车机", "刷新播放列表: 发起 getCurrentSongId")
     channel.invokeMethod("getCurrentSongId", arguments: nil) { currentId in
       let songId = currentId as? String
+      DiagLog.log("车机", "getCurrentSongId 返回: \(String(describing: currentId))")
       channel.invokeMethod("getPlaylist", arguments: nil) { result in
+        if let err = result as? FlutterError {
+          DiagLog.log("车机", "getPlaylist 出错: \(err.code) \(err.message ?? "")")
+        }
         guard let songs = result as? [[String: Any]], !songs.isEmpty else {
+          DiagLog.log("车机", "getPlaylist 空或类型不符: \(type(of: result))")
           let emptyItem = CPListItem(text: "暂无歌曲", detailText: "在手机上播放音乐后显示")
           let section = CPListSection(items: [emptyItem])
           template.updateSections([section])
           return
         }
+        DiagLog.log("车机", "getPlaylist 返回 \(songs.count) 首")
         let items = self.buildListItems(from: songs, action: "playAtIndex", currentSongId: songId)
         let section = CPListSection(items: items, header: "当前播放列表", sectionIndexTitle: nil)
         template.updateSections([section])
+        DiagLog.log("车机", "播放列表已写入模板")
       }
     }
   }
@@ -154,18 +183,25 @@ import Flutter
       showChannelWaiting(template: template)
       return
     }
+    DiagLog.log("车机", "刷新收藏: 发起 getFavorites")
     channel.invokeMethod("getCurrentSongId", arguments: nil) { currentId in
       let songId = currentId as? String
       channel.invokeMethod("getFavorites", arguments: nil) { result in
+        if let err = result as? FlutterError {
+          DiagLog.log("车机", "getFavorites 出错: \(err.code) \(err.message ?? "")")
+        }
         guard let songs = result as? [[String: Any]], !songs.isEmpty else {
+          DiagLog.log("车机", "getFavorites 空或类型不符: \(type(of: result))")
           let emptyItem = CPListItem(text: "暂无收藏", detailText: "收藏歌曲后会在这里显示")
           let section = CPListSection(items: [emptyItem])
           template.updateSections([section])
           return
         }
+        DiagLog.log("车机", "getFavorites 返回 \(songs.count) 首")
         let items = self.buildListItems(from: songs, action: "playFavorite", currentSongId: songId)
         let section = CPListSection(items: items, header: "我的收藏", sectionIndexTitle: nil)
         template.updateSections([section])
+        DiagLog.log("车机", "收藏已写入模板")
       }
     }
   }
@@ -181,6 +217,7 @@ import Flutter
         item.isPlaying = true
       }
       item.handler = { [weak self] _, completion in
+        DiagLog.log("车机", "点击第 \(index) 项, 调用 \(action)")
         self?.methodChannel?.invokeMethod(action, arguments: index)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
           if let intf = self?.interfaceController {

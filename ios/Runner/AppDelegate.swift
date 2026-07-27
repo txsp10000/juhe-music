@@ -10,22 +10,28 @@ import MediaPlayer
   private var lastArtUri: String = ""
   private var cachedArtwork: MPMediaItemArtwork?
   private var nowPlayingChannel: FlutterMethodChannel?
+  private var diagChannel: FlutterMethodChannel?
 
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    DiagLog.log("App", "didFinishLaunching 开始")
+
     let engine = FlutterEngine(name: "miaomiao.main")
-    engine.run()
+    let ran = engine.run()
+    DiagLog.log("App", "engine.run() = \(ran)")
     GeneratedPluginRegistrant.register(with: engine)
     AppDelegate.flutterEngine = engine
+    DiagLog.log("App", "插件已注册, engine 就绪")
 
     let session = AVAudioSession.sharedInstance()
     do {
       try session.setCategory(.playback, mode: .default, policy: .longFormAudio)
       try session.setActive(true)
+      DiagLog.log("App", "AVAudioSession 已激活")
     } catch {
-      print("AVAudioSession 配置失败: \(error)")
+      DiagLog.log("App", "AVAudioSession 配置失败: \(error)")
     }
 
     UIApplication.shared.beginReceivingRemoteControlEvents()
@@ -58,11 +64,15 @@ import MediaPlayer
 
   private func setupNowPlayingChannel() {
     guard let messenger = AppDelegate.resolveBinaryMessenger() else {
+      DiagLog.log("App", "nowplaying: messenger 未就绪, 1 秒后重试")
       DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
         self?.setupNowPlayingChannel()
       }
       return
     }
+    DiagLog.log("App", "nowplaying: messenger 已获取")
+
+    setupDiagChannel(messenger)
 
     if nowPlayingChannel == nil {
       let channel = FlutterMethodChannel(
@@ -102,6 +112,34 @@ import MediaPlayer
           }
           result(nil)
         }
+      }
+    }
+  }
+
+  private func setupDiagChannel(_ messenger: FlutterBinaryMessenger) {
+    guard diagChannel == nil else { return }
+    let channel = FlutterMethodChannel(
+      name: "com.miaomiao.music/diag",
+      binaryMessenger: messenger
+    )
+    diagChannel = channel
+    channel.setMethodCallHandler { (call, result) in
+      switch call.method {
+      case "read":
+        result(DiagLog.readAll())
+      case "clear":
+        DiagLog.clear()
+        result(nil)
+      case "path":
+        result(DiagLog.logPath)
+      case "write":
+        if let args = call.arguments as? [String: Any],
+           let msg = args["message"] as? String {
+          DiagLog.log(args["tag"] as? String ?? "Dart", msg)
+        }
+        result(nil)
+      default:
+        result(FlutterMethodNotImplemented)
       }
     }
   }
@@ -150,7 +188,15 @@ import MediaPlayer
     willConnectTo session: UISceneSession,
     options connectionOptions: UIScene.ConnectionOptions
   ) {
-    guard let windowScene = scene as? UIWindowScene else { return }
+    DiagLog.log("手机场景", "willConnectTo 触发, role=\(session.role.rawValue)")
+    guard let windowScene = scene as? UIWindowScene else {
+      DiagLog.log("手机场景", "错误: scene 不是 UIWindowScene, 实际=\(type(of: scene))")
+      return
+    }
+
+    if AppDelegate.flutterEngine == nil {
+      DiagLog.log("手机场景", "警告: 共享 engine 为空, 走兜底新建")
+    }
 
     let engine = AppDelegate.flutterEngine ?? {
       let e = FlutterEngine(name: "miaomiao.fallback")
@@ -165,5 +211,6 @@ import MediaPlayer
     win.rootViewController = controller
     self.window = win
     win.makeKeyAndVisible()
+    DiagLog.log("手机场景", "window 已创建并可见, rootVC=\(type(of: controller))")
   }
 }
