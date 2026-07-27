@@ -8,6 +8,8 @@ import Flutter
   var interfaceController: CPInterfaceController?
   private var methodChannel: FlutterMethodChannel?
   private var retryTimer: Timer?
+  private var probeCount = 0
+  private let maxProbes = 40
 
   func templateApplicationScene(
     _ templateApplicationScene: CPTemplateApplicationScene,
@@ -52,13 +54,46 @@ import Flutter
     retryTimer?.invalidate()
     retryTimer = nil
 
-    methodChannel = FlutterMethodChannel(
+    let channel = FlutterMethodChannel(
       name: "com.miaomiao.music/carplay",
       binaryMessenger: binaryMessenger
     )
+    methodChannel = channel
     DiagLog.log("车机", "通道已建立 com.miaomiao.music/carplay")
 
-    refreshAllTabs()
+    channel.setMethodCallHandler { [weak self] call, result in
+      if call.method == "dartReady" {
+        DiagLog.log("车机", "收到 Dart 就绪通知, 立即刷新")
+        self?.probeCount = 0
+        self?.refreshAllTabs()
+      }
+      result(nil)
+    }
+
+    probeCount = 0
+    probeDartReady()
+  }
+
+  private func probeDartReady() {
+    guard let channel = methodChannel else { return }
+    guard probeCount < maxProbes else {
+      DiagLog.log("车机", "探测超时, Dart 侧始终未就绪")
+      return
+    }
+    probeCount += 1
+
+    channel.invokeMethod("ping", arguments: nil) { [weak self] reply in
+      guard let self = self else { return }
+      guard (reply as? String) == "ok" else {
+        DiagLog.log("车机", "ping 第 \(self.probeCount) 次未就绪 (\(Self.describe(reply))), 0.5 秒后重试")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+          self.probeDartReady()
+        }
+        return
+      }
+      DiagLog.log("车机", "ping 成功, Dart 已就绪")
+      self.refreshAllTabs()
+    }
   }
 
   private func startRetryTimer() {
@@ -95,17 +130,15 @@ import Flutter
       return
     }
 
-    intf.setRootTemplate(tabBar, animated: true) { [weak self] success, error in
+    intf.setRootTemplate(tabBar, animated: true) { success, error in
       if let error = error {
-        DiagLog.log("车机", "★ setRootTemplate 失败: \(error.localizedDescription)")
-        return
-      }
-      DiagLog.log("车机", "★ setRootTemplate 成功=\(success)")
-      guard success else { return }
-      DispatchQueue.main.async {
-        self?.setupMethodChannel()
+        DiagLog.log("车机", "setRootTemplate 回调: 失败 \(error.localizedDescription)")
+      } else {
+        DiagLog.log("车机", "setRootTemplate 回调: 成功=\(success)")
       }
     }
+
+    setupMethodChannel()
   }
 
   // MARK: - Playlist Tab
@@ -139,6 +172,17 @@ import Flutter
     return interfaceController?.rootTemplate is CPTabBarTemplate
   }
 
+  private static func describe(_ value: Any?) -> String {
+    guard let v = value else { return "nil (Dart 未响应或未注册 handler)" }
+    if let err = v as? FlutterError {
+      return "FlutterError(\(err.code))"
+    }
+    if let arr = v as? [Any] {
+      return "数组 空=\(arr.isEmpty) 条数=\(arr.count)"
+    }
+    return "类型=\(type(of: v)) 值=\(v)"
+  }
+
   private func showChannelWaiting(template: CPListTemplate) {
     DiagLog.log("车机", "通道未就绪, 显示等待提示 (\(template.tabTitle ?? "?"))")
     guard isRootAttached else {
@@ -157,13 +201,13 @@ import Flutter
     DiagLog.log("车机", "刷新播放列表: 发起 getCurrentSongId")
     channel.invokeMethod("getCurrentSongId", arguments: nil) { currentId in
       let songId = currentId as? String
-      DiagLog.log("车机", "getCurrentSongId 返回: \(String(describing: currentId))")
+      DiagLog.log("车机", "getCurrentSongId 返回: \(Self.describe(currentId))")
       channel.invokeMethod("getPlaylist", arguments: nil) { result in
         if let err = result as? FlutterError {
           DiagLog.log("车机", "getPlaylist 出错: \(err.code) \(err.message ?? "")")
         }
         guard let songs = result as? [[String: Any]], !songs.isEmpty else {
-          DiagLog.log("车机", "getPlaylist 空或类型不符: \(type(of: result))")
+          DiagLog.log("车机", "getPlaylist 无数据: \(Self.describe(result))")
           let emptyItem = CPListItem(text: "暂无歌曲", detailText: "在手机上播放音乐后显示")
           let section = CPListSection(items: [emptyItem])
           template.updateSections([section])
@@ -191,7 +235,7 @@ import Flutter
           DiagLog.log("车机", "getFavorites 出错: \(err.code) \(err.message ?? "")")
         }
         guard let songs = result as? [[String: Any]], !songs.isEmpty else {
-          DiagLog.log("车机", "getFavorites 空或类型不符: \(type(of: result))")
+          DiagLog.log("车机", "getFavorites 无数据: \(Self.describe(result))")
           let emptyItem = CPListItem(text: "暂无收藏", detailText: "收藏歌曲后会在这里显示")
           let section = CPListSection(items: [emptyItem])
           template.updateSections([section])

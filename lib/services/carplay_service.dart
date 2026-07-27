@@ -15,6 +15,7 @@ class CarPlayService {
     DiagService.log('Dart', 'CarPlayService.init 已注册 handler');
 
     _channel.setMethodCallHandler((call) async {
+      if (call.method == 'ping') return 'ok';
       DiagService.log('Dart', '收到调用: ${call.method}');
       switch (call.method) {
         case 'getPlaylist':
@@ -38,6 +39,17 @@ class CarPlayService {
         default:
           return null;
       }
+    });
+
+    notifyReady();
+  }
+
+  static void notifyReady() {
+    _channel.invokeMethod('dartReady').then((_) {
+      DiagService.log('Dart', 'dartReady 已送达原生');
+    }).catchError((_) {
+      DiagService.log('Dart', 'dartReady 未送达(车机侧尚未连接), 属正常');
+      return null;
     });
   }
 
