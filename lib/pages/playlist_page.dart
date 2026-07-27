@@ -14,11 +14,21 @@ class PlaylistPage extends StatefulWidget {
 
 class _PlaylistPageState extends State<PlaylistPage> {
   final _player = PlayerService();
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _player.addSongChangeListener(_onSongChange);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToPlaying());
+  }
+
+  void _scrollToPlaying() {
+    final idx = _player.currentIndex;
+    if (idx > 0 && _scrollController.hasClients) {
+      final offset = (idx * 62.0).clamp(0.0, _scrollController.position.maxScrollExtent);
+      _scrollController.animateTo(offset, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+    }
   }
 
   void _onSongChange(Song _) {
@@ -27,6 +37,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _player.removeSongChangeListener(_onSongChange);
     super.dispose();
   }
@@ -67,6 +78,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
       body: songs.isEmpty
           ? const Center(child: Text('暂无歌曲', style: TextStyle(color: Color(0xFF8F919A), fontSize: 16)))
           : ListView.builder(
+              controller: _scrollController,
               itemCount: songs.length,
               itemBuilder: (_, i) {
                 final s = songs[i];

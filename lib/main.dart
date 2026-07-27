@@ -4,6 +4,7 @@ import 'services/player_service.dart';
 import 'services/carplay_service.dart';
 import 'services/settings_service.dart';
 import 'services/audio_cache_service.dart';
+import 'services/wifi_cache_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,6 +13,7 @@ Future<void> main() async {
   AudioCacheService().migrateOldFiles();
   await PlayerService.init();
   CarPlayService.init();
+  WifiCacheService().init();
   runApp(const MusicApp());
 }
 

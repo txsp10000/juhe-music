@@ -19,6 +19,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
   final _player = PlayerService();
   bool _editMode = false;
   final Set<int> _selected = {};
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -33,13 +34,31 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _player.removeSongChangeListener(_onSongChange);
     super.dispose();
   }
 
   Future<void> _load() async {
     final songs = await FavoritesService.load();
-    if (mounted) setState(() => _songs = songs);
+    if (mounted) {
+      setState(() => _songs = songs);
+      _scrollToPlaying();
+    }
+  }
+
+  void _scrollToPlaying() {
+    final current = _player.currentSong;
+    if (current == null) return;
+    final idx = _songs.indexWhere((s) => s.id == current.id);
+    if (idx > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          final offset = (idx * 62.0).clamp(0.0, _scrollController.position.maxScrollExtent);
+          _scrollController.animateTo(offset, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+        }
+      });
+    }
   }
 
   void _playAt(int index) {
@@ -143,6 +162,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
           ? const Center(
               child: Text('还没有收藏歌曲', style: TextStyle(color: Color(0xFF8F919A), fontSize: 16)))
           : ListView.builder(
+              controller: _scrollController,
               itemCount: _songs.length,
               itemBuilder: (_, i) {
                 final s = _songs[i];

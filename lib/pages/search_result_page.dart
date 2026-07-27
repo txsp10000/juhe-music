@@ -26,17 +26,11 @@ class _SearchResultPageState extends State<SearchResultPage> {
   void initState() {
     super.initState();
     _search();
-    _player.addSongChangeListener(_onSongChange);
   }
 
-
-  void _onSongChange(Song _) {
-    if (mounted) setState(() {});
-  }
 
   @override
   void dispose() {
-    _player.removeSongChangeListener(_onSongChange);
     super.dispose();
   }
   Future<void> _search() async {
@@ -146,7 +140,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF171B26),
         title: Text(
-          _loading ? '搜索中...' : '搜索结果 · 网易云音乐',
+          _loading ? '搜索中...' : '搜索结果',
           style: const TextStyle(color: Colors.white),
         ),
         leading: IconButton(
@@ -179,25 +173,19 @@ class _SearchResultPageState extends State<SearchResultPage> {
                     itemBuilder: (_, i) {
                       final s = _songs[i];
                       final isFav = _favoritedIds.contains(s.id);
-                      final isCurrent = _player.currentSong?.id == s.id;
                       return InkWell(
                         onTap: () => _playAt(i),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                          decoration: BoxDecoration(
-                            color: isCurrent ? const Color(0x1A6890F9) : Colors.transparent,
-                            border: isCurrent
-                                ? const Border(bottom: BorderSide(color: Color(0xFF6890F9), width: 2))
-                                : const Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
+                          decoration: const BoxDecoration(
+                            border: Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
                           ),
                           child: Row(
                             children: [
                               SizedBox(
                                 width: 28,
-                                child: isCurrent
-                                    ? const Icon(Icons.volume_up, color: Color(0xFF6890F9), size: 22)
-                                    : Text('${i + 1}', textAlign: TextAlign.center,
-                                        style: const TextStyle(color: Color(0xFF8F919A), fontSize: 14)),
+                                child: Text('${i + 1}', textAlign: TextAlign.center,
+                                    style: const TextStyle(color: Color(0xFF8F919A), fontSize: 14)),
                               ),
                               const SizedBox(width: 14),
                               Expanded(
@@ -205,8 +193,8 @@ class _SearchResultPageState extends State<SearchResultPage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(s.name,
-                                        style: TextStyle(
-                                            color: isCurrent ? const Color(0xFF6890F9) : Colors.white,
+                                        style: const TextStyle(
+                                            color: Colors.white,
                                             fontSize: 16),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis),
