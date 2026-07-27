@@ -62,6 +62,11 @@ class _PlayerPageState extends State<PlayerPage> {
   void _onSongChange(Song s) {
     if (mounted) {
       _parsedLrc = _parseLrc(s.lyric);
+      // 切歌时先清除旧封面，避免显示上一首的图
+      if (s.cover.isEmpty || s.cover != _coverUrl) {
+        _coverBytes = null;
+        _coverUrl = '';
+      }
       setState(() {});
       _checkFavorite();
       _loadCover(s);

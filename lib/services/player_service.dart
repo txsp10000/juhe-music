@@ -250,6 +250,7 @@ class PlayerService {
 
     if (coverUrl != null && coverUrl.isNotEmpty) {
       song.cover = coverUrl;
+      _notifySongChange(song);
     }
     if (localCover == null) {
       final networkCover = await coverCache.getLocalPath(picId);
