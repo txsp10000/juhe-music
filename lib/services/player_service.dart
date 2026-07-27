@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
@@ -9,6 +9,7 @@ import 'lyric_cache_service.dart';
 import 'audio_cache_service.dart';
 import 'cover_cache_service.dart';
 import 'settings_service.dart';
+import 'favorites_service.dart';
 
 class PlayerService {
   static final PlayerService _instance = PlayerService._();
@@ -404,9 +405,45 @@ class PlayerService {
 
 class _AudioPlayerTask extends BaseAudioHandler {
   static const _nowPlayingChannel = MethodChannel('com.miaomiao.music/nowplaying');
+  bool _audioInterrupted = false;
 
   _AudioPlayerTask() {
     final ps = PlayerService();
+
+    // 监听原生层音频中断事件（Siri / 通话 / 蓝牙路由切换）
+    _nowPlayingChannel.setMethodCallHandler((call) async {
+      switch (call.method) {
+        case 'audioInterruption':
+          final active = call.arguments is Map
+              ? (call.arguments as Map)['active'] == true
+              : false;
+          if (active) {
+            // 中断开始：记录当前播放状态并暂停
+            _audioInterrupted = true;
+            await ps._player.pause();
+          } else {
+            // 中断结束：如果之前正在播放，则恢复
+            _audioInterrupted = false;
+            if (ps._currentIndex >= 0) {
+              try {
+                await ps._player.play();
+              } catch (_) {}
+            }
+          }
+          break;
+        case 'audioRouteDisconnected':
+          // 蓝牙/车载设备断开，暂停播放避免公放
+          _audioInterrupted = true;
+          await ps._player.pause();
+          break;
+        case 'audioRouteConnected':
+          // 蓝牙/CarPlay 自动连接，加载收藏列表并从头播放
+          await _autoPlayFavorites(ps);
+          break;
+        default:
+          break;
+      }
+    });
 
     ps._player.stream.playing.listen((playing) {
       _updatePlaybackState();
@@ -463,6 +500,24 @@ class _AudioPlayerTask extends BaseAudioHandler {
       'playbackRate': ps._isPlaying ? 1.0 : 0.0,
       'artUri': item.artUri?.toString() ?? '',
     });
+  }
+
+  /// 蓝牙/CarPlay 连接后，自动加载收藏列表并从头播放
+  Future<void> _autoPlayFavorites(PlayerService ps) async {
+    // 如果已经在播放中，不打断
+    if (ps._isPlaying) return;
+
+    try {
+      final favorites = await FavoritesService.load();
+      if (favorites.isEmpty) return;
+
+      // 替换播放列表为收藏列表
+      ps.playlist.clear();
+      ps.playlist.addAll(favorites);
+
+      // 从第一首开始
+      await ps.playAt(0);
+    } catch (_) {}
   }
 
   @override

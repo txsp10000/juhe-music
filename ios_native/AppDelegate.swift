@@ -8,6 +8,7 @@ import MediaPlayer
   private var lastArtUri: String = ""
   private var cachedArtwork: MPMediaItemArtwork?
   private var nowPlayingChannel: FlutterMethodChannel?
+  private var wasInterrupted: Bool = false
 
   override func application(
     _ application: UIApplication,
@@ -22,6 +23,7 @@ import MediaPlayer
     } catch {}
 
     UIApplication.shared.beginReceivingRemoteControlEvents()
+    setupAudioObservers()
 
     let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
 
@@ -32,6 +34,171 @@ import MediaPlayer
     }
 
     return result
+  }
+
+  // MARK: - Audio Session Observers
+
+  private func setupAudioObservers() {
+    let nc = NotificationCenter.default
+
+    nc.addObserver(self,
+                   selector: #selector(handleInterruption(_:)),
+                   name: AVAudioSession.interruptionNotification,
+                   object: nil)
+
+    nc.addObserver(self,
+                   selector: #selector(handleRouteChange(_:)),
+                   name: AVAudioSession.routeChangeNotification,
+                   object: nil)
+
+    nc.addObserver(self,
+                   selector: #selector(handleMediaServicesReset(_:)),
+                   name: AVAudioSession.mediaServicesWereResetNotification,
+                   object: nil)
+
+    nc.addObserver(self,
+                   selector: #selector(handleSilenceSecondaryAudio(_:)),
+                   name: AVAudioSession.silenceSecondaryAudioHintNotification,
+                   object: nil)
+  }
+
+  /// Siri / 通话等音频中断处理
+  @objc private func handleInterruption(_ notification: Notification) {
+    guard let typeValue = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+          let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
+      return
+    }
+
+    switch type {
+    case .began:
+      // 中断开始（Siri 唤醒 / 来电），通知 Flutter 暂停
+      wasInterrupted = true
+      DispatchQueue.main.async {
+        self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": true])
+      }
+
+    case .ended:
+      wasInterrupted = false
+      guard let optionsValue = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt else {
+        // 无恢复选项，不做处理
+        return
+      }
+      let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+      if options.contains(.shouldResume) {
+        // 中断结束（Siri 关闭 / 通话挂断），重新激活音频并恢复播放
+        let session = AVAudioSession.sharedInstance()
+        do {
+          try session.setActive(true)
+        } catch {
+          // 激活失败，延迟重试一次
+          DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            try? AVAudioSession.sharedInstance().setActive(true)
+          }
+        }
+        DispatchQueue.main.async {
+          self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": false])
+        }
+      }
+
+    @unknown default:
+      break
+    }
+  }
+
+  /// 蓝牙 / CarPlay / 耳机等音频路由切换处理
+  @objc private func handleRouteChange(_ notification: Notification) {
+    guard let reasonValue = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+          let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else {
+      return
+    }
+
+    let session = AVAudioSession.sharedInstance()
+
+    switch reason {
+    case .oldDeviceUnavailable:
+      // 设备断开（蓝牙耳机掉电 / 车载熄火等）
+      if let previousRoute = notification.userInfo?[AVAudioSessionRouteChangePreviousRouteKey] as? AVAudioSessionRouteDescription {
+        let wasHeadphonesOrBluetooth = previousRoute.outputs.contains { output in
+          output.portType == .headphones ||
+          output.portType == .bluetoothA2DP ||
+          output.portType == .bluetoothHFP ||
+          output.portType == .bluetoothLE ||
+          output.portType == .carAudio
+        }
+        let isSpeaker = session.currentRoute.outputs.contains { $0.portType == .builtInSpeaker }
+        if wasHeadphonesOrBluetooth && isSpeaker {
+          // 外设断开切到扬声器，暂停播放避免公放
+          DispatchQueue.main.async {
+            self.nowPlayingChannel?.invokeMethod("audioRouteDisconnected", arguments: nil)
+          }
+        }
+      }
+
+    case .newDeviceAvailable:
+      // 新设备接入（连接蓝牙 / CarPlay / 插耳机）
+      let isExternalDevice = session.currentRoute.outputs.contains { output in
+        output.portType == .headphones ||
+        output.portType == .bluetoothA2DP ||
+        output.portType == .bluetoothHFP ||
+        output.portType == .bluetoothLE ||
+        output.portType == .carAudio
+      }
+      if isExternalDevice {
+        DispatchQueue.main.async {
+          self.nowPlayingChannel?.invokeMethod("audioRouteConnected", arguments: nil)
+        }
+      }
+
+    case .override:
+      // 系统结束音频覆盖，尝试恢复
+      if wasInterrupted {
+        try? session.setActive(true)
+        wasInterrupted = false
+        DispatchQueue.main.async {
+          self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": false])
+        }
+      }
+
+    default:
+      break
+    }
+  }
+
+  /// 媒体服务重置处理
+  @objc private func handleMediaServicesReset(_ notification: Notification) {
+    let session = AVAudioSession.sharedInstance()
+    do {
+      try session.setCategory(.playback, mode: .default, policy: .longFormAudio)
+      try session.setActive(true)
+    } catch {}
+    DispatchQueue.main.async {
+      self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": false])
+    }
+  }
+
+  /// 其他 App 播放音频时的静音提示（导航语音 / 其他音乐 App 等）
+  @objc private func handleSilenceSecondaryAudio(_ notification: Notification) {
+    guard let typeValue = notification.userInfo?[AVAudioSessionSilenceSecondaryAudioHintTypeKey] as? UInt,
+          let type = AVAudioSession.SilenceSecondaryAudioHintType(rawValue: typeValue) else {
+      return
+    }
+
+    switch type {
+    case .begin:
+      // 其他音频开始（导航播报 / 其他 App 播放），暂停本 App
+      DispatchQueue.main.async {
+        self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": true])
+      }
+
+    case .end:
+      // 其他音频结束，恢复播放
+      DispatchQueue.main.async {
+        self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": false])
+      }
+
+    @unknown default:
+      break
+    }
   }
 
   private func setupNowPlayingChannel(messenger: FlutterBinaryMessenger) {
