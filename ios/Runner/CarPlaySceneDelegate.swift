@@ -4,7 +4,7 @@ import MediaPlayer
 import Flutter
 
 @available(iOS 14.0, *)
-class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
+@objc class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   var interfaceController: CPInterfaceController?
   private var methodChannel: FlutterMethodChannel?
   private var retryTimer: Timer?
@@ -15,7 +15,6 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   ) {
     self.interfaceController = interfaceController
     showRootTemplate()
-    setupMethodChannel()
   }
 
   func sceneDidBecomeActive(_ scene: UIScene) {
@@ -80,7 +79,16 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
 
     let tabBar = CPTabBarTemplate(templates: [favoritesTab, playlistTab])
     tabBar.delegate = self
-    interfaceController?.setRootTemplate(tabBar, animated: true, completion: nil)
+    interfaceController?.setRootTemplate(tabBar, animated: true) { [weak self] success, error in
+      if let error = error {
+        NSLog("CarPlay setRootTemplate 失败: \(error.localizedDescription)")
+        return
+      }
+      guard success else { return }
+      DispatchQueue.main.async {
+        self?.setupMethodChannel()
+      }
+    }
   }
 
   // MARK: - Playlist Tab
@@ -92,8 +100,6 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     template.tabTitle = "播放列表"
     template.emptyViewTitleVariants = ["暂无播放列表"]
     template.emptyViewSubtitleVariants = ["在手机上播放音乐后这里会显示"]
-
-    refreshPlaylist(template: template)
 
     return template
   }
@@ -108,13 +114,16 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     template.emptyViewTitleVariants = ["暂无收藏"]
     template.emptyViewSubtitleVariants = ["收藏歌曲后会在这里显示"]
 
-    refreshFavorites(template: template)
-
     return template
   }
 
   // MARK: - Data Loading
+  private var isRootAttached: Bool {
+    return interfaceController?.rootTemplate is CPTabBarTemplate
+  }
+
   private func showChannelWaiting(template: CPListTemplate) {
+    guard isRootAttached else { return }
     let item = CPListItem(text: "等待手机端连接", detailText: "请在手机上打开苗苗music")
     template.updateSections([CPListSection(items: [item])])
   }
