@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../services/settings_service.dart';
-import 'diag_log_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -34,33 +33,6 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           ...AudioQuality.values.map((q) => _buildQualityTile(q)),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 28, 16, 8),
-            child: Text(
-              '诊断',
-              style: TextStyle(
-                color: Color(0xFF6890F9),
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          ListTile(
-            title: const Text(
-              '诊断日志',
-              style: TextStyle(color: Colors.white, fontSize: 15),
-            ),
-            subtitle: const Text(
-              '启动与 CarPlay 连接过程记录',
-              style: TextStyle(color: Color(0xFF8A93A6), fontSize: 12),
-            ),
-            trailing: const Icon(Icons.chevron_right,
-                color: Color(0xFF8A93A6), size: 20),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const DiagLogPage()),
-            ),
-          ),
         ],
       ),
     );

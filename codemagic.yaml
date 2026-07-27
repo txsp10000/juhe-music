@@ -47,8 +47,6 @@ workflows:
       - name: Install custom native files
         script: |
           cp ios_native/AppDelegate.swift ios/Runner/AppDelegate.swift
-          cp ios_native/CarPlaySceneDelegate.swift ios/Runner/CarPlaySceneDelegate.swift
-          cp ios_native/DiagLog.swift ios/Runner/DiagLog.swift
           cp ios_native/Runner.entitlements ios/Runner/Runner.entitlements
 
       - name: Configure Xcode project with Ruby (xcodeproj gem)
@@ -77,12 +75,6 @@ workflows:
 
           # 2. Add custom Swift files to project
           runner_group = project.main_group.find_subpath('Runner', false)
-          ['CarPlaySceneDelegate.swift', 'DiagLog.swift'].each do |name|
-            next if runner_group.files.any? { |f| f.path == name }
-            file_ref = runner_group.new_file(name)
-            target.source_build_phase.add_file_reference(file_ref)
-            puts "Added #{name} to project and sources"
-          end
 
           project.save
           puts "Xcode project configured successfully"
@@ -103,26 +95,7 @@ workflows:
           /usr/libexec/PlistBuddy -c "Delete :NSAppTransportSecurity" "$PLIST" 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" "$PLIST"
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PLIST"
-          SM=":UIApplicationSceneManifest"
-          CFG="$SM:UISceneConfigurations"
-          CP="$CFG:CPTemplateApplicationSceneSessionRoleApplication"
-          /usr/libexec/PlistBuddy -c "Delete $SM" "$PLIST" 2>/dev/null || true
-          /usr/libexec/PlistBuddy -c "Add $SM dict" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add $SM:UIApplicationSupportsMultipleScenes bool true" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add $CFG dict" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add $CP array" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add $CP:0 dict" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add $CP:0:UISceneClassName string CPTemplateApplicationScene" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add $CP:0:UISceneConfigurationName string CarPlay" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add $CP:0:UISceneDelegateClassName string Runner.CarPlaySceneDelegate" "$PLIST"
-          WS="$CFG:UIWindowSceneSessionRoleApplication"
-          /usr/libexec/PlistBuddy -c "Add $WS array" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add $WS:0 dict" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add $WS:0:UISceneClassName string UIWindowScene" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add $WS:0:UISceneConfigurationName string Default" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add $WS:0:UISceneDelegateClassName string Runner.MainSceneDelegate" "$PLIST"
-          echo "=== Scene manifest ==="
-          /usr/libexec/PlistBuddy -c "Print $SM" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Delete :UIApplicationSceneManifest" "$PLIST" 2>/dev/null || true
 
       - name: Generate app icons
         script: |
@@ -162,7 +135,7 @@ workflows:
             codesign --force --sign - "$fw" 2>/dev/null || true
           done
 
-          # Sign main binary with CarPlay entitlements
+          # Sign main binary with entitlements
           codesign --force --sign - --entitlements ios_native/Runner.entitlements "$APP_PATH/Runner"
           echo "Signed with entitlements via codesign"
 

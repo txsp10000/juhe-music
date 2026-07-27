@@ -1,16 +1,9 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- 后台音频播放 -->
     <key>com.apple.developer.background-audio</key>
     <true/>
-    
-    <!-- CarPlay Audio App 权限 -->
-    <key>com.apple.developer.carplay-audio</key>
-    <true/>
-    
-    <!-- 网络访问 -->
     <key>com.apple.security.network.client</key>
     <true/>
 </dict>
