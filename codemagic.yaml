@@ -1,4 +1,4 @@
-﻿workflows:
+workflows:
   ios-build:
     name: iOS Build
     max_build_duration: 60
@@ -91,17 +91,26 @@
           PLIST="ios/Runner/Info.plist"
           /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 苗苗music" "$PLIST"
           /usr/libexec/PlistBuddy -c "Set :CFBundleName 苗苗music" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" "$PLIST" 2>/dev/null
-          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" "$PLIST" 2>/dev/null
-          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" "$PLIST" 2>/dev/null
-          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PLIST" 2>/dev/null
-          /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest dict" "$PLIST" 2>/dev/null
-          /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UIApplicationSupportsMultipleScenes bool false" "$PLIST" 2>/dev/null
-          /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UISceneConfigurations dict" "$PLIST" 2>/dev/null
-          /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UISceneConfigurations:CPTemplateApplicationSceneSessionRoleApplication array" "$PLIST" 2>/dev/null
-          /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UISceneConfigurations:CPTemplateApplicationSceneSessionRoleApplication:0 dict" "$PLIST" 2>/dev/null
-          /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UISceneConfigurations:CPTemplateApplicationSceneSessionRoleApplication:0:UISceneConfigurationName string CarPlay" "$PLIST" 2>/dev/null
-          /usr/libexec/PlistBuddy -c "Add :UIApplicationSceneManifest:UISceneConfigurations:CPTemplateApplicationSceneSessionRoleApplication:0:UISceneDelegateClassName string Runner.CarPlaySceneDelegate" "$PLIST" 2>/dev/null
+          /usr/libexec/PlistBuddy -c "Delete :UIBackgroundModes" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Delete :NSAppTransportSecurity" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PLIST"
+          SM=":UIApplicationSceneManifest"
+          CFG="$SM:UISceneConfigurations"
+          CP="$CFG:CPTemplateApplicationSceneSessionRoleApplication"
+          /usr/libexec/PlistBuddy -c "Delete $SM" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add $SM dict" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add $SM:UIApplicationSupportsMultipleScenes bool true" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add $CFG dict" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add $CP array" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add $CP:0 dict" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add $CP:0:UISceneClassName string CPTemplateApplicationScene" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add $CP:0:UISceneConfigurationName string CarPlay" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add $CP:0:UISceneDelegateClassName string Runner.CarPlaySceneDelegate" "$PLIST"
+          echo "=== Scene manifest ==="
+          /usr/libexec/PlistBuddy -c "Print $SM" "$PLIST"
 
       - name: Generate app icons
         script: |

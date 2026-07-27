@@ -1,4 +1,4 @@
-﻿import UIKit
+import UIKit
 import CarPlay
 import MediaPlayer
 import Flutter
@@ -14,8 +14,16 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     didConnect interfaceController: CPInterfaceController
   ) {
     self.interfaceController = interfaceController
-    setupMethodChannel()
     showRootTemplate()
+    setupMethodChannel()
+  }
+
+  func sceneDidBecomeActive(_ scene: UIScene) {
+    if methodChannel == nil {
+      setupMethodChannel()
+    } else {
+      refreshAllTabs()
+    }
   }
 
   func templateApplicationScene(
@@ -29,28 +37,7 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   }
 
   private func setupMethodChannel() {
-    var messenger: FlutterBinaryMessenger?
-
-    if let appDelegate = UIApplication.shared.delegate as? FlutterAppDelegate,
-       let controller = appDelegate.window?.rootViewController as? FlutterViewController {
-      messenger = controller.binaryMessenger
-    }
-
-    if messenger == nil {
-      for scene in UIApplication.shared.connectedScenes {
-        if let windowScene = scene as? UIWindowScene {
-          for window in windowScene.windows {
-            if let flutterVC = window.rootViewController as? FlutterViewController {
-              messenger = flutterVC.binaryMessenger
-              break
-            }
-          }
-        }
-        if messenger != nil { break }
-      }
-    }
-
-    guard let binaryMessenger = messenger else {
+    guard let binaryMessenger = AppDelegate.resolveBinaryMessenger() else {
       startRetryTimer()
       return
     }
@@ -127,8 +114,16 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   }
 
   // MARK: - Data Loading
+  private func showChannelWaiting(template: CPListTemplate) {
+    let item = CPListItem(text: "等待手机端连接", detailText: "请在手机上打开苗苗music")
+    template.updateSections([CPListSection(items: [item])])
+  }
+
   private func refreshPlaylist(template: CPListTemplate) {
-    guard let channel = methodChannel else { return }
+    guard let channel = methodChannel else {
+      showChannelWaiting(template: template)
+      return
+    }
     channel.invokeMethod("getCurrentSongId", arguments: nil) { currentId in
       let songId = currentId as? String
       channel.invokeMethod("getPlaylist", arguments: nil) { result in
@@ -146,7 +141,10 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   }
 
   private func refreshFavorites(template: CPListTemplate) {
-    guard let channel = methodChannel else { return }
+    guard let channel = methodChannel else {
+      showChannelWaiting(template: template)
+      return
+    }
     channel.invokeMethod("getCurrentSongId", arguments: nil) { currentId in
       let songId = currentId as? String
       channel.invokeMethod("getFavorites", arguments: nil) { result in

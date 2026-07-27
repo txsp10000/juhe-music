@@ -7,6 +7,7 @@ import MediaPlayer
 @objc class AppDelegate: FlutterAppDelegate {
   private var lastArtUri: String = ""
   private var cachedArtwork: MPMediaItemArtwork?
+  private var nowPlayingChannel: FlutterMethodChannel?
 
   override func application(
     _ application: UIApplication,
@@ -26,11 +27,41 @@ import MediaPlayer
 
     let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
 
-    if let controller = window?.rootViewController as? FlutterViewController {
+    setupNowPlayingChannel()
+
+    return result
+  }
+
+  static func resolveBinaryMessenger() -> FlutterBinaryMessenger? {
+    if let appDelegate = UIApplication.shared.delegate as? FlutterAppDelegate,
+       let controller = appDelegate.window?.rootViewController as? FlutterViewController {
+      return controller.binaryMessenger
+    }
+    for scene in UIApplication.shared.connectedScenes {
+      guard let windowScene = scene as? UIWindowScene else { continue }
+      for window in windowScene.windows {
+        if let flutterVC = window.rootViewController as? FlutterViewController {
+          return flutterVC.binaryMessenger
+        }
+      }
+    }
+    return nil
+  }
+
+  private func setupNowPlayingChannel() {
+    guard let messenger = AppDelegate.resolveBinaryMessenger() else {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+        self?.setupNowPlayingChannel()
+      }
+      return
+    }
+
+    if nowPlayingChannel == nil {
       let channel = FlutterMethodChannel(
         name: "com.miaomiao.music/nowplaying",
-        binaryMessenger: controller.binaryMessenger
+        binaryMessenger: messenger
       )
+      nowPlayingChannel = channel
       channel.setMethodCallHandler { [weak self] (call, result) in
         guard let self = self else { result(nil); return }
         if call.method == "update", let args = call.arguments as? [String: Any] {
@@ -65,8 +96,6 @@ import MediaPlayer
         }
       }
     }
-
-    return result
   }
 
   private func loadArtwork(from urlString: String) {
