@@ -13,6 +13,8 @@ import MediaPlayer
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    GeneratedPluginRegistrant.register(with: self)
+
     let session = AVAudioSession.sharedInstance()
     do {
       try session.setCategory(.playback, mode: .default, policy: .longFormAudio)
@@ -23,8 +25,10 @@ import MediaPlayer
 
     let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
 
-    if let controller = window?.rootViewController as? FlutterViewController {
-      setupNowPlayingChannel(messenger: controller.binaryMessenger)
+    DispatchQueue.main.async {
+      if let controller = self.window?.rootViewController as? FlutterViewController {
+        self.setupNowPlayingChannel(messenger: controller.binaryMessenger)
+      }
     }
 
     return result
