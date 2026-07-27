@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:connectivity_plus/connectivity_plus.dart';
+import 'dart:io';
 import '../api/music_api.dart';
 import '../models/song.dart';
 import 'favorites_service.dart';
@@ -13,25 +13,32 @@ class WifiCacheService {
   WifiCacheService._();
 
   bool _running = false;
-  StreamSubscription? _connectivitySub;
+  Timer? _timer;
 
   void init() {
-    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
-      final isWifi = results.contains(ConnectivityResult.wifi);
-      if (isWifi && !_running) {
-        _startCaching();
-      }
-    });
-    // Check immediately on init
-    Connectivity().checkConnectivity().then((results) {
-      if (results.contains(ConnectivityResult.wifi)) {
-        _startCaching();
-      }
-    });
+    // 启动后延迟5秒开始检测，之后每60秒检测一次
+    _timer = Timer.periodic(const Duration(seconds: 60), (_) => _checkAndCache());
+    Future.delayed(const Duration(seconds: 5), _checkAndCache);
   }
 
   void dispose() {
-    _connectivitySub?.cancel();
+    _timer?.cancel();
+  }
+
+  Future<bool> _isOnWifi() async {
+    try {
+      final interfaces = await NetworkInterface.list();
+      // iOS: en0 is WiFi interface
+      return interfaces.any((i) => i.name == 'en0' && i.addresses.isNotEmpty);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _checkAndCache() async {
+    if (_running) return;
+    if (!await _isOnWifi()) return;
+    _startCaching();
   }
 
   Future<void> _startCaching() async {
@@ -45,8 +52,7 @@ class WifiCacheService {
 
       for (final song in songs) {
         // Re-check WiFi before each download
-        final results = await Connectivity().checkConnectivity();
-        if (!results.contains(ConnectivityResult.wifi)) break;
+        if (!await _isOnWifi()) break;
 
         // Check if already cached
         final cached = await cache.findCachedFile(song.id, requestedBr: br);
