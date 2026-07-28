@@ -215,19 +215,24 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           child: SafeArea(
-            child: Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(
-                  left: 20, right: 20, top: 12, bottom: 20,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                  child: _buildSearchBar(),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildSearchBar(),
-                    const SizedBox(height: 12),
-                    _buildNowPlayingBar(),
-                    const SizedBox(height: 12),
-                    _buildFuncCards(),
+                const SizedBox(height: 12),
+                _buildNowPlayingBar(),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.only(
+                      left: 20, right: 20, bottom: 20,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildFuncCards(),
                         const SizedBox(height: 24),
                         _buildPinnedSection(),
                         const SizedBox(height: 24),
@@ -236,7 +241,8 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                 ),
-              ),
+              ],
+            ),
           ),
         ),
     );

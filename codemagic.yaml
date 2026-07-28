@@ -9,11 +9,11 @@ workflows:
       xcode: "16.2"
       cocoapods: default
     triggering:
-      events:
-        - push
-      branch_patterns:
-        - pattern: main
-          include: true
+      events: []
+      # 自动构建已关闭，需手动触发
+      # branch_patterns:
+      #   - pattern: main
+      #     include: true
     scripts:
       - name: Setup Flutter project
         script: |
