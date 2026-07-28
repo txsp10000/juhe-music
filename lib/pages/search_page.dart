@@ -14,6 +14,13 @@ class _SearchPageState extends State<SearchPage> {
   final _focusNode = FocusNode();
   List<String> _history = [];
 
+  // ─── Design tokens ───
+  static const _bg = Color(0xFF07080C);
+  static const _surface = Color(0xFF0F1116);
+  static const _accent = Color(0xFF5A78F0);
+  static const _textPrimary = Color(0xFFEDEDF2);
+  static const _textSecondary = Color(0xFF7C7F8C);
+
   @override
   void initState() {
     super.initState();
@@ -41,37 +48,36 @@ class _SearchPageState extends State<SearchPage> {
     ));
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0F14),
+      backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF171B26),
+        backgroundColor: _bg,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: _textSecondary),
           onPressed: () => Navigator.pop(context),
         ),
         title: TextField(
           controller: _controller,
-          autofocus: false,
+          autofocus: true,
           focusNode: _focusNode,
-          style: const TextStyle(color: Colors.white, fontSize: 18),
-          cursorColor: const Color(0xFF6890F9),
+          style: const TextStyle(color: _textPrimary, fontSize: 17),
+          cursorColor: _accent,
           textInputAction: TextInputAction.search,
           onSubmitted: (v) {
             if (v.trim().isNotEmpty) _doSearch(v.trim());
           },
           decoration: const InputDecoration(
-            hintText: '输入歌曲名、歌手名搜索...',
-            hintStyle: TextStyle(color: Color(0xFF888888)),
+            hintText: '搜索歌曲、歌手...',
+            hintStyle: TextStyle(color: Color(0xFF4E515E)),
             border: InputBorder.none,
           ),
         ),
       ),
       body: _history.isEmpty
           ? const Center(
-              child: Text('暂无搜索历史', style: TextStyle(color: Color(0xFF8F919A), fontSize: 16)))
+              child: Text('暂无搜索历史', style: TextStyle(color: _textSecondary, fontSize: 15)))
           : ListView.builder(
               itemCount: _history.length,
               itemBuilder: (_, i) {
@@ -79,23 +85,23 @@ class _SearchPageState extends State<SearchPage> {
                 return InkWell(
                   onTap: () => _doSearch(kw),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                     decoration: const BoxDecoration(
-                      border: Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
+                      border: Border(bottom: BorderSide(color: Color(0x08FFFFFF))),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.history, size: 20, color: Color(0xFF8F919A)),
+                        const Icon(Icons.history, size: 18, color: _textSecondary),
                         const SizedBox(width: 14),
                         Expanded(
-                          child: Text(kw, style: const TextStyle(color: Color(0xFFE0E0E0), fontSize: 16)),
+                          child: Text(kw, style: const TextStyle(color: _textPrimary, fontSize: 15)),
                         ),
                         GestureDetector(
                           onTap: () async {
                             await SearchHistoryService.removeOne(kw);
                             setState(() => _history.removeAt(i));
                           },
-                          child: const Icon(Icons.close, size: 18, color: Color(0xFF8F919A)),
+                          child: const Icon(Icons.close, size: 16, color: Color(0xFF4E515E)),
                         ),
                       ],
                     ),
