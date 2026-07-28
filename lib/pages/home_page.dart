@@ -222,34 +222,29 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ),
           ),
           child: SafeArea(
-            child: Stack(
+            child: Column(
               children: [
-                Column(
-                  children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: EdgeInsets.only(
-                          left: 20, right: 20, top: 12,
-                          bottom: hasSong ? 80 : 20,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 8),
-                            _buildSearchBar(),
-                            const SizedBox(height: 20),
-                            _buildFuncCards(),
-                            const SizedBox(height: 24),
-                            _buildPinnedSection(),
-                            const SizedBox(height: 24),
-                            ..._buildCategories(),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
                 if (hasSong) _buildNowPlayingBar(),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.only(
+                      left: 20, right: 20, top: 12, bottom: 20,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (!hasSong) const SizedBox(height: 8),
+                        _buildSearchBar(),
+                        const SizedBox(height: 20),
+                        _buildFuncCards(),
+                        const SizedBox(height: 24),
+                        _buildPinnedSection(),
+                        const SizedBox(height: 24),
+                        ..._buildCategories(),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -284,31 +279,27 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Widget _buildFuncCards() {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _buildFuncCard(
-            icon: Icons.favorite,
-            iconColor: const Color(0xFFFF6B6B),
-            bgColor: const Color(0x1FFF6B6B),
-            title: '我的收藏',
-            desc: '已收藏的歌曲',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const FavoritesPage()),
-            ).then((_) { _bindPlayer(); _syncState(); if (mounted) setState(() {}); }),
-          ),
+        _buildFuncCard(
+          icon: Icons.favorite,
+          iconColor: const Color(0xFFFF6B6B),
+          bgColor: const Color(0x1FFF6B6B),
+          title: '我的收藏',
+          desc: '已收藏的歌曲',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const FavoritesPage()),
+          ).then((_) { _bindPlayer(); _syncState(); if (mounted) setState(() {}); }),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildFuncCard(
-            icon: Icons.shuffle,
-            iconColor: const Color(0xFF4ECDC4),
-            bgColor: const Color(0x1F4ECDC4),
-            title: '随机播放',
-            desc: '从置顶歌单随机选曲',
-            onTap: _randomPlay,
-          ),
+        const SizedBox(height: 12),
+        _buildFuncCard(
+          icon: Icons.shuffle,
+          iconColor: const Color(0xFF4ECDC4),
+          bgColor: const Color(0x1F4ECDC4),
+          title: '随机播放',
+          desc: '从置顶歌单随机选曲',
+          onTap: _randomPlay,
         ),
       ],
     );
@@ -466,23 +457,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   Widget _buildNowPlayingBar() {
     final isPlaying = _player.isPlaying;
-    return Positioned(
-      left: 0,
-      right: 0,
-      bottom: 0,
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
       child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              const Color(0x000D0F14),
-              const Color(0xFF0D0F14),
-            ],
-          ),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-        child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
             color: const Color(0xFF161922),
