@@ -235,8 +235,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildGreeting(),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 8),
                             _buildSearchBar(),
                             const SizedBox(height: 20),
                             _buildFuncCards(),
@@ -256,19 +255,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildGreeting() {
-    return const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('发现音乐',
-            style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w600)),
-        SizedBox(height: 4),
-        Text('探索你喜欢的歌单和歌曲',
-            style: TextStyle(color: Color(0xFF8B8FA0), fontSize: 13)),
-      ],
     );
   }
 

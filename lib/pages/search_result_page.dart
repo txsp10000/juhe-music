@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import '../api/music_api.dart';
 import '../models/song.dart';
 import '../services/player_service.dart';
-import '../services/favorites_service.dart';
-import '../utils/toast.dart';
 import 'player_page.dart';
 
 class SearchResultPage extends StatefulWidget {
@@ -23,8 +21,6 @@ class _SearchResultPageState extends State<SearchResultPage> {
   bool _hasMore = true;
   List<Song> _songs = [];
   String _errorMsg = '';
-  final Set<String> _favoritedIds = {};
-
   @override
   void initState() {
     super.initState();
@@ -62,7 +58,6 @@ class _SearchResultPageState extends State<SearchResultPage> {
           _loading = false;
           _isLoadingMore = false;
         });
-        if (!append) _checkFavoriteStates();
       } else {
         setState(() {
           if (!append) {
@@ -109,66 +104,6 @@ class _SearchResultPageState extends State<SearchResultPage> {
     }
   }
 
-  Future<void> _favoriteAll() async {
-    final notFav = _songs.where((s) => !_favoritedIds.contains(s.id)).toList();
-    if (notFav.isEmpty) {
-      if (mounted) Toast.show(context, '全部歌曲已收藏');
-      return;
-    }
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF171B26),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        contentPadding: const EdgeInsets.all(20),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('确认收藏 ${notFav.length} 首歌曲？（共${_songs.length}首，已收藏${_songs.length - notFav.length}首）',
-                style: const TextStyle(color: Colors.white, fontSize: 16)),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 48,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6890F9),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('确认', style: TextStyle(color: Colors.white, fontSize: 16)),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-    if (confirmed != true) return;
-    for (final s in notFav) {
-      await FavoritesService.save(s);
-    }
-    if (mounted) {
-      _checkFavoriteStates();
-      Toast.show(context, '已收藏 ${notFav.length} 首');
-    }
-  }
-
-  Future<void> _checkFavoriteStates() async {
-    _favoritedIds.clear();
-    for (final s in _songs) {
-      if (await FavoritesService.isFavorite(s)) {
-        _favoritedIds.add(s.id);
-      }
-    }
-    if (mounted) setState(() {});
-  }
-
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -187,15 +122,6 @@ class _SearchResultPageState extends State<SearchResultPage> {
                   icon: const Icon(Icons.arrow_back, color: Colors.white),
                   onPressed: () => Navigator.pop(context),
                 ),
-          actions: [
-            if (_songs.isNotEmpty)
-              TextButton.icon(
-                onPressed: _favoriteAll,
-                icon: const Icon(Icons.favorite, color: Colors.red, size: 20),
-                label: const Text('全部收藏',
-                    style: TextStyle(color: Colors.red, fontSize: 13)),
-              ),
-          ],
         ),
         body: GestureDetector(
           onTap: () => FocusScope.of(context).unfocus(),

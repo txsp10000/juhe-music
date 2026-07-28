@@ -34,14 +34,12 @@ workflows:
               end
             end
           CODE
-          # Insert before the last 'end' in the file
           last_end_idx = content.rindex("end")
           if last_end_idx
             content.insert(last_end_idx, code)
           end
           File.write("ios/Podfile", content)
           puts "Podfile patched successfully"
-          puts File.read("ios/Podfile")
           RUBY
 
       - name: Install custom native files
@@ -49,7 +47,7 @@ workflows:
           cp ios_native/AppDelegate.swift ios/Runner/AppDelegate.swift
           cp ios_native/Runner.entitlements ios/Runner/Runner.entitlements
 
-      - name: Configure Xcode project with Ruby (xcodeproj gem)
+      - name: Configure Xcode project (ad-hoc signing)
         script: |
           ruby << 'RUBY'
           require 'xcodeproj'
@@ -57,27 +55,27 @@ workflows:
           project = Xcodeproj::Project.open('ios/Runner.xcodeproj')
           target = project.targets.find { |t| t.name == 'Runner' }
 
-          # 1. Set bundle identifier and disable codesigning
           target.build_configurations.each do |config|
             config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.miaomiao.music'
             config.build_settings['CODE_SIGN_ENTITLEMENTS'] = 'Runner/Runner.entitlements'
             config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
-            config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
-            config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
-            config.build_settings['CODE_SIGN_IDENTITY'] = ''
+            # 使用 ad-hoc 签名 (-) 而不是完全禁用签名，这样 Xcode 才能产出有效二进制
+            config.build_settings['CODE_SIGN_STYLE'] = 'Manual'
+            config.build_settings['CODE_SIGN_IDENTITY'] = '-'
             config.build_settings['DEVELOPMENT_TEAM'] = ''
+            config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = ''
+            # 删除可能冲突的旧设置
+            config.build_settings.delete('CODE_SIGNING_ALLOWED')
+            config.build_settings.delete('CODE_SIGNING_REQUIRED')
           end
 
-          # Also set project-level deployment target
           project.build_configurations.each do |config|
             config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
           end
 
-          # 2. Add custom Swift files to project
           runner_group = project.main_group.find_subpath('Runner', false)
-
           project.save
-          puts "Xcode project configured successfully"
+          puts "Xcode project configured (ad-hoc signing)"
           RUBY
 
       - name: Configure Info.plist
@@ -110,46 +108,86 @@ workflows:
 
       - name: Build iOS
         script: |
-          flutter build ios --release --no-codesign
-          echo "=== Searching for .app ==="
-          find build -name "*.app" -type d 2>/dev/null
-          find . -path "*/Release-iphoneos/Runner.app" -type d 2>/dev/null
+          # 不再使用 --no-codesign，改用 ad-hoc 签名 (CODE_SIGN_IDENTITY=-)
+          flutter build ios --release
+          BUILD_EXIT=$?
+          if [ $BUILD_EXIT -ne 0 ]; then
+            echo "ERROR: flutter build ios exited with code $BUILD_EXIT"
+            exit $BUILD_EXIT
+          fi
 
-      - name: Package IPA with entitlements
-        script: |
+          echo "=== Verifying build output ==="
           APP_PATH=$(find build/ios -name "Runner.app" -type d 2>/dev/null | head -1)
           if [ -z "$APP_PATH" ]; then
-            APP_PATH=$(find build -name "*.app" -type d 2>/dev/null | head -1)
+            echo "ERROR: Runner.app not found after build"
+            exit 1
           fi
+          echo "App path: $APP_PATH"
+
+          # 验证二进制文件存在且大小合理（至少 1MB）
+          BINARY="$APP_PATH/Runner"
+          if [ ! -f "$BINARY" ]; then
+            echo "ERROR: Binary not found at $BINARY"
+            exit 1
+          fi
+          BINARY_SIZE=$(stat -f%z "$BINARY" 2>/dev/null || stat -c%s "$BINARY" 2>/dev/null || echo 0)
+          echo "Binary size: $BINARY_SIZE bytes ($(echo "scale=1; $BINARY_SIZE/1048576" | bc)MB)"
+          if [ "$BINARY_SIZE" -lt 1000000 ]; then
+            echo "ERROR: Binary is too small ($BINARY_SIZE bytes). Build failed."
+            exit 1
+          fi
+
+          # 验证 Frameworks
+          FRAMEWORK_COUNT=$(find "$APP_PATH/Frameworks" -name "*.framework" -type d 2>/dev/null | wc -l)
+          echo "Frameworks found: $FRAMEWORK_COUNT"
+          if [ "$FRAMEWORK_COUNT" -eq 0 ]; then
+            echo "ERROR: No frameworks in .app bundle"
+            exit 1
+          fi
+          echo "=== Build verified successfully ==="
+
+      - name: Package IPA (TrollStore ready)
+        script: |
+          APP_PATH=$(find build/ios -name "Runner.app" -type d 2>/dev/null | head -1)
           if [ -z "$APP_PATH" ]; then
             echo "ERROR: .app not found"
             exit 1
           fi
-          echo "Found app: $APP_PATH"
-          echo "Frameworks:"
-          ls "$APP_PATH/Frameworks/" 2>/dev/null || echo "  (none)"
+          BINARY="$APP_PATH/Runner"
 
-          # Sign with entitlements using codesign (ad-hoc) for TrollStore
-          # First sign all frameworks
+          echo "Found app: $APP_PATH"
+
+          # 重新验证二进制
+          BINARY_SIZE=$(stat -f%z "$BINARY" 2>/dev/null || stat -c%s "$BINARY" 2>/dev/null || echo 0)
+          echo "Binary: $BINARY ($(echo "scale=1; $BINARY_SIZE/1048576" | bc)MB)"
+
+          # Sign frameworks with ad-hoc
+          echo "Signing frameworks..."
           find "$APP_PATH/Frameworks" -name "*.framework" -type d | while read fw; do
-            codesign --force --sign - "$fw" 2>/dev/null || true
+            codesign --force --sign - "$fw" 2>/dev/null || echo "  Warning: failed to sign $fw"
           done
 
-          # Sign main binary with entitlements
-          codesign --force --sign - --entitlements ios_native/Runner.entitlements "$APP_PATH/Runner"
-          echo "Signed with entitlements via codesign"
+          # Sign main binary with entitlements (ad-hoc for TrollStore)
+          echo "Signing main binary with entitlements..."
+          codesign --force --sign - --entitlements ios_native/Runner.entitlements "$BINARY"
+          if [ $? -ne 0 ]; then
+            echo "ERROR: codesign failed"
+            exit 1
+          fi
+          echo "Signed successfully"
 
           # Verify entitlements
           echo "=== Entitlements ==="
-          codesign -d --entitlements - "$APP_PATH/Runner" 2>&1 || true
+          codesign -d --entitlements - "$BINARY" 2>&1 || true
           echo "==================="
 
+          # Package
           rm -rf Payload
           mkdir Payload
           cp -R "$APP_PATH" Payload/
           zip -r Runner.ipa Payload
-          du -sh Runner.ipa
+          IPA_SIZE=$(du -sh Runner.ipa | cut -f1)
+          echo "IPA created: $IPA_SIZE"
 
     artifacts:
       - Runner.ipa
-
