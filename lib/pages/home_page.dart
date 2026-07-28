@@ -109,11 +109,11 @@ class _HomePageState extends State<HomePage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('添加置顶歌单',
-                style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+                style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold)),
             const SizedBox(height: 14),
             TextField(
               controller: controller,
-              style: const TextStyle(color: Colors.white, fontSize: 15),
+              style: const TextStyle(color: Colors.white, fontSize: 17),
               decoration: InputDecoration(
                 hintText: '输入歌单名称',
                 hintStyle: const TextStyle(color: Color(0x66FFFFFF)),
@@ -141,7 +141,7 @@ class _HomePageState extends State<HomePage> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-                child: const Text('添加', style: TextStyle(color: Colors.white, fontSize: 16)),
+                child: const Text('添加', style: TextStyle(color: Colors.white, fontSize: 18)),
               ),
             ),
           ],
@@ -167,7 +167,7 @@ class _HomePageState extends State<HomePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('确定要删除「$name」吗？',
-                style: const TextStyle(color: Colors.white, fontSize: 16)),
+                style: const TextStyle(color: Colors.white, fontSize: 18)),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -178,7 +178,7 @@ class _HomePageState extends State<HomePage> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('删除', style: TextStyle(color: Colors.white, fontSize: 16)),
+                child: const Text('删除', style: TextStyle(color: Colors.white, fontSize: 18)),
               ),
             ),
           ],
@@ -256,7 +256,7 @@ class _HomePageState extends State<HomePage> {
             Icon(Icons.search, size: 20, color: Color(0xFF555A6E)),
             SizedBox(width: 10),
             Text('搜索歌曲、歌手、歌单...',
-                style: TextStyle(color: Color(0xFF555A6E), fontSize: 15)),
+                style: TextStyle(color: Color(0xFF555A6E), fontSize: 17)),
           ],
         ),
       ),
@@ -323,10 +323,10 @@ class _HomePageState extends State<HomePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
-                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500)),
                 const SizedBox(height: 2),
                 Text(desc,
-                    style: const TextStyle(color: Color(0xFF8B8FA0), fontSize: 11)),
+                    style: const TextStyle(color: Color(0xFF8B8FA0), fontSize: 13)),
               ],
             ),
             const Spacer(),
@@ -342,7 +342,7 @@ class _HomePageState extends State<HomePage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('已置顶',
-            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
@@ -368,7 +368,7 @@ class _HomePageState extends State<HomePage> {
           border: Border.all(color: const Color(0x336C8CFF)),
         ),
         child: Text('📌 $name',
-            style: const TextStyle(color: Color(0xFF6C8CFF), fontSize: 13, fontWeight: FontWeight.w500)),
+            style: const TextStyle(color: Color(0xFF6C8CFF), fontSize: 15, fontWeight: FontWeight.w500)),
       ),
     );
   }
@@ -383,7 +383,7 @@ class _HomePageState extends State<HomePage> {
           border: Border.all(color: const Color(0x4D6C8CFF)),
         ),
         child: const Text('+ 添加',
-            style: TextStyle(color: Color(0xFF6C8CFF), fontSize: 13)),
+            style: TextStyle(color: Color(0xFF6C8CFF), fontSize: 15)),
       ),
     );
   }
@@ -395,7 +395,7 @@ class _HomePageState extends State<HomePage> {
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: Text(entry.key,
-              style: const TextStyle(color: Color(0xFF8B8FA0), fontSize: 13, fontWeight: FontWeight.w500)),
+              style: const TextStyle(color: Color(0xFF8B8FA0), fontSize: 15, fontWeight: FontWeight.w500)),
         ),
       );
       widgets.add(
@@ -435,7 +435,7 @@ class _HomePageState extends State<HomePage> {
           border: Border.all(color: const Color(0x14FFFFFF)),
         ),
         child: Text(name,
-            style: const TextStyle(color: Color(0xFFF0F0F5), fontSize: 13)),
+            style: const TextStyle(color: Color(0xFFF0F0F5), fontSize: 15)),
       ),
     );
   }
@@ -480,14 +480,14 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   Text(
                     _currentSong?.name ?? '暂无播放',
-                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
                     _currentSong?.singer ?? '',
-                    style: const TextStyle(color: Color(0xFF8B8FA0), fontSize: 11),
+                    style: const TextStyle(color: Color(0xFF8B8FA0), fontSize: 13),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),

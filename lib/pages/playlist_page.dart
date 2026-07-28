@@ -16,13 +16,6 @@ class _PlaylistPageState extends State<PlaylistPage> {
   final _player = PlayerService();
   final ScrollController _scrollController = ScrollController();
 
-  // ─── Design tokens ───
-  static const _bg = Color(0xFF07080C);
-  static const _accent = Color(0xFF5A78F0);
-  static const _textPrimary = Color(0xFFEDEDF2);
-  static const _textSecondary = Color(0xFF7C7F8C);
-  static const _textTertiary = Color(0xFF4E515E);
-
   @override
   void initState() {
     super.initState();
@@ -34,8 +27,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
     final idx = _player.currentIndex;
     if (idx > 0 && _scrollController.hasClients) {
       final offset = (idx * 62.0).clamp(0.0, _scrollController.position.maxScrollExtent);
-      _scrollController.animateTo(offset,
-          duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+      _scrollController.animateTo(offset, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
     }
   }
 
@@ -67,24 +59,24 @@ class _PlaylistPageState extends State<PlaylistPage> {
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
     final songs = _player.playlist;
     final currentIdx = _player.currentIndex;
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: const Color(0xFF0D0F14),
       appBar: AppBar(
-        backgroundColor: _bg,
-        title: Text('播放列表 (${songs.length})',
-            style: const TextStyle(color: _textPrimary, fontSize: 17, fontWeight: FontWeight.w600)),
+        backgroundColor: const Color(0xFF171B26),
+        title: Text('播放列表 (${songs.length}首)',
+            style: const TextStyle(color: Colors.white)),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: _textSecondary),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
       ),
       body: songs.isEmpty
-          ? const Center(
-              child: Text('暂无歌曲', style: TextStyle(color: _textSecondary, fontSize: 15)))
+          ? const Center(child: Text('暂无歌曲', style: TextStyle(color: Color(0xFF8F919A), fontSize: 18)))
           : ListView.builder(
               controller: _scrollController,
               itemCount: songs.length,
@@ -93,27 +85,28 @@ class _PlaylistPageState extends State<PlaylistPage> {
                 final isCurrent = i == currentIdx;
                 return SwipeActionCell(
                   actionLabel: '删除',
-                  actionColor: const Color(0xFFFF5E5E),
+                  actionColor: Colors.red,
                   onAction: () {
                     setState(() => _player.playlist.removeAt(i));
                   },
                   child: InkWell(
                     onTap: () => _playAt(i),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                       decoration: BoxDecoration(
-                        color: isCurrent ? _accent.withOpacity(0.08) : Colors.transparent,
-                        border: const Border(bottom: BorderSide(color: Color(0x08FFFFFF))),
+                        color: isCurrent ? const Color(0x1A6890F9) : Colors.transparent,
+                        border: isCurrent
+                            ? const Border(bottom: BorderSide(color: Color(0xFF6890F9), width: 2))
+                            : const Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
                       ),
                       child: Row(
                         children: [
                           SizedBox(
-                            width: 26,
+                            width: 28,
                             child: isCurrent
-                                ? const Icon(Icons.volume_up, color: _accent, size: 18)
-                                : Text('${i + 1}',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(color: _textTertiary, fontSize: 13)),
+                                ? const Icon(Icons.volume_up, color: Color(0xFF6890F9), size: 22)
+                                : Text('${i + 1}', textAlign: TextAlign.center,
+                                    style: const TextStyle(color: Color(0xFF8F919A), fontSize: 16)),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
@@ -122,10 +115,10 @@ class _PlaylistPageState extends State<PlaylistPage> {
                               children: [
                                 Text(s.name,
                                     style: TextStyle(
-                                        color: isCurrent ? _accent : _textPrimary, fontSize: 15)),
-                                const SizedBox(height: 3),
+                                        color: isCurrent ? const Color(0xFF6890F9) : Colors.white,
+                                        fontSize: 18)),
                                 Text(s.singer,
-                                    style: const TextStyle(color: _textSecondary, fontSize: 12)),
+                                    style: const TextStyle(color: Color(0xFF8F919A), fontSize: 15)),
                               ],
                             ),
                           ),
@@ -139,3 +132,5 @@ class _PlaylistPageState extends State<PlaylistPage> {
     );
   }
 }
+
+
