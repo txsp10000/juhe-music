@@ -1,4 +1,4 @@
-﻿import '../services/settings_service.dart';
+import '../services/settings_service.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/song.dart';
@@ -30,13 +30,13 @@ class MusicApi {
   }
 
   /// 搜索歌曲（返回原始响应体，用于错误展示）
-  static Future<SearchRawResult> searchRaw(String keyword, {int num = 20}) async {
+  static Future<SearchRawResult> searchRaw(String keyword, {int num = 20, int page = 1}) async {
     final encoded = _enc(keyword);
     var songs = <Song>[];
     var rawBody = '';
     for (var attempt = 1; attempt <= 30; attempt++) {
       try {
-        final url = '$_base?types=search&source=netease&name=$encoded&count=$num';
+        final url = '$_base?types=search&source=netease&name=$encoded&count=$num&pages=$page';
         rawBody = await _httpGet(url);
         final list = jsonDecode(rawBody);
         if (list is List) {

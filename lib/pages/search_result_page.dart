@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../api/music_api.dart';
 import '../models/song.dart';
 import '../services/player_service.dart';
@@ -18,6 +18,9 @@ class SearchResultPage extends StatefulWidget {
 class _SearchResultPageState extends State<SearchResultPage> {
   final _player = PlayerService();
   bool _loading = true;
+  bool _isLoadingMore = false;
+  int _currentPage = 1;
+  bool _hasMore = true;
   List<Song> _songs = [];
   String _errorMsg = '';
   final Set<String> _favoritedIds = {};
@@ -28,14 +31,14 @@ class _SearchResultPageState extends State<SearchResultPage> {
     _search();
   }
 
-
   @override
   void dispose() {
     super.dispose();
   }
-  Future<void> _search() async {
+
+  Future<void> _search({bool append = false}) async {
     try {
-      final result = await MusicApi.searchRaw(widget.keyword);
+      final result = await MusicApi.searchRaw(widget.keyword, num: 20, page: _currentPage);
       if (!mounted) return;
       if (result.songs.isNotEmpty) {
         final picIds =
@@ -50,23 +53,41 @@ class _SearchResultPageState extends State<SearchResultPage> {
           setState(() {});
         });
         setState(() {
-          _songs = result.songs;
+          if (append) {
+            _songs.addAll(result.songs);
+          } else {
+            _songs = result.songs;
+          }
+          _hasMore = result.songs.length >= 20;
           _loading = false;
+          _isLoadingMore = false;
         });
-        _checkFavoriteStates();
+        if (!append) _checkFavoriteStates();
       } else {
         setState(() {
-          _loading = false;
-          _errorMsg = '重试30次后仍无结果\nAPI返回:\n${result.rawBody.isEmpty ? "空列表" : result.rawBody.substring(0, result.rawBody.length > 200 ? 200 : result.rawBody.length)}';
+          if (!append) {
+            _loading = false;
+            _errorMsg = '重试30次后仍无结果';
+          }
+          _hasMore = false;
+          _isLoadingMore = false;
         });
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _errorMsg = '搜索失败: $e';
+        _isLoadingMore = false;
+        if (!append) _errorMsg = '搜索失败: $e';
       });
     }
+  }
+
+  Future<void> _loadNextPage() async {
+    if (!_hasMore || _isLoadingMore) return;
+    _currentPage++;
+    setState(() => _isLoadingMore = true);
+    await _search(append: true);
   }
 
   void _playAt(int index) {
@@ -97,19 +118,35 @@ class _SearchResultPageState extends State<SearchResultPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E2030),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('确认收藏 ${notFav.length} 首歌曲？（共${_songs.length}首，已收藏${_songs.length - notFav.length}首）',
-            style: const TextStyle(color: Colors.white, fontSize: 16)),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('确认',
-                  style: TextStyle(color: Color(0xFF6890F9)))),
-        ],
+        backgroundColor: const Color(0xFF171B26),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        contentPadding: const EdgeInsets.all(20),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('确认收藏 ${notFav.length} 首歌曲？（共${_songs.length}首，已收藏${_songs.length - notFav.length}首）',
+                style: const TextStyle(color: Colors.white, fontSize: 16)),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF6890F9),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('确认', style: TextStyle(color: Colors.white, fontSize: 16)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
     if (confirmed != true) return;
@@ -132,43 +169,59 @@ class _SearchResultPageState extends State<SearchResultPage> {
     if (mounted) setState(() {});
   }
 
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D0F14),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF171B26),
-        title: Text(
-          _loading ? '搜索中...' : '搜索结果',
-          style: const TextStyle(color: Colors.white),
+    return PopScope(
+      canPop: !_isLoadingMore,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0D0F14),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF171B26),
+          title: Text(
+            _loading ? '搜索中...' : '搜索结果',
+            style: const TextStyle(color: Colors.white),
+          ),
+          leading: _isLoadingMore
+              ? const SizedBox()
+              : IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+          actions: [
+            if (_songs.isNotEmpty)
+              TextButton.icon(
+                onPressed: _favoriteAll,
+                icon: const Icon(Icons.favorite, color: Colors.red, size: 20),
+                label: const Text('全部收藏',
+                    style: TextStyle(color: Colors.red, fontSize: 13)),
+              ),
+          ],
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          if (_songs.isNotEmpty)
-            TextButton.icon(
-              onPressed: _favoriteAll,
-              icon: const Icon(Icons.favorite, color: Colors.red, size: 20),
-              label: const Text('全部收藏',
-                  style: TextStyle(color: Colors.red, fontSize: 13)),
-            ),
-        ],
-      ),
-      body: GestureDetector(
-        onTap: () => FocusScope.of(context).unfocus(),
-        child: _loading
-            ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFF6890F9)))
-            : _songs.isEmpty
-                ? Center(
+        body: GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: Stack(
+            children: [
+              if (_loading)
+                const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF6890F9)))
+              else if (_songs.isEmpty && !_isLoadingMore)
+                Center(
                     child: Text(_errorMsg.isNotEmpty ? _errorMsg : '无搜索结果',
                         style: const TextStyle(
                             color: Color(0xFF8F919A), fontSize: 16),
                         textAlign: TextAlign.center))
-                : ListView.builder(
+              else
+                NotificationListener<ScrollNotification>(
+                  onNotification: (notification) {
+                    if (notification is ScrollEndNotification &&
+                        notification.metrics.pixels >= notification.metrics.maxScrollExtent - 100 &&
+                        !_isLoadingMore &&
+                        _hasMore) {
+                      _loadNextPage();
+                    }
+                    return false;
+                  },
+                  child: ListView.builder(
                     itemCount: _songs.length,
                     itemBuilder: (_, i) {
                       final s = _songs[i];
@@ -209,9 +262,27 @@ class _SearchResultPageState extends State<SearchResultPage> {
                       );
                     },
                   ),
+                ),
+              // 加载中遮罩
+              if (_isLoadingMore)
+                Container(
+                  color: Colors.black54,
+                  child: const Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(color: Color(0xFF6890F9)),
+                        SizedBox(height: 16),
+                        Text('加载中...',
+                            style: TextStyle(color: Colors.white, fontSize: 16)),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
-
-

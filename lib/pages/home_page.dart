@@ -1,17 +1,11 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/player_service.dart';
 import '../models/song.dart';
 import 'search_page.dart';
 import 'favorites_page.dart';
-import 'settings_page.dart';
 import 'player_page.dart';
-
-/// LRC 歌词行
-class _LrcLine {
-  final int timeMs;
-  final String text;
-  const _LrcLine(this.timeMs, this.text);
-}
+import 'search_result_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -27,11 +21,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   late Animation<double> _pulseAnimation;
 
   Song? _currentSong;
-  Duration _position = Duration.zero;
-  Duration _duration = Duration.zero;
-  List<_LrcLine> _parsedLrc = [];
-  bool _isDragging = false;
-  double _dragValue = 0.0;
+
+  final List<String> _pinnedPlaylists = [];
+
+  static const _pinKey = 'pinned_playlists';
+
+  static const _categories = <String, List<String>>{
+    '语种': ['华语', '欧美', '日语', '韩语', '粤语', '小语种', '闽南语'],
+    '风格': ['流行', '嘻哈说唱', '喊麦', '电子', '轻音乐', '慢摇DJ', '民谣', '摇滚', '国风', '古风', '另类/独立', '实验', '民族歌曲', '原声带', '世界音乐', '二次元', '节奏布鲁斯', '戏曲', '古典', '金属', '新世纪', '儿童音乐', '爵士', '蓝调', '乡村', '雷鬼', '拉丁音乐', '舞曲', '网络歌曲', '纯音乐', '交响乐', '朋克', '后摇', '迷幻'],
+    '榜单': ['热歌榜', '新歌榜', '飙升榜', '原创榜'],
+    '场景': ['清晨', '夜晚', '起床', '助眠', '学习', '工作', '运动', '驾车', '约会', '小酒馆', 'KTV', '游戏直播', '咖啡厅', '瑜伽', '冥想', '下午茶', '散步', '洗澡'],
+    '心情': ['伤感', '怀旧', '浪漫', '治愈', '安静', '励志', '快乐', '感动', '孤独', '思念', '放松', '慵懒', '甜蜜', '清新', '热血', '空灵'],
+    '主题': ['影视原声', '餐厅', '旅行', '派对', '婚礼', '童年', '青春', '毕业', '圣诞', '新年', '情人节', '生日', '秋天', '冬天', '春天', '夏天'],
+  };
 
   @override
   void initState() {
@@ -46,200 +48,226 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _pulseController.repeat(reverse: true);
     _bindPlayer();
     _syncState();
+    _loadPinnedPlaylists();
+  }
+
+  Future<void> _loadPinnedPlaylists() async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_pinKey) ?? [];
+    _pinnedPlaylists.clear();
+    _pinnedPlaylists.addAll(list);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _savePinnedPlaylists() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_pinKey, List.from(_pinnedPlaylists));
   }
 
   void _bindPlayer() {
-    _player.removeProgressListener(_onProgressUpdate);
     _player.removeSongChangeListener(_onSongChange);
-    _player.addProgressListener(_onProgressUpdate);
     _player.addSongChangeListener(_onSongChange);
     _player.onPlayStateChanged = (_) => mounted ? setState(() {}) : null;
   }
 
-  void _onProgressUpdate(Duration pos, Duration? dur) {
-    if (mounted) setState(() { _position = pos; _duration = dur ?? Duration.zero; });
-  }
-
   void _onSongChange(Song song) {
-    if (mounted) {
-      _parsedLrc = _parseLrc(song.lyric);
-      setState(() => _currentSong = song);
-    }
+    if (mounted) setState(() => _currentSong = song);
   }
 
   void _syncState() {
     _currentSong = _player.currentSong;
-    if (_currentSong != null) _parsedLrc = _parseLrc(_currentSong!.lyric);
-    if (_player.duration != null) _duration = _player.duration!;
-    _position = _player.position;
-  }
-
-  /// 解析 LRC 歌词
-  List<_LrcLine> _parseLrc(String? lyric) {
-    if (lyric == null || lyric.isEmpty) return [];
-    final lines = <_LrcLine>[];
-    final regex = RegExp(r'\[(\d{2}):(\d{2})(?:\.(\d{1,3}))?\](.*)');
-    for (final line in lyric.split('\n')) {
-      final match = regex.firstMatch(line.trim());
-      if (match != null) {
-        final min = int.parse(match.group(1)!);
-        final sec = int.parse(match.group(2)!);
-        var msStr = match.group(3);
-        var ms = 0;
-        if (msStr != null) {
-          ms = int.parse(msStr);
-          switch (msStr.length) {
-            case 1: ms *= 100; break;
-            case 2: ms *= 10; break;
-          }
-        }
-        final text = match.group(4)?.trim() ?? '';
-        if (text.isNotEmpty) {
-          lines.add(_LrcLine((min * 60 + sec) * 1000 + ms, text));
-        }
-      }
-    }
-    lines.sort((a, b) => a.timeMs.compareTo(b.timeMs));
-    return lines;
-  }
-
-  /// 获取当前播放位置对应的歌词行（二分查找）
-  int _currentLrcIndex() {
-    if (_parsedLrc.isEmpty) return -1;
-    final posMs = _position.inMilliseconds;
-    int left = 0;
-    int right = _parsedLrc.length - 1;
-    int idx = -1;
-    while (left <= right) {
-      int mid = (left + right) ~/ 2;
-      if (_parsedLrc[mid].timeMs <= posMs) {
-        idx = mid;
-        left = mid + 1;
-      } else {
-        right = mid - 1;
-      }
-    }
-    return idx;
   }
 
   @override
   void dispose() {
-    _player.removeProgressListener(_onProgressUpdate);
     _player.removeSongChangeListener(_onSongChange);
     _pulseController.dispose();
     super.dispose();
   }
 
-  String _fmt(Duration d) {
-    final s = d.inSeconds;
-    return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
+  void _openPlaylist(String name) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SearchResultPage(keyword: name),
+      ),
+    ).then((_) {
+      _bindPlayer();
+      _syncState();
+      if (mounted) setState(() {});
+    });
   }
 
-  Widget _buildProgressBar() {
-    final max = _duration.inMilliseconds.toDouble();
-    final current = _isDragging
-        ? _dragValue
-        : _position.inMilliseconds.toDouble().clamp(0.0, max);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      child: Column(
-        children: [
-          SliderTheme(
-            data: SliderThemeData(
-              trackHeight: 3,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-              activeTrackColor: const Color(0xFF6890F9),
-              inactiveTrackColor: const Color(0xFF2A2D3A),
-              thumbColor: const Color(0xFF6890F9),
-              overlayColor: const Color(0xFF6890F9).withOpacity(0.2),
-            ),
-            child: Slider(
-              min: 0,
-              max: max > 0 ? max : 1,
-              value: max > 0 ? current.clamp(0.0, max) : 0,
-              onChangeStart: (v) {
-                _isDragging = true;
-                _dragValue = v;
-              },
-              onChanged: (v) {
-                setState(() => _dragValue = v);
-              },
-              onChangeEnd: (v) {
-                _isDragging = false;
-                _player.seek(Duration(milliseconds: v.toInt()));
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _fmt(_isDragging ? Duration(milliseconds: _dragValue.toInt()) : _position),
-                  style: const TextStyle(color: Color(0xFF8F919A), fontSize: 11),
+  Future<void> _showAddDialog() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF171B26),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        contentPadding: const EdgeInsets.all(20),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('添加置顶歌单',
+                style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              style: const TextStyle(color: Colors.white, fontSize: 15),
+              decoration: InputDecoration(
+                hintText: '输入歌单名称',
+                hintStyle: const TextStyle(color: Color(0x66FFFFFF)),
+                filled: true,
+                fillColor: const Color(0x00000000),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Color(0xFF6890F9)),
                 ),
-                Text(_fmt(_duration),
-                    style: const TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
-              ],
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Color(0x33FFFFFF)),
+                ),
+              ),
+              maxLines: 1,
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6890F9),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+                child: const Text('添加', style: TextStyle(color: Colors.white, fontSize: 16)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result != null && result.isNotEmpty && !_pinnedPlaylists.contains(result)) {
+      _pinnedPlaylists.add(result);
+      await _savePinnedPlaylists();
+      if (mounted) setState(() {});
+    }
+  }
+
+  Future<void> _showDeleteDialog(String name) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF171B26),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        contentPadding: const EdgeInsets.all(20),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('确定要删除「$name」吗？',
+                style: const TextStyle(color: Colors.white, fontSize: 16)),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE05555),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('删除', style: TextStyle(color: Colors.white, fontSize: 16)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed == true) {
+      _pinnedPlaylists.remove(name);
+      await _savePinnedPlaylists();
+      if (mounted) setState(() {});
+    }
+  }
+
+  Widget _buildPlaylistChip(String name, {bool isPinned = false}) {
+    return GestureDetector(
+      onTap: () => _openPlaylist(name),
+      onLongPress: isPinned
+          ? () => _showDeleteDialog(name)
+          : () async {
+              _pinnedPlaylists.add(name);
+              await _savePinnedPlaylists();
+              if (mounted) setState(() {});
+            },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        margin: const EdgeInsets.only(right: 8, bottom: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0x33FFFFFF)),
+        ),
+        child: Text(
+          isPinned ? '📌 $name' : name,
+          style: const TextStyle(color: Color(0xFFE0E0E0), fontSize: 13),
+        ),
       ),
     );
   }
 
-  Widget _buildLyricArea() {
-    if (_parsedLrc.isEmpty) return const SizedBox.shrink();
+  Widget _buildPlaylistSection() {
+    final widgets = <Widget>[];
 
-    final currentIdx = _currentLrcIndex();
-    final lines = <Widget>[];
+    // 已置顶区域
+    widgets.add(const Padding(
+      padding: EdgeInsets.only(bottom: 8),
+      child: Text('已置顶',
+          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+    ));
 
-    // 前两行
-    for (var i = currentIdx - 2; i < currentIdx; i++) {
-      if (i >= 0) {
-        lines.add(Text(
-          _parsedLrc[i].text,
-          style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 17),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ));
-        lines.add(const SizedBox(height: 6));
-      }
-    }
-    // 当前行
-    if (currentIdx >= 0) {
-      lines.add(Text(
-        _parsedLrc[currentIdx].text,
-        style: const TextStyle(color: Color(0xFF6890F9), fontSize: 21, fontWeight: FontWeight.w600),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+    if (_pinnedPlaylists.isNotEmpty) {
+      widgets.add(Wrap(
+        children: _pinnedPlaylists.map((n) => _buildPlaylistChip(n, isPinned: true)).toList(),
       ));
-      lines.add(const SizedBox(height: 6));
-    }
-    // 后三行
-    for (var i = currentIdx + 1; i <= currentIdx + 3; i++) {
-      if (i < _parsedLrc.length) {
-        lines.add(Text(
-          _parsedLrc[i].text,
-          style: const TextStyle(color: Color(0xFF5A5D6E), fontSize: 16),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ));
-        if (i < currentIdx + 3) lines.add(const SizedBox(height: 6));
-      }
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        child: Column(
-          key: ValueKey(currentIdx),
-          mainAxisSize: MainAxisSize.min,
-          children: lines,
+    // 添加按钮
+    widgets.add(Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GestureDetector(
+        onTap: _showAddDialog,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0x336890F9)),
+          ),
+          child: const Text('+ 添加',
+              style: TextStyle(color: Color(0xFF6890F9), fontSize: 13)),
         ),
+      ),
+    ));
+
+    // 普通分类
+    for (final entry in _categories.entries) {
+      widgets.add(Padding(
+        padding: const EdgeInsets.only(top: 12, bottom: 8),
+        child: Text(entry.key,
+            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+      ));
+      widgets.add(Wrap(
+        children: entry.value.map((n) => _buildPlaylistChip(n)).toList(),
+      ));
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: widgets,
       ),
     );
   }
@@ -250,151 +278,88 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-      body: SafeArea(
-        child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF1A1D28), Color(0xFF0D0F14)],
-            ),
-          ),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(28, 12, 28, 0),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40, height: 40,
-                      decoration: BoxDecoration(
-                        color: const Color(0x226890F9),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.music_note, color: Color(0xFF6890F9), size: 24),
-                    ),
-                    const SizedBox(width: 10),
-                    const Text('苗苗music',
-                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SearchPage())).then((_) { _bindPlayer(); _syncState(); if (mounted) setState(() {}); }),
-                      child: Container(
-                        height: 40,
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0x33FFFFFF)),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.search, size: 20, color: Color(0xFF888888)),
-                            SizedBox(width: 8),
-                            Text('搜索', style: TextStyle(color: Color(0xFF888888), fontSize: 14)),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    GestureDetector(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoritesPage())).then((_) { _bindPlayer(); _syncState(); if (mounted) setState(() {}); }),
-                      child: Container(
-                        height: 40,
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0x33FFFFFF)),
-                        ),
-                        child: const Icon(Icons.favorite, size: 20, color: Colors.red),
-                      ),
-                    ),
-                  ],
-                ),
+        body: SafeArea(
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFF1A1D28), Color(0xFF0D0F14)],
               ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 30),
-                  child: Column(
+            ),
+            child: Column(
+              children: [
+                // 顶栏：搜索 + 收藏
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(28, 12, 28, 0),
+                  child: Row(
                     children: [
-                      Text(
-                        hasSong ? _currentSong!.name : '苗苗music',
-                        style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        hasSong ? _currentSong!.singer : '搜索你喜欢的音乐',
-                        style: const TextStyle(color: Color(0xFFF4F4F7), fontSize: 17),
-                      ),
                       const Spacer(),
-                      if (hasSong)
-                        _buildLyricArea(),
-                      if (!hasSong || _parsedLrc.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            hasSong ? '暂无歌词' : '点击右上角搜索框开始',
-                            style: const TextStyle(color: Color(0xFF8F919A), fontSize: 15),
+                      GestureDetector(
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SearchPage())).then((_) { _bindPlayer(); _syncState(); if (mounted) setState(() {}); }),
+                        child: Container(
+                          width: 220,
+                          height: 40,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0x33FFFFFF)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.search, size: 20, color: Color(0xFF888888)),
+                              SizedBox(width: 8),
+                              Text('搜索', style: TextStyle(color: Color(0xFF888888), fontSize: 14)),
+                            ],
                           ),
                         ),
-                      const Spacer(),
-                    ],
-                  ),
-                ),
-              ),
-              if (hasSong)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12, bottom: 8),
-                  child: AnimatedBuilder(
-                    animation: _pulseAnimation,
-                    builder: (_, child) => Transform.scale(
-                      scale: _pulseAnimation.value,
-                      child: child,
-                    ),
-                    child: GestureDetector(
-                      onTap: () => _openPlayer(),
-                      child: Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
+                      ),
+                      const SizedBox(width: 12),
+                      GestureDetector(
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoritesPage())).then((_) { _bindPlayer(); _syncState(); if (mounted) setState(() {}); }),
+                        child: Container(
+                          height: 40,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0x33FFFFFF)),
+                          ),
+                          child: const Icon(Icons.favorite, size: 20, color: Colors.red),
                         ),
-                        child: const Icon(Icons.graphic_eq, color: Colors.white, size: 32),
-                      ),
-                    ),
-                  ),
-                ),
-              if (hasSong)
-                _buildProgressBar(),
-              if (hasSong)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 6),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        onPressed: () => _player.prev(),
-                        icon: const Icon(Icons.skip_previous, color: Colors.white, size: 48),
-                      ),
-                      const SizedBox(width: 24),
-                      IconButton(
-                        onPressed: () => _player.togglePlayPause(),
-                        iconSize: 60,
-                        icon: Icon(_player.isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white),
-                      ),
-                      const SizedBox(width: 24),
-                      IconButton(
-                        onPressed: () => _player.next(),
-                        icon: const Icon(Icons.skip_next, color: Colors.white, size: 48),
                       ),
                     ],
                   ),
                 ),
-            ],
+                // 歌单区域
+                Expanded(child: _buildPlaylistSection()),
+                // 跳动按钮
+                if (hasSong)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12, bottom: 12),
+                    child: AnimatedBuilder(
+                      animation: _pulseAnimation,
+                      builder: (_, child) => Transform.scale(
+                        scale: _pulseAnimation.value,
+                        child: child,
+                      ),
+                      child: GestureDetector(
+                        onTap: _openPlayer,
+                        child: Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.graphic_eq, color: Colors.white, size: 32),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
