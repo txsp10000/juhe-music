@@ -150,26 +150,39 @@ workflows:
           fi
           echo "App path: $APP_PATH"
 
-          # 验证二进制文件存在且大小合理（至少 10MB，Flutter app 的 Release 二进制通常 20-50MB）
+          # 验证二进制文件存在（Flutter 的 Runner 仅为薄壳 ~160KB，核心代码在 Frameworks 中）
           BINARY="$APP_PATH/Runner"
           if [ ! -f "$BINARY" ]; then
             echo "ERROR: Binary not found at $BINARY"
             exit 1
           fi
           BINARY_SIZE=$(stat -f%z "$BINARY" 2>/dev/null || stat -c%s "$BINARY" 2>/dev/null || echo 0)
-          echo "Binary size: $BINARY_SIZE bytes ($(echo "scale=1; $BINARY_SIZE/1048576" | bc)MB)"
-          if [ "$BINARY_SIZE" -lt 10000000 ]; then
-            echo "ERROR: Binary is too small ($BINARY_SIZE bytes). Build likely failed."
+          echo "Runner binary: $BINARY_SIZE bytes ($(echo "scale=1; $BINARY_SIZE/1048576" | bc)MB)"
+
+          # 验证 App.framework（包含 Dart AOT 编译代码）
+          if [ ! -d "$APP_PATH/Frameworks/App.framework" ]; then
+            echo "ERROR: App.framework not found - Dart AOT compilation may have failed"
             exit 1
           fi
 
-          # 验证 Frameworks
-          FRAMEWORK_COUNT=$(find "$APP_PATH/Frameworks" -name "*.framework" -type d 2>/dev/null | wc -l)
-          echo "Frameworks found: $FRAMEWORK_COUNT"
-          if [ "$FRAMEWORK_COUNT" -eq 0 ]; then
-            echo "ERROR: No frameworks in .app bundle"
+          # 验证 Flutter.framework（Flutter 引擎）
+          if [ ! -d "$APP_PATH/Frameworks/Flutter.framework" ]; then
+            echo "ERROR: Flutter.framework not found"
             exit 1
           fi
+
+          # 验证总 .app 大小（Flutter 完整包应 ≥ 40MB）
+          APP_SIZE=$(du -sk "$APP_PATH" | cut -f1)
+          APP_SIZE_MB=$((APP_SIZE / 1024))
+          echo "App total size: ${APP_SIZE_MB}MB"
+          if [ "$APP_SIZE" -lt 40000 ]; then
+            echo "ERROR: .app is too small (${APP_SIZE_MB}MB). Frameworks may be incomplete."
+            exit 1
+          fi
+
+          # 列出所有 Frameworks
+          echo "Frameworks:"
+          ls "$APP_PATH/Frameworks/" 2>/dev/null
           echo "=== Build verified successfully ==="
 
       - name: Package IPA (TrollStore ready)
