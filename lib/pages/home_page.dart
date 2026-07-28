@@ -224,7 +224,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           child: SafeArea(
             child: Column(
               children: [
-                if (hasSong) _buildNowPlayingBar(),
+                _buildNowPlayingBar(),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.only(
