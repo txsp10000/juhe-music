@@ -429,7 +429,7 @@ class _AudioPlayerTask extends BaseAudioHandler {
             _resumeTimer?.cancel();
             _audioInterrupted = false;
             if (ps._currentIndex >= 0) {
-              _resumeTimer = Timer(const Duration(milliseconds: 800), () {
+              _resumeTimer = Timer(const Duration(milliseconds: 2000), () {
                 _audioInterrupted = false;
                 try {
                   ps._player.play();
@@ -448,7 +448,7 @@ class _AudioPlayerTask extends BaseAudioHandler {
         case 'audioRouteConnected':
           // 蓝牙/CarPlay 自动连接，延迟后加载收藏列表并播放
           _resumeTimer?.cancel();
-          _resumeTimer = Timer(const Duration(milliseconds: 800), () {
+          _resumeTimer = Timer(const Duration(milliseconds: 2000), () {
             _autoPlayFavorites(ps);
           });
           break;
