@@ -151,7 +151,6 @@ class _SearchResultPageState extends State<SearchResultPage> {
                     itemCount: _songs.length,
                     itemBuilder: (_, i) {
                       final s = _songs[i];
-                      final isFav = _favoritedIds.contains(s.id);
                       return InkWell(
                         onTap: () => _playAt(i),
                         child: Container(

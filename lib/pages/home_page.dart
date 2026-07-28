@@ -520,7 +520,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        _currentSong?.artist ?? '',
+                        _currentSong?.singer ?? '',
                         style: const TextStyle(color: Color(0xFF8B8FA0), fontSize: 11),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
