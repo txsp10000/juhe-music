@@ -485,7 +485,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              const Color(0xFF0D0F14).withOpacity(0),
+              const Color(0x000D0F14),
               const Color(0xFF0D0F14),
             ],
           ),
