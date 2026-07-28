@@ -47,7 +47,7 @@ workflows:
           cp ios_native/AppDelegate.swift ios/Runner/AppDelegate.swift
           cp ios_native/Runner.entitlements ios/Runner/Runner.entitlements
 
-      - name: Configure Xcode project (ad-hoc signing)
+      - name: Configure Xcode project (no signing at build time)
         script: |
           ruby << 'RUBY'
           require 'xcodeproj'
@@ -59,14 +59,14 @@ workflows:
             config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.miaomiao.music'
             config.build_settings['CODE_SIGN_ENTITLEMENTS'] = 'Runner/Runner.entitlements'
             config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
-            # 使用 ad-hoc 签名 (-) 而不是完全禁用签名，这样 Xcode 才能产出有效二进制
+            # iOS 26.4 SDK 禁止编译期 ad-hoc 签名，改为完全禁用编译期签名
+            # 编译完成后在 Package 步骤手动 codesign
             config.build_settings['CODE_SIGN_STYLE'] = 'Manual'
-            config.build_settings['CODE_SIGN_IDENTITY'] = '-'
+            config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+            config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+            config.build_settings['CODE_SIGN_IDENTITY'] = ''
             config.build_settings['DEVELOPMENT_TEAM'] = ''
             config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = ''
-            # 删除可能冲突的旧设置
-            config.build_settings.delete('CODE_SIGNING_ALLOWED')
-            config.build_settings.delete('CODE_SIGNING_REQUIRED')
           end
 
           project.build_configurations.each do |config|
@@ -75,7 +75,7 @@ workflows:
 
           runner_group = project.main_group.find_subpath('Runner', false)
           project.save
-          puts "Xcode project configured (ad-hoc signing)"
+          puts "Xcode project configured (no signing during build)"
           RUBY
 
       - name: Configure Info.plist
@@ -114,8 +114,9 @@ workflows:
           cd ..
 
           # 直接使用 xcodebuild，绕过 flutter build 的证书检查
-          # ad-hoc 签名 (CODE_SIGN_IDENTITY=-) 不需要 Apple 开发者证书
-          echo "Running xcodebuild with ad-hoc signing..."
+          # iOS 26.4 SDK 禁止编译期 CODE_SIGN_IDENTITY=-，改用完全禁用编译期签名
+          # 编译完成后在 Package 步骤手动 codesign
+          echo "Running xcodebuild (no signing during build)..."
           xcodebuild \
             -workspace ios/Runner.xcworkspace \
             -scheme Runner \
@@ -123,10 +124,10 @@ workflows:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             CONFIGURATION_BUILD_DIR="$(pwd)/build/ios/Release-iphoneos" \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
-            PROVISIONING_PROFILE_SPECIFIER="" \
             ONLY_ACTIVE_ARCH=NO \
             build
 
