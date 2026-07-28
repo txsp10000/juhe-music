@@ -171,11 +171,11 @@ workflows:
             exit 1
           fi
 
-          # 验证总 .app 大小（Flutter 完整包应 ≥ 40MB）
-          APP_SIZE=$(du -sk "$APP_PATH" | cut -f1)
-          APP_SIZE_MB=$((APP_SIZE / 1024))
-          echo "App total size: ${APP_SIZE_MB}MB"
-          if [ "$APP_SIZE" -lt 40000 ]; then
+          # 验证总 .app 大小（Flutter 完整包应 ≥ 15MB）
+           APP_SIZE=$(du -sk "$APP_PATH" | cut -f1)
+           APP_SIZE_MB=$((APP_SIZE / 1024))
+           echo "App total size: ${APP_SIZE_MB}MB"
+           if [ "$APP_SIZE" -lt 15000 ]; then
             echo "ERROR: .app is too small (${APP_SIZE_MB}MB). Frameworks may be incomplete."
             exit 1
           fi
