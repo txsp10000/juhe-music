@@ -406,6 +406,7 @@ class PlayerService {
 class _AudioPlayerTask extends BaseAudioHandler {
   static const _nowPlayingChannel = MethodChannel('com.miaomiao.music/nowplaying');
   bool _audioInterrupted = false;
+  Timer? _resumeTimer;
 
   _AudioPlayerTask() {
     final ps = PlayerService();
@@ -418,27 +419,38 @@ class _AudioPlayerTask extends BaseAudioHandler {
               ? (call.arguments as Map)['active'] == true
               : false;
           if (active) {
-            // 中断开始：记录当前播放状态并暂停
+            // 中断开始：取消延迟恢复定时器，立即暂停
+            _resumeTimer?.cancel();
+            _resumeTimer = null;
             _audioInterrupted = true;
             await ps._player.pause();
           } else {
-            // 中断结束：如果之前正在播放，则恢复
+            // 中断结束：延迟恢复，防止微信语音等场景的短暂中断间隙导致误恢复
+            _resumeTimer?.cancel();
             _audioInterrupted = false;
             if (ps._currentIndex >= 0) {
-              try {
-                await ps._player.play();
-              } catch (_) {}
+              _resumeTimer = Timer(const Duration(milliseconds: 800), () {
+                _audioInterrupted = false;
+                try {
+                  ps._player.play();
+                } catch (_) {}
+              });
             }
           }
           break;
         case 'audioRouteDisconnected':
           // 蓝牙/车载设备断开，暂停播放避免公放
+          _resumeTimer?.cancel();
+          _resumeTimer = null;
           _audioInterrupted = true;
           await ps._player.pause();
           break;
         case 'audioRouteConnected':
-          // 蓝牙/CarPlay 自动连接，加载收藏列表并从头播放
-          await _autoPlayFavorites(ps);
+          // 蓝牙/CarPlay 自动连接，延迟后加载收藏列表并播放
+          _resumeTimer?.cancel();
+          _resumeTimer = Timer(const Duration(milliseconds: 800), () {
+            _autoPlayFavorites(ps);
+          });
           break;
         default:
           break;

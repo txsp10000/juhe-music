@@ -15,10 +15,8 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
+class _HomePageState extends State<HomePage> {
   final _player = PlayerService();
-
-  late AnimationController _barController;
 
   Song? _currentSong;
 
@@ -38,10 +36,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _barController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat();
     _bindPlayer();
     _syncState();
     _loadPinnedPlaylists();
@@ -77,7 +71,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   @override
   void dispose() {
     _player.removeSongChangeListener(_onSongChange);
-    _barController.dispose();
     super.dispose();
   }
 
@@ -222,21 +215,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ),
           ),
           child: SafeArea(
-            child: Column(
-              children: [
-                _buildNowPlayingBar(),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.only(
-                      left: 20, right: 20, top: 12, bottom: 20,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (!hasSong) const SizedBox(height: 8),
-                        _buildSearchBar(),
-                        const SizedBox(height: 20),
-                        _buildFuncCards(),
+            child: Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.only(
+                  left: 20, right: 20, top: 12, bottom: 20,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSearchBar(),
+                    const SizedBox(height: 12),
+                    _buildNowPlayingBar(),
+                    const SizedBox(height: 12),
+                    _buildFuncCards(),
                         const SizedBox(height: 24),
                         _buildPinnedSection(),
                         const SizedBox(height: 24),
@@ -245,11 +236,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
           ),
         ),
-      ),
     );
   }
 
@@ -456,65 +445,60 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Widget _buildNowPlayingBar() {
+    final hasSong = _currentSong != null;
     final isPlaying = _player.isPlaying;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: hasSong ? _openPlayer : null,
       child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: const Color(0xFF161922),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0x14FFFFFF)),
-          ),
-          child: Row(
-            children: [
-              GestureDetector(
-                onTap: _openPlayer,
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF6C8CFF), Color(0xFF9B6CFF)],
-                    ),
-                  ),
-                  child: AnimatedBuilder(
-                    animation: _barController,
-                    builder: (_, __) => CustomPaint(
-                      painter: _BarsPainter(_barController.value),
-                    ),
-                  ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF161922),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0x14FFFFFF)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF6C8CFF), Color(0xFF9B6CFF)],
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _openPlayer,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _currentSong?.name ?? '',
-                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _currentSong?.singer ?? '',
-                        style: const TextStyle(color: Color(0xFF8B8FA0), fontSize: 11),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
+              child: const Icon(
+                Icons.music_note,
+                size: 18,
+                color: Colors.white,
               ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _currentSong?.name ?? '暂无播放',
+                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _currentSong?.singer ?? '',
+                    style: const TextStyle(color: Color(0xFF8B8FA0), fontSize: 11),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            if (hasSong)
               GestureDetector(
                 onTap: () => _player.togglePlayPause(),
                 child: Icon(
@@ -523,37 +507,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   color: const Color(0x99FFFFFF),
                 ),
               ),
-            ],
-          ),
+          ],
         ),
+      ),
     );
   }
-}
-
-class _BarsPainter extends CustomPainter {
-  final double progress;
-  _BarsPainter(this.progress);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = 3;
-
-    const barCount = 4;
-    final spacing = size.width / (barCount + 1);
-    final maxHeight = size.height * 0.6;
-
-    for (var i = 0; i < barCount; i++) {
-      final x = spacing * (i + 1);
-      final phase = (progress + i * 0.25) % 1.0;
-      final h = maxHeight * (0.3 + 0.7 * sin(phase * pi));
-      final top = (size.height - h) / 2;
-      canvas.drawLine(Offset(x, top), Offset(x, top + h), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_BarsPainter old) => old.progress != progress;
 }
