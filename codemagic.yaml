@@ -5,7 +5,8 @@ workflows:
     instance_type: mac_mini_m2
     environment:
       flutter: stable
-      xcode: latest
+      # iOS 26.4 SDK 禁止编译期无签名/adhoc 签名，固定使用 Xcode 16.2 的旧 SDK
+      xcode: "16.2"
       cocoapods: default
     triggering:
       events:
