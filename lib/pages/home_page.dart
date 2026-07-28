@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/player_service.dart';
@@ -17,8 +18,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   final _player = PlayerService();
 
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
+  late AnimationController _barController;
 
   Song? _currentSong;
 
@@ -38,14 +38,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(
+    _barController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
-    );
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-    _pulseController.repeat(reverse: true);
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
     _bindPlayer();
     _syncState();
     _loadPinnedPlaylists();
@@ -81,21 +77,31 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   @override
   void dispose() {
     _player.removeSongChangeListener(_onSongChange);
-    _pulseController.dispose();
+    _barController.dispose();
     super.dispose();
   }
 
   void _openPlaylist(String name) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => SearchResultPage(keyword: name),
-      ),
+      MaterialPageRoute(builder: (_) => SearchResultPage(keyword: name)),
     ).then((_) {
       _bindPlayer();
       _syncState();
       if (mounted) setState(() {});
     });
+  }
+
+  void _randomPlay() {
+    if (_pinnedPlaylists.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先置顶一些歌单'), duration: Duration(seconds: 2)),
+      );
+      return;
+    }
+    final random = Random();
+    final pick = _pinnedPlaylists[random.nextInt(_pinnedPlaylists.length)];
+    _openPlaylist(pick);
   }
 
   Future<void> _showAddDialog() async {
@@ -123,7 +129,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFF6890F9)),
+                  borderSide: const BorderSide(color: Color(0xFF6C8CFF)),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -138,7 +144,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               height: 48,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6890F9),
+                  backgroundColor: const Color(0xFF6C8CFF),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: () => Navigator.pop(ctx, controller.text.trim()),
@@ -193,83 +199,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     }
   }
 
-  Widget _buildPlaylistChip(String name, {bool isPinned = false}) {
-    return GestureDetector(
-      onTap: () => _openPlaylist(name),
-      onLongPress: isPinned
-          ? () => _showDeleteDialog(name)
-          : () async {
-              _pinnedPlaylists.add(name);
-              await _savePinnedPlaylists();
-              if (mounted) setState(() {});
-            },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        margin: const EdgeInsets.only(right: 8, bottom: 8),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0x33FFFFFF)),
-        ),
-        child: Text(
-          isPinned ? '📌 $name' : name,
-          style: const TextStyle(color: Color(0xFFE0E0E0), fontSize: 13),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPlaylistSection() {
-    final widgets = <Widget>[];
-
-    // 已置顶区域
-    widgets.add(const Padding(
-      padding: EdgeInsets.only(bottom: 8),
-      child: Text('已置顶',
-          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-    ));
-
-    if (_pinnedPlaylists.isNotEmpty) {
-      widgets.add(Wrap(
-        children: _pinnedPlaylists.map((n) => _buildPlaylistChip(n, isPinned: true)).toList(),
-      ));
-    }
-
-    // 添加按钮
-    widgets.add(Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: GestureDetector(
-        onTap: _showAddDialog,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0x336890F9)),
-          ),
-          child: const Text('+ 添加',
-              style: TextStyle(color: Color(0xFF6890F9), fontSize: 13)),
-        ),
-      ),
-    ));
-
-    // 普通分类
-    for (final entry in _categories.entries) {
-      widgets.add(Padding(
-        padding: const EdgeInsets.only(top: 12, bottom: 8),
-        child: Text(entry.key,
-            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-      ));
-      widgets.add(Wrap(
-        children: entry.value.map((n) => _buildPlaylistChip(n)).toList(),
-      ));
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: widgets,
-      ),
-    );
+  void _openPlayer() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage())).then((_) {
+      _bindPlayer();
+      _syncState();
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -278,84 +213,44 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        body: SafeArea(
-          child: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFF1A1D28), Color(0xFF0D0F14)],
-              ),
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF1A1D28), Color(0xFF0D0F14)],
             ),
-            child: Column(
+          ),
+          child: SafeArea(
+            child: Stack(
               children: [
-                // 顶栏：搜索 + 收藏
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(28, 12, 28, 0),
-                  child: Row(
-                    children: [
-                      const Spacer(),
-                      GestureDetector(
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SearchPage())).then((_) { _bindPlayer(); _syncState(); if (mounted) setState(() {}); }),
-                        child: Container(
-                          width: 220,
-                          height: 40,
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0x33FFFFFF)),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.search, size: 20, color: Color(0xFF888888)),
-                              SizedBox(width: 8),
-                              Text('搜索', style: TextStyle(color: Color(0xFF888888), fontSize: 14)),
-                            ],
-                          ),
+                Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.only(
+                          left: 20, right: 20, top: 12,
+                          bottom: hasSong ? 80 : 20,
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      GestureDetector(
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoritesPage())).then((_) { _bindPlayer(); _syncState(); if (mounted) setState(() {}); }),
-                        child: Container(
-                          height: 40,
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0x33FFFFFF)),
-                          ),
-                          child: const Icon(Icons.favorite, size: 20, color: Colors.red),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // 歌单区域
-                Expanded(child: _buildPlaylistSection()),
-                // 跳动按钮
-                if (hasSong)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12, bottom: 12),
-                    child: AnimatedBuilder(
-                      animation: _pulseAnimation,
-                      builder: (_, child) => Transform.scale(
-                        scale: _pulseAnimation.value,
-                        child: child,
-                      ),
-                      child: GestureDetector(
-                        onTap: _openPlayer,
-                        child: Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.graphic_eq, color: Colors.white, size: 32),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildGreeting(),
+                            const SizedBox(height: 20),
+                            _buildSearchBar(),
+                            const SizedBox(height: 20),
+                            _buildFuncCards(),
+                            const SizedBox(height: 24),
+                            _buildPinnedSection(),
+                            const SizedBox(height: 24),
+                            ..._buildCategories(),
+                          ],
                         ),
                       ),
                     ),
-                  ),
+                  ],
+                ),
+                if (hasSong) _buildNowPlayingBar(),
               ],
             ),
           ),
@@ -364,11 +259,323 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  void _openPlayer() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage())).then((_) {
-      _bindPlayer();
-      _syncState();
-      if (mounted) setState(() {});
-    });
+  Widget _buildGreeting() {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('发现音乐',
+            style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w600)),
+        SizedBox(height: 4),
+        Text('探索你喜欢的歌单和歌曲',
+            style: TextStyle(color: Color(0xFF8B8FA0), fontSize: 13)),
+      ],
+    );
   }
+
+  Widget _buildSearchBar() {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const SearchPage()),
+      ).then((_) { _bindPlayer(); _syncState(); if (mounted) setState(() {}); }),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E2230),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0x14FFFFFF)),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.search, size: 20, color: Color(0xFF555A6E)),
+            SizedBox(width: 10),
+            Text('搜索歌曲、歌手、歌单...',
+                style: TextStyle(color: Color(0xFF555A6E), fontSize: 15)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFuncCards() {
+    return Column(
+      children: [
+        _buildFuncCard(
+          icon: Icons.favorite,
+          iconColor: const Color(0xFFFF6B6B),
+          bgColor: const Color(0x1FFF6B6B),
+          title: '我的收藏',
+          desc: '已收藏的歌曲',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const FavoritesPage()),
+          ).then((_) { _bindPlayer(); _syncState(); if (mounted) setState(() {}); }),
+        ),
+        const SizedBox(height: 12),
+        _buildFuncCard(
+          icon: Icons.shuffle,
+          iconColor: const Color(0xFF4ECDC4),
+          bgColor: const Color(0x1F4ECDC4),
+          title: '随机播放',
+          desc: '从置顶歌单随机选曲',
+          onTap: _randomPlay,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFuncCard({
+    required IconData icon,
+    required Color iconColor,
+    required Color bgColor,
+    required String title,
+    required String desc,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF161922),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0x14FFFFFF)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 18, color: iconColor),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 2),
+                Text(desc,
+                    style: const TextStyle(color: Color(0xFF8B8FA0), fontSize: 11)),
+              ],
+            ),
+            const Spacer(),
+            const Icon(Icons.chevron_right, size: 20, color: Color(0xFF555A6E)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPinnedSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('已置顶',
+            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ..._pinnedPlaylists.map((n) => _buildPinnedChip(n)),
+            _buildAddChip(),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPinnedChip(String name) {
+    return GestureDetector(
+      onTap: () => _openPlaylist(name),
+      onLongPress: () => _showDeleteDialog(name),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0x1F6C8CFF),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: const Color(0x336C8CFF)),
+        ),
+        child: Text('📌 $name',
+            style: const TextStyle(color: Color(0xFF6C8CFF), fontSize: 13, fontWeight: FontWeight.w500)),
+      ),
+    );
+  }
+
+  Widget _buildAddChip() {
+    return GestureDetector(
+      onTap: _showAddDialog,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: const Color(0x4D6C8CFF)),
+        ),
+        child: const Text('+ 添加',
+            style: TextStyle(color: Color(0xFF6C8CFF), fontSize: 13)),
+      ),
+    );
+  }
+
+  List<Widget> _buildCategories() {
+    final widgets = <Widget>[];
+    for (final entry in _categories.entries) {
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Text(entry.key,
+              style: const TextStyle(color: Color(0xFF8B8FA0), fontSize: 13, fontWeight: FontWeight.w500)),
+        ),
+      );
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 20),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: entry.value.map((n) => _buildCatChip(n)).toList(),
+          ),
+        ),
+      );
+    }
+    return widgets;
+  }
+
+  Widget _buildCatChip(String name) {
+    return GestureDetector(
+      onTap: () => _openPlaylist(name),
+      onLongPress: () async {
+        if (!_pinnedPlaylists.contains(name)) {
+          _pinnedPlaylists.add(name);
+          await _savePinnedPlaylists();
+          if (mounted) setState(() {});
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('已置顶「$name」'), duration: const Duration(seconds: 1)),
+            );
+          }
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: const Color(0xFF161922),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0x14FFFFFF)),
+        ),
+        child: Text(name,
+            style: const TextStyle(color: Color(0xFFF0F0F5), fontSize: 13)),
+      ),
+    );
+  }
+
+  Widget _buildNowPlayingBar() {
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              const Color(0xFF0D0F14).withOpacity(0),
+              const Color(0xFF0D0F14),
+            ],
+          ),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+        child: GestureDetector(
+          onTap: _openPlayer,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF161922),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0x14FFFFFF)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF6C8CFF), Color(0xFF9B6CFF)],
+                    ),
+                  ),
+                  child: AnimatedBuilder(
+                    animation: _barController,
+                    builder: (_, __) => CustomPaint(
+                      painter: _BarsPainter(_barController.value),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _currentSong?.name ?? '',
+                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _currentSong?.artist ?? '',
+                        style: const TextStyle(color: Color(0xFF8B8FA0), fontSize: 11),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.play_arrow, size: 24, color: Color(0x99FFFFFF)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BarsPainter extends CustomPainter {
+  final double progress;
+  _BarsPainter(this.progress);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 3;
+
+    const barCount = 4;
+    final spacing = size.width / (barCount + 1);
+    final maxHeight = size.height * 0.6;
+
+    for (var i = 0; i < barCount; i++) {
+      final x = spacing * (i + 1);
+      final phase = (progress + i * 0.25) % 1.0;
+      final h = maxHeight * (0.3 + 0.7 * sin(phase * pi));
+      final top = (size.height - h) / 2;
+      canvas.drawLine(Offset(x, top), Offset(x, top + h), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_BarsPainter old) => old.progress != progress;
 }
