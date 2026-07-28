@@ -21,6 +21,14 @@ class _FavoritesPageState extends State<FavoritesPage> {
   final Set<int> _selected = {};
   final ScrollController _scrollController = ScrollController();
 
+  // ─── Design tokens ───
+  static const _bg = Color(0xFF07080C);
+  static const _surface = Color(0xFF0F1116);
+  static const _accent = Color(0xFF5A78F0);
+  static const _textPrimary = Color(0xFFEDEDF2);
+  static const _textSecondary = Color(0xFF7C7F8C);
+  static const _textTertiary = Color(0xFF4E515E);
+
   @override
   void initState() {
     super.initState();
@@ -55,7 +63,8 @@ class _FavoritesPageState extends State<FavoritesPage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
           final offset = (idx * 62.0).clamp(0.0, _scrollController.position.maxScrollExtent);
-          _scrollController.animateTo(offset, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+          _scrollController.animateTo(offset,
+              duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
         }
       });
     }
@@ -79,7 +88,6 @@ class _FavoritesPageState extends State<FavoritesPage> {
       Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
     }
   }
-
 
   Future<void> _removeSong(int index) async {
     final song = _songs[index];
@@ -119,13 +127,15 @@ class _FavoritesPageState extends State<FavoritesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0F14),
+      backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF171B26),
-        title: Text(_editMode ? '已选 ${_selected.length} 首' : '我的收藏 (${_songs.length}首)',
-            style: const TextStyle(color: Colors.white)),
+        backgroundColor: _bg,
+        title: Text(
+          _editMode ? '已选 ${_selected.length} 首' : '我的收藏 (${_songs.length})',
+          style: const TextStyle(color: _textPrimary, fontSize: 17, fontWeight: FontWeight.w600),
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: _textSecondary),
           onPressed: () {
             if (_editMode) {
               setState(() { _editMode = false; _selected.clear(); });
@@ -137,7 +147,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
         actions: [
           if (!_editMode && _songs.isNotEmpty)
             IconButton(
-              icon: const Icon(Icons.delete_outline, color: Colors.white, size: 22),
+              icon: const Icon(Icons.delete_outline, color: _textSecondary, size: 22),
               onPressed: () => setState(() => _editMode = true),
             ),
           if (_editMode) ...[
@@ -145,22 +155,22 @@ class _FavoritesPageState extends State<FavoritesPage> {
               onPressed: _toggleSelectAll,
               child: Text(
                 _selected.length == _songs.length ? '取消全选' : '全选',
-                style: const TextStyle(color: Color(0xFF6890F9), fontSize: 16),
+                style: const TextStyle(color: _accent, fontSize: 14),
               ),
             ),
             TextButton(
               onPressed: _selected.isEmpty ? null : _deleteSelected,
-              child: Text('删除', style: TextStyle(
-                color: _selected.isEmpty ? const Color(0xFF8F919A) : Colors.red,
-                fontSize: 16,
-              )),
+              child: Text('删除',
+                  style: TextStyle(
+                      color: _selected.isEmpty ? _textTertiary : const Color(0xFFFF5E5E),
+                      fontSize: 14)),
             ),
           ],
         ],
       ),
       body: _songs.isEmpty
           ? const Center(
-              child: Text('还没有收藏歌曲', style: TextStyle(color: Color(0xFF8F919A), fontSize: 18)))
+              child: Text('还没有收藏歌曲', style: TextStyle(color: _textSecondary, fontSize: 15)))
           : ListView.builder(
               controller: _scrollController,
               itemCount: _songs.length,
@@ -172,25 +182,25 @@ class _FavoritesPageState extends State<FavoritesPage> {
                       _selected.contains(i) ? _selected.remove(i) : _selected.add(i);
                     }),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       decoration: const BoxDecoration(
-                        border: Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
+                        border: Border(bottom: BorderSide(color: Color(0x08FFFFFF))),
                       ),
                       child: Row(
                         children: [
                           Icon(
                             _selected.contains(i) ? Icons.check_circle : Icons.radio_button_unchecked,
-                            color: _selected.contains(i) ? const Color(0xFF6890F9) : const Color(0xFF8F919A),
-                            size: 22,
+                            color: _selected.contains(i) ? _accent : _textTertiary,
+                            size: 20,
                           ),
                           const SizedBox(width: 14),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(s.name, style: const TextStyle(color: Color(0xFFE0E0E0), fontSize: 18)),
-                                const SizedBox(height: 4),
-                                Text(s.singer, style: const TextStyle(color: Color(0xFF8F919A), fontSize: 15)),
+                                Text(s.name, style: const TextStyle(color: _textPrimary, fontSize: 15)),
+                                const SizedBox(height: 3),
+                                Text(s.singer, style: const TextStyle(color: _textSecondary, fontSize: 12)),
                               ],
                             ),
                           ),
@@ -202,26 +212,25 @@ class _FavoritesPageState extends State<FavoritesPage> {
                 final isCurrent = _player.currentSong?.id == s.id;
                 return SwipeActionCell(
                   actionLabel: '删除',
-                  actionColor: Colors.red,
+                  actionColor: const Color(0xFFFF5E5E),
                   onAction: () => _removeSong(i),
                   child: InkWell(
                     onTap: () => _playAt(i),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       decoration: BoxDecoration(
-                        color: isCurrent ? const Color(0x1A6890F9) : Colors.transparent,
-                        border: isCurrent
-                            ? const Border(bottom: BorderSide(color: Color(0xFF6890F9), width: 2))
-                            : const Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
+                        color: isCurrent ? _accent.withOpacity(0.08) : Colors.transparent,
+                        border: const Border(bottom: BorderSide(color: Color(0x08FFFFFF))),
                       ),
                       child: Row(
                         children: [
                           SizedBox(
-                            width: 28,
+                            width: 26,
                             child: isCurrent
-                                ? const Icon(Icons.volume_up, color: Color(0xFF6890F9), size: 22)
-                                : Text('${i + 1}', textAlign: TextAlign.center,
-                                    style: const TextStyle(color: Color(0xFF8F919A), fontSize: 16)),
+                                ? const Icon(Icons.volume_up, color: _accent, size: 18)
+                                : Text('${i + 1}',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(color: _textTertiary, fontSize: 13)),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
@@ -230,10 +239,10 @@ class _FavoritesPageState extends State<FavoritesPage> {
                               children: [
                                 Text(s.name,
                                     style: TextStyle(
-                                        color: isCurrent ? const Color(0xFF6890F9) : Colors.white,
-                                        fontSize: 18)),
+                                        color: isCurrent ? _accent : _textPrimary, fontSize: 15)),
+                                const SizedBox(height: 3),
                                 Text(s.singer,
-                                    style: const TextStyle(color: Color(0xFF8F919A), fontSize: 15)),
+                                    style: const TextStyle(color: _textSecondary, fontSize: 12)),
                               ],
                             ),
                           ),
@@ -247,5 +256,3 @@ class _FavoritesPageState extends State<FavoritesPage> {
     );
   }
 }
-
-

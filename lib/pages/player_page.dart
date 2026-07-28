@@ -162,7 +162,7 @@ class _PlayerPageState extends State<PlayerPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('搜索同名歌曲或歌手',
             style: TextStyle(
-                color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600)),
+                color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -351,7 +351,7 @@ class _PlayerPageState extends State<PlayerPage> {
                   song.name,
                   style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 19,
+                      fontSize: 17,
                       fontWeight: FontWeight.bold),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -360,7 +360,7 @@ class _PlayerPageState extends State<PlayerPage> {
                 const SizedBox(height: 3),
                 Text(
                   song.singer,
-                  style: const TextStyle(color: Color(0xFFF4F4F7), fontSize: 15),
+                  style: const TextStyle(color: Color(0xFFF4F4F7), fontSize: 13),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
@@ -368,7 +368,7 @@ class _PlayerPageState extends State<PlayerPage> {
                 const SizedBox(height: 2),
                   Text(
                     _currentBrLabel(),
-                  style: TextStyle(color: Color(0xFF6890F9), fontSize: 14),
+                  style: TextStyle(color: Color(0xFF6890F9), fontSize: 12),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -451,7 +451,7 @@ class _PlayerPageState extends State<PlayerPage> {
           const SizedBox(width: 8),
           const Text(
             '缓存中',
-            style: TextStyle(color: Color(0xFF8F919A), fontSize: 14),
+            style: TextStyle(color: Color(0xFF8F919A), fontSize: 12),
           ),
         ],
       ),
@@ -506,11 +506,11 @@ class _PlayerPageState extends State<PlayerPage> {
                       ? Duration(milliseconds: _dragValue.toInt())
                       : _position),
                   style: const TextStyle(
-                      color: Color(0xFF8F919A), fontSize: 14),
+                      color: Color(0xFF8F919A), fontSize: 12),
                 ),
                 Text(_fmt(_duration),
                     style: const TextStyle(
-                        color: Color(0xFF8F919A), fontSize: 14)),
+                        color: Color(0xFF8F919A), fontSize: 12)),
               ],
             ),
           ),
@@ -569,7 +569,7 @@ class _PlayerPageState extends State<PlayerPage> {
                 const SizedBox(height: 4),
                 Text(_isFavorite ? '已收藏' : '收藏',
                     style:
-                        const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
+                        const TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
               ],
             ),
           ),
@@ -582,7 +582,7 @@ class _PlayerPageState extends State<PlayerPage> {
                 const SizedBox(height: 4),
                 const Text('搜索同名',
                     style:
-                        TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
+                        TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
               ],
             ),
           ),
@@ -595,7 +595,7 @@ class _PlayerPageState extends State<PlayerPage> {
                 const SizedBox(height: 4),
                 Text(_qualityLabel(),
                     style:
-                        const TextStyle(color: Color(0xFF8F919A), fontSize: 13)),
+                        const TextStyle(color: Color(0xFF8F919A), fontSize: 11)),
               ],
             ),
           ),
@@ -633,13 +633,13 @@ class _PlayerPageState extends State<PlayerPage> {
         return AlertDialog(
           backgroundColor: const Color(0xFF1E2030),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('音质选择', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+          title: const Text('音质选择', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: AudioQuality.values.map((q) {
               final selected = SettingsService().quality == q;
               return ListTile(
-                title: Text(q.label, style: TextStyle(color: selected ? const Color(0xFF6890F9) : Colors.white, fontSize: 17)),
+                title: Text(q.label, style: TextStyle(color: selected ? const Color(0xFF6890F9) : Colors.white, fontSize: 15)),
                 trailing: selected ? const Icon(Icons.check_circle, color: Color(0xFF6890F9), size: 20) : null,
                 onTap: () async {
                   final oldBr = SettingsService().quality.br;

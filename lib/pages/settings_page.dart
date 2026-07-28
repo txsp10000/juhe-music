@@ -27,7 +27,7 @@ class _SettingsPageState extends State<SettingsPage> {
               '音质选择',
               style: TextStyle(
                 color: Color(0xFF6890F9),
-                fontSize: 16,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -45,7 +45,7 @@ class _SettingsPageState extends State<SettingsPage> {
         q.label,
         style: TextStyle(
           color: isSelected ? const Color(0xFF6890F9) : Colors.white,
-          fontSize: 17,
+          fontSize: 15,
         ),
       ),
       trailing: isSelected

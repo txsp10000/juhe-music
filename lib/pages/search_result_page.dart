@@ -21,15 +21,19 @@ class _SearchResultPageState extends State<SearchResultPage> {
   bool _hasMore = true;
   List<Song> _songs = [];
   String _errorMsg = '';
+
+  // ─── Design tokens ───
+  static const _bg = Color(0xFF07080C);
+  static const _surface = Color(0xFF0F1116);
+  static const _accent = Color(0xFF5A78F0);
+  static const _textPrimary = Color(0xFFEDEDF2);
+  static const _textSecondary = Color(0xFF7C7F8C);
+  static const _textTertiary = Color(0xFF4E515E);
+
   @override
   void initState() {
     super.initState();
     _search();
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
   }
 
   Future<void> _search({bool append = false}) async {
@@ -37,8 +41,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
       final result = await MusicApi.searchRaw(widget.keyword, num: 20, page: _currentPage);
       if (!mounted) return;
       if (result.songs.isNotEmpty) {
-        final picIds =
-            result.songs.map((s) => s.picId.isNotEmpty ? s.picId : s.id).toList();
+        final picIds = result.songs.map((s) => s.picId.isNotEmpty ? s.picId : s.id).toList();
         MusicApi.getCovers(picIds).then((covers) {
           if (!mounted) return;
           for (final s in result.songs) {
@@ -62,7 +65,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
         setState(() {
           if (!append) {
             _loading = false;
-            _errorMsg = '重试30次后仍无结果';
+            _errorMsg = '未找到结果';
           }
           _hasMore = false;
           _isLoadingMore = false;
@@ -73,7 +76,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
       setState(() {
         _loading = false;
         _isLoadingMore = false;
-        if (!append) _errorMsg = '搜索失败: $e';
+        if (!append) _errorMsg = '搜索失败';
       });
     }
   }
@@ -109,17 +112,17 @@ class _SearchResultPageState extends State<SearchResultPage> {
     return PopScope(
       canPop: !_isLoadingMore,
       child: Scaffold(
-        backgroundColor: const Color(0xFF0D0F14),
+        backgroundColor: _bg,
         appBar: AppBar(
-          backgroundColor: const Color(0xFF171B26),
+          backgroundColor: _bg,
           title: Text(
-            _loading ? '搜索中...' : '搜索结果',
-            style: const TextStyle(color: Colors.white),
+            _loading ? '搜索中...' : widget.keyword,
+            style: const TextStyle(color: _textPrimary, fontSize: 17, fontWeight: FontWeight.w600),
           ),
           leading: _isLoadingMore
               ? const SizedBox()
               : IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  icon: const Icon(Icons.arrow_back, color: _textSecondary),
                   onPressed: () => Navigator.pop(context),
                 ),
         ),
@@ -128,21 +131,17 @@ class _SearchResultPageState extends State<SearchResultPage> {
           child: Stack(
             children: [
               if (_loading)
-                const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF6890F9)))
+                const Center(child: CircularProgressIndicator(color: _accent))
               else if (_songs.isEmpty && !_isLoadingMore)
                 Center(
                     child: Text(_errorMsg.isNotEmpty ? _errorMsg : '无搜索结果',
-                        style: const TextStyle(
-                            color: Color(0xFF8F919A), fontSize: 18),
-                        textAlign: TextAlign.center))
+                        style: const TextStyle(color: _textSecondary, fontSize: 15)))
               else
                 NotificationListener<ScrollNotification>(
                   onNotification: (notification) {
                     if (notification is ScrollEndNotification &&
                         notification.metrics.pixels >= notification.metrics.maxScrollExtent - 100 &&
-                        !_isLoadingMore &&
-                        _hasMore) {
+                        !_isLoadingMore && _hasMore) {
                       _loadNextPage();
                     }
                     return false;
@@ -151,19 +150,24 @@ class _SearchResultPageState extends State<SearchResultPage> {
                     itemCount: _songs.length,
                     itemBuilder: (_, i) {
                       final s = _songs[i];
+                      final isCurrent = _player.currentSong?.id == s.id;
                       return InkWell(
                         onTap: () => _playAt(i),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                          decoration: const BoxDecoration(
-                            border: Border(bottom: BorderSide(color: Color(0x15FFFFFF))),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: isCurrent ? _accent.withOpacity(0.08) : Colors.transparent,
+                            border: const Border(bottom: BorderSide(color: Color(0x08FFFFFF))),
                           ),
                           child: Row(
                             children: [
                               SizedBox(
-                                width: 28,
-                                child: Text('${i + 1}', textAlign: TextAlign.center,
-                                    style: const TextStyle(color: Color(0xFF8F919A), fontSize: 16)),
+                                width: 26,
+                                child: isCurrent
+                                    ? const Icon(Icons.volume_up, color: _accent, size: 18)
+                                    : Text('${i + 1}',
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(color: _textTertiary, fontSize: 13)),
                               ),
                               const SizedBox(width: 14),
                               Expanded(
@@ -171,13 +175,13 @@ class _SearchResultPageState extends State<SearchResultPage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(s.name,
-                                        style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 18),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis),
+                                        style: TextStyle(
+                                            color: isCurrent ? _accent : _textPrimary,
+                                            fontSize: 15),
+                                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                                    const SizedBox(height: 3),
                                     Text(s.singer,
-                                        style: const TextStyle(color: Color(0xFF8F919A), fontSize: 15)),
+                                        style: const TextStyle(color: _textSecondary, fontSize: 12)),
                                   ],
                                 ),
                               ),
@@ -188,7 +192,6 @@ class _SearchResultPageState extends State<SearchResultPage> {
                     },
                   ),
                 ),
-              // 加载中遮罩
               if (_isLoadingMore)
                 Container(
                   color: Colors.black54,
@@ -196,10 +199,9 @@ class _SearchResultPageState extends State<SearchResultPage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        CircularProgressIndicator(color: Color(0xFF6890F9)),
+                        CircularProgressIndicator(color: _accent),
                         SizedBox(height: 16),
-                        Text('加载中...',
-                            style: TextStyle(color: Colors.white, fontSize: 18)),
+                        Text('加载中...', style: TextStyle(color: Colors.white, fontSize: 15)),
                       ],
                     ),
                   ),

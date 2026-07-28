@@ -99,7 +99,7 @@ class _SwipeActionCellState extends State<SwipeActionCell> with SingleTickerProv
                       alignment: Alignment.center,
                       child: Text(
                         widget.actionLabel,
-                        style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600),
+                        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
                       ),
                     ),
                   ),
