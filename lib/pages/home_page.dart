@@ -461,6 +461,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Widget _buildNowPlayingBar() {
+    final isPlaying = _player.isPlaying;
     return Positioned(
       left: 0,
       right: 0,
@@ -477,18 +478,18 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           ),
         ),
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-        child: GestureDetector(
-          onTap: _openPlayer,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF161922),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0x14FFFFFF)),
-            ),
-            child: Row(
-              children: [
-                Container(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF161922),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0x14FFFFFF)),
+          ),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: _openPlayer,
+                child: Container(
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
@@ -506,8 +507,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: GestureDetector(
+                  onTap: _openPlayer,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -528,9 +532,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     ],
                   ),
                 ),
-                const Icon(Icons.play_arrow, size: 24, color: Color(0x99FFFFFF)),
-              ],
-            ),
+              ),
+              GestureDetector(
+                onTap: () => _player.togglePlayPause(),
+                child: Icon(
+                  isPlaying ? Icons.pause : Icons.play_arrow,
+                  size: 24,
+                  color: const Color(0x99FFFFFF),
+                ),
+              ),
+            ],
           ),
         ),
       ),

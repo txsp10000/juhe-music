@@ -10,8 +10,6 @@ import MediaPlayer
   private var nowPlayingChannel: FlutterMethodChannel?
   private var wasInterrupted: Bool = false
   private var wasOverriddenBySystem: Bool = false
-  private var pausedForResignActive: Bool = false
-
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -63,15 +61,6 @@ import MediaPlayer
                    name: AVAudioSession.silenceSecondaryAudioHintNotification,
                    object: nil)
 
-    // Phone 端 Siri / Control Center 兜底：App 进入 Inactive 但非后台 → 暂停
-    nc.addObserver(self,
-                   selector: #selector(handleResignActive),
-                   name: UIApplication.willResignActiveNotification,
-                   object: nil)
-    nc.addObserver(self,
-                   selector: #selector(handleBecomeActive),
-                   name: UIApplication.didBecomeActiveNotification,
-                   object: nil)
   }
 
   /// Siri / 通话等音频中断处理
@@ -230,31 +219,6 @@ import MediaPlayer
 
     @unknown default:
       break
-    }
-  }
-
-  /// Phone 端 Siri 呼出 → App ResignActive，暂停播放
-  @objc private func handleResignActive() {
-    // 延迟检查：如果 App 没有进入后台（即未触发 didEnterBackground），说明是 Siri / Control Center
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-      guard let self = self else { return }
-      // 仍在 Inactive 或 Active 状态且未进后台 → Siri 或控制中心
-      let state = UIApplication.shared.applicationState
-      if state != .background {
-        self.pausedForResignActive = true
-        self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": true])
-      }
-    }
-  }
-
-  /// Phone 端 Siri 退出 → App BecomeActive，恢复播放
-  @objc private func handleBecomeActive() {
-    guard pausedForResignActive else { return }
-    pausedForResignActive = false
-    let session = AVAudioSession.sharedInstance()
-    try? session.setActive(true)
-    DispatchQueue.main.async {
-      self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": false])
     }
   }
 
