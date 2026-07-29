@@ -39,16 +39,10 @@ import MediaPlayer
 
   override func applicationWillResignActive(_ application: UIApplication) {
     super.applicationWillResignActive(application)
-    if !interruptionActive {
-      sendEvent("pause", reason: "resignActive")
-    }
   }
 
   override func applicationDidBecomeActive(_ application: UIApplication) {
     super.applicationDidBecomeActive(application)
-    if !interruptionActive {
-      sendEvent("resume", reason: "becomeActive")
-    }
   }
 
   // MARK: - Audio Session Observers

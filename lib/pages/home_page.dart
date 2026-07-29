@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../api/music_api.dart';
 import '../services/player_service.dart';
 import '../models/song.dart';
+import '../utils/toast.dart';
 import 'search_page.dart';
 import 'favorites_page.dart';
 import 'player_page.dart';
@@ -88,25 +89,19 @@ class _HomePageState extends State<HomePage> {
 
   void _randomPlay() {
     if (_pinnedPlaylists.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先置顶一些歌单'), duration: Duration(seconds: 2)),
-      );
+      Toast.show(context, '请先置顶一些歌单');
       return;
     }
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      backgroundColor: const Color(0xFF171B26),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF171B26),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        title: const Text('随机播放', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 14),
-              child: Text('随机播放', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
-            ),
             ListTile(
               leading: const Icon(Icons.shuffle, color: Color(0xFF6C8CFF)),
               title: const Text('自动随机选择歌单播放', style: TextStyle(color: Colors.white, fontSize: 15)),
@@ -126,7 +121,6 @@ class _HomePageState extends State<HomePage> {
                 _loadAndPlay(name);
               },
             )),
-            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -135,9 +129,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadAndPlay(String playlistName) async {
     final keyword = '$playlistName歌单';
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('正在加载「$playlistName」...'), duration: const Duration(seconds: 2)),
-    );
+    Toast.show(context, '正在加载「$playlistName」...');
     try {
       final page1 = await MusicApi.searchRaw(keyword, num: 20, page: 1);
       List<Song> songs = List.from(page1.songs);
@@ -147,9 +139,7 @@ class _HomePageState extends State<HomePage> {
       }
       if (!mounted) return;
       if (songs.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('未找到歌曲'), duration: Duration(seconds: 2)),
-        );
+        Toast.show(context, '未找到歌曲');
         return;
       }
       _player.playlist.clear();
@@ -162,9 +152,7 @@ class _HomePageState extends State<HomePage> {
       });
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('加载失败，请重试'), duration: Duration(seconds: 2)),
-      );
+      Toast.show(context, '加载失败，请重试');
     }
   }
 
@@ -492,9 +480,7 @@ class _HomePageState extends State<HomePage> {
           await _savePinnedPlaylists();
           if (mounted) setState(() {});
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('已置顶「$name」'), duration: const Duration(seconds: 1)),
-            );
+            Toast.show(context, '已置顶「$name」');
           }
         }
       },

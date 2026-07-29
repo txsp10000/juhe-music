@@ -483,7 +483,7 @@ class _AudioPlayerTask extends BaseAudioHandler {
         }
         _pauseReason = reason;
         ps._player.pause();
-        if (reason == 'secondaryAudio' || reason == 'resignActive' || reason == 'siriOverride') {
+        if (reason == 'secondaryAudio' || reason == 'siriOverride') {
           _fallbackResumeTimer = Timer(const Duration(seconds: 30), () {
             _fallbackResumeTimer = null;
             if (_pauseReason != null && _wasPlayingBeforePause) {
@@ -546,8 +546,6 @@ class _AudioPlayerTask extends BaseAudioHandler {
         return 1500;
       case 'secondaryAudioEnded':
         return 800;
-      case 'becomeActive':
-        return 500;
       case 'mediaServicesReset':
         return 1000;
       default:

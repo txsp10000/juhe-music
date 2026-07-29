@@ -41,10 +41,11 @@ class _SearchResultPageState extends State<SearchResultPage> {
 
   Future<void> _initialLoad() async {
     await _search();
-    if (_hasMore && mounted) {
+    while (_hasMore && mounted) {
       _currentPage++;
       await _search(append: true);
     }
+    if (mounted) setState(() => _loading = false);
   }
 
   Future<void> _loadFavorites() async {
@@ -78,15 +79,11 @@ class _SearchResultPageState extends State<SearchResultPage> {
             _songs = result.songs;
           }
           _hasMore = result.songs.length >= 20;
-          _loading = false;
           _isLoadingMore = false;
         });
       } else {
         setState(() {
-          if (!append) {
-            _loading = false;
-            _errorMsg = '未找到结果';
-          }
+          if (!append) _errorMsg = '未找到结果';
           _hasMore = false;
           _isLoadingMore = false;
         });
@@ -95,6 +92,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
+        _hasMore = false;
         _isLoadingMore = false;
         if (!append) _errorMsg = '搜索失败';
       });
@@ -177,9 +175,22 @@ class _SearchResultPageState extends State<SearchResultPage> {
                     }
                     return false;
                   },
-                  child: ListView.builder(
-                    itemCount: _songs.length,
-                    itemBuilder: (_, i) {
+                  child: Column(
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        color: _accent.withOpacity(0.08),
+                        child: Text(
+                          '共 ${_songs.length} 首歌',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: _accent, fontSize: 13),
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: _songs.length,
+                          itemBuilder: (_, i) {
                       final s = _songs[i];
                       final isCurrent = _player.currentSong?.id == s.id;
                       return InkWell(
@@ -239,6 +250,9 @@ class _SearchResultPageState extends State<SearchResultPage> {
                     },
                   ),
                 ),
+                  ],
+                ),
+              ),
               if (_isLoadingMore)
                 Container(
                   color: Colors.black54,
