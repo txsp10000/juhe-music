@@ -35,8 +35,16 @@ class _SearchResultPageState extends State<SearchResultPage> {
   @override
   void initState() {
     super.initState();
-    _search();
+    _initialLoad();
     _loadFavorites();
+  }
+
+  Future<void> _initialLoad() async {
+    await _search();
+    if (_hasMore && mounted) {
+      _currentPage++;
+      await _search(append: true);
+    }
   }
 
   Future<void> _loadFavorites() async {

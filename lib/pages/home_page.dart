@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../api/music_api.dart';
 import '../services/player_service.dart';
 import '../models/song.dart';
 import 'search_page.dart';
@@ -94,7 +95,42 @@ class _HomePageState extends State<HomePage> {
     }
     final random = Random();
     final pick = _pinnedPlaylists[random.nextInt(_pinnedPlaylists.length)];
-    _openPlaylist(pick);
+    _loadAndPlay(pick);
+  }
+
+  Future<void> _loadAndPlay(String playlistName) async {
+    final keyword = '$playlistName歌单';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('正在加载「$playlistName」...'), duration: const Duration(seconds: 2)),
+    );
+    try {
+      final page1 = await MusicApi.searchRaw(keyword, num: 20, page: 1);
+      List<Song> songs = List.from(page1.songs);
+      if (page1.songs.length >= 20) {
+        final page2 = await MusicApi.searchRaw(keyword, num: 20, page: 2);
+        songs.addAll(page2.songs);
+      }
+      if (!mounted) return;
+      if (songs.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('未找到歌曲'), duration: Duration(seconds: 2)),
+        );
+        return;
+      }
+      _player.playlist.clear();
+      _player.playlist.addAll(songs);
+      _player.playAt(0);
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage())).then((_) {
+        _bindPlayer();
+        _syncState();
+        if (mounted) setState(() {});
+      });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('加载失败，请重试'), duration: Duration(seconds: 2)),
+      );
+    }
   }
 
   Future<void> _showAddDialog() async {
