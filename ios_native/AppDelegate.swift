@@ -8,8 +8,8 @@ import MediaPlayer
   private var lastArtUri: String = ""
   private var cachedArtwork: MPMediaItemArtwork?
   private var nowPlayingChannel: FlutterMethodChannel?
-  private var wasInterrupted: Bool = false
-  private var wasOverriddenBySystem: Bool = false
+  private var interruptionActive: Bool = false
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -40,185 +40,108 @@ import MediaPlayer
 
   private func setupAudioObservers() {
     let nc = NotificationCenter.default
-
-    nc.addObserver(self,
-                   selector: #selector(handleInterruption(_:)),
-                   name: AVAudioSession.interruptionNotification,
-                   object: nil)
-
-    nc.addObserver(self,
-                   selector: #selector(handleRouteChange(_:)),
-                   name: AVAudioSession.routeChangeNotification,
-                   object: nil)
-
-    nc.addObserver(self,
-                   selector: #selector(handleMediaServicesReset(_:)),
-                   name: AVAudioSession.mediaServicesWereResetNotification,
-                   object: nil)
-
-    nc.addObserver(self,
-                   selector: #selector(handleSilenceSecondaryAudio(_:)),
-                   name: AVAudioSession.silenceSecondaryAudioHintNotification,
-                   object: nil)
-
+    nc.addObserver(self, selector: #selector(handleInterruption(_:)),
+                   name: AVAudioSession.interruptionNotification, object: nil)
+    nc.addObserver(self, selector: #selector(handleRouteChange(_:)),
+                   name: AVAudioSession.routeChangeNotification, object: nil)
+    nc.addObserver(self, selector: #selector(handleMediaServicesReset(_:)),
+                   name: AVAudioSession.mediaServicesWereResetNotification, object: nil)
+    nc.addObserver(self, selector: #selector(handleSilenceSecondaryAudio(_:)),
+                   name: AVAudioSession.silenceSecondaryAudioHintNotification, object: nil)
   }
 
-  /// Siri / 通话等音频中断处理
+  private func sendEvent(_ event: String, reason: String) {
+    DispatchQueue.main.async {
+      self.nowPlayingChannel?.invokeMethod("audioEvent", arguments: [
+        "event": event,
+        "reason": reason
+      ])
+    }
+  }
+
   @objc private func handleInterruption(_ notification: Notification) {
     guard let typeValue = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
-          let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
-      return
-    }
+          let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
 
     switch type {
     case .began:
-      // 中断开始（Siri 唤醒 / 来电），通知 Flutter 暂停
-      wasInterrupted = true
-      DispatchQueue.main.async {
-        self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": true])
-      }
+      interruptionActive = true
+      sendEvent("pause", reason: "interruption")
 
     case .ended:
-      wasInterrupted = false
-      guard let optionsValue = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt else {
-        // 无恢复选项，不做处理
-        return
-      }
-      let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
-      if options.contains(.shouldResume) {
-        // 中断结束（Siri 关闭 / 通话挂断），重新激活音频并恢复播放
-        let session = AVAudioSession.sharedInstance()
-        do {
-          try session.setActive(true)
-        } catch {
-          // 激活失败，延迟重试一次
-          DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            try? AVAudioSession.sharedInstance().setActive(true)
-          }
-        }
-        DispatchQueue.main.async {
-          self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": false])
+      interruptionActive = false
+      try? AVAudioSession.sharedInstance().setActive(true)
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        if !self.interruptionActive {
+          self.sendEvent("resume", reason: "interruptionEnded")
         }
       }
 
-    @unknown default:
-      break
+    @unknown default: break
     }
   }
 
-  /// 蓝牙 / CarPlay / 耳机等音频路由切换处理
   @objc private func handleRouteChange(_ notification: Notification) {
     guard let reasonValue = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
-          let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else {
-      return
-    }
+          let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else { return }
 
     let session = AVAudioSession.sharedInstance()
 
     switch reason {
     case .oldDeviceUnavailable:
-      // 设备断开（蓝牙耳机掉电 / 车载熄火等）
       if let previousRoute = notification.userInfo?[AVAudioSessionRouteChangePreviousRouteKey] as? AVAudioSessionRouteDescription {
-        let wasHeadphonesOrBluetooth = previousRoute.outputs.contains { output in
-          output.portType == .headphones ||
-          output.portType == .bluetoothA2DP ||
-          output.portType == .bluetoothHFP ||
-          output.portType == .bluetoothLE ||
-          output.portType == .carAudio
+        let hadExternalOutput = previousRoute.outputs.contains { output in
+          [.headphones, .bluetoothA2DP, .bluetoothHFP, .bluetoothLE, .carAudio].contains(output.portType)
         }
-        let isSpeaker = session.currentRoute.outputs.contains { $0.portType == .builtInSpeaker }
-        if wasHeadphonesOrBluetooth && isSpeaker {
-          // 外设断开切到扬声器，暂停播放避免公放
-          DispatchQueue.main.async {
-            self.nowPlayingChannel?.invokeMethod("audioRouteDisconnected", arguments: nil)
-          }
+        let nowSpeaker = session.currentRoute.outputs.contains { $0.portType == .builtInSpeaker }
+        if hadExternalOutput && nowSpeaker {
+          sendEvent("pause", reason: "routeDisconnected")
         }
       }
 
     case .newDeviceAvailable:
-      // 新设备接入（连接蓝牙 / CarPlay / 插耳机）
-      let isExternalDevice = session.currentRoute.outputs.contains { output in
-        output.portType == .headphones ||
-        output.portType == .bluetoothA2DP ||
-        output.portType == .bluetoothHFP ||
-        output.portType == .bluetoothLE ||
-        output.portType == .carAudio
+      let hasExternalOutput = session.currentRoute.outputs.contains { output in
+        [.headphones, .bluetoothA2DP, .bluetoothHFP, .bluetoothLE, .carAudio].contains(output.portType)
       }
-      if isExternalDevice {
-        DispatchQueue.main.async {
-          self.nowPlayingChannel?.invokeMethod("audioRouteConnected", arguments: nil)
-        }
+      if hasExternalOutput && !interruptionActive {
+        sendEvent("routeConnected", reason: "newDevice")
       }
 
     case .override:
-      // Siri / 系统覆盖音频通道（CarPlay 场景 Siri 走此路径，非 interruption）
-      if wasOverriddenBySystem {
-        // 覆盖结束，重新激活并恢复
-        wasOverriddenBySystem = false
-        try? session.setActive(true)
-        DispatchQueue.main.async {
-          self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": false])
-        }
-      } else {
-        // 覆盖开始（Siri 启动），暂停播放
-        wasOverriddenBySystem = true
-        DispatchQueue.main.async {
-          self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": true])
-        }
+      if !interruptionActive {
+        sendEvent("pause", reason: "siriOverride")
       }
 
     case .categoryChange:
-      // 音频类别变更（某些 iOS 版本 Siri 走此路径）
-      if wasOverriddenBySystem {
-        wasOverriddenBySystem = false
-        try? session.setActive(true)
-        DispatchQueue.main.async {
-          self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": false])
-        }
-      } else {
-        wasOverriddenBySystem = true
-        DispatchQueue.main.async {
-          self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": true])
-        }
-      }
-
-    default:
       break
+
+    default: break
     }
   }
 
-  /// 媒体服务重置处理
   @objc private func handleMediaServicesReset(_ notification: Notification) {
-    let session = AVAudioSession.sharedInstance()
     do {
+      let session = AVAudioSession.sharedInstance()
       try session.setCategory(.playback, mode: .default, policy: .longFormAudio)
       try session.setActive(true)
     } catch {}
-    DispatchQueue.main.async {
-      self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": false])
+    if !interruptionActive {
+      sendEvent("resume", reason: "mediaServicesReset")
     }
   }
 
-  /// 其他 App 播放音频时的静音提示（导航语音 / 其他音乐 App 等）
   @objc private func handleSilenceSecondaryAudio(_ notification: Notification) {
     guard let typeValue = notification.userInfo?[AVAudioSessionSilenceSecondaryAudioHintTypeKey] as? UInt,
-          let type = AVAudioSession.SilenceSecondaryAudioHintType(rawValue: typeValue) else {
-      return
-    }
+          let type = AVAudioSession.SilenceSecondaryAudioHintType(rawValue: typeValue) else { return }
 
     switch type {
     case .begin:
-      DispatchQueue.main.async {
-        self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": true])
-      }
-
+      sendEvent("pause", reason: "secondaryAudio")
     case .end:
-      DispatchQueue.main.async {
-        self.nowPlayingChannel?.invokeMethod("audioInterruption", arguments: ["active": false])
+      if !interruptionActive {
+        sendEvent("resume", reason: "secondaryAudioEnded")
       }
-
-    @unknown default:
-      break
+    @unknown default: break
     }
   }
 

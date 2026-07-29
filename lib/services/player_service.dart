@@ -405,62 +405,34 @@ class PlayerService {
 
 class _AudioPlayerTask extends BaseAudioHandler {
   static const _nowPlayingChannel = MethodChannel('com.miaomiao.music/nowplaying');
-  bool _audioInterrupted = false;
-  bool _wasPlayingBeforeInterruption = false;
+
+  String? _pauseReason;
+  bool _wasPlayingBeforePause = false;
   Timer? _resumeTimer;
 
   _AudioPlayerTask() {
     final ps = PlayerService();
 
-    // 监听原生层音频中断事件（Siri / 通话 / 蓝牙路由切换）
     _nowPlayingChannel.setMethodCallHandler((call) async {
       switch (call.method) {
+        case 'audioEvent':
+          final args = call.arguments as Map? ?? {};
+          final event = args['event'] as String? ?? '';
+          final reason = args['reason'] as String? ?? '';
+          _handleAudioEvent(ps, event, reason);
+          break;
         case 'audioInterruption':
           final active = call.arguments is Map
               ? (call.arguments as Map)['active'] == true
               : false;
-          if (active) {
-            // 中断开始：记录播放状态，取消延迟恢复定时器，立即暂停
-            _resumeTimer?.cancel();
-            _resumeTimer = null;
-            _audioInterrupted = true;
-            _wasPlayingBeforeInterruption = ps._isPlaying;
-            await ps._player.pause();
-          } else {
-            // 中断结束：延迟恢复（仅当中断前正在播放时），防止微信语音等场景的短暂中断间隙导致误恢复
-            // _audioInterrupted 保持 true，直到真正恢复播放后才清除，防止通话期间误恢复
-            _resumeTimer?.cancel();
-            if (ps._currentIndex >= 0 && _wasPlayingBeforeInterruption) {
-              _resumeTimer = Timer(const Duration(milliseconds: 2000), () {
-                _audioInterrupted = false;
-                _wasPlayingBeforeInterruption = false;
-                try {
-                  ps._player.play();
-                } catch (_) {}
-              });
-            } else {
-              _audioInterrupted = false;
-              _wasPlayingBeforeInterruption = false;
-            }
-          }
+          _handleAudioEvent(ps, active ? 'pause' : 'resume',
+              active ? 'interruption' : 'interruptionEnded');
           break;
         case 'audioRouteDisconnected':
-          // 蓝牙/车载设备断开，暂停播放避免公放
-          _resumeTimer?.cancel();
-          _resumeTimer = null;
-          _audioInterrupted = true;
-          _wasPlayingBeforeInterruption = ps._isPlaying;
-          await ps._player.pause();
+          _handleAudioEvent(ps, 'pause', 'routeDisconnected');
           break;
         case 'audioRouteConnected':
-          // 蓝牙/CarPlay 连接：仅当中断前正在播放且当前未被中断（非通话中）时才恢复
-          _resumeTimer?.cancel();
-          if (_wasPlayingBeforeInterruption && !_audioInterrupted) {
-            _resumeTimer = Timer(const Duration(milliseconds: 2000), () {
-              _wasPlayingBeforeInterruption = false;
-              _autoPlayFavorites(ps);
-            });
-          }
+          _handleAudioEvent(ps, 'routeConnected', 'newDevice');
           break;
         default:
           break;
@@ -468,6 +440,10 @@ class _AudioPlayerTask extends BaseAudioHandler {
     });
 
     ps._player.stream.playing.listen((playing) {
+      if (playing && _pauseReason != null && _resumeTimer == null) {
+        _pauseReason = null;
+        _wasPlayingBeforePause = false;
+      }
       _updatePlaybackState();
     });
 
@@ -492,6 +468,72 @@ class _AudioPlayerTask extends BaseAudioHandler {
         mediaItem.add(item);
       }
     });
+  }
+
+  void _handleAudioEvent(PlayerService ps, String event, String reason) {
+    switch (event) {
+      case 'pause':
+        _resumeTimer?.cancel();
+        _resumeTimer = null;
+        if (_pauseReason == null) {
+          _wasPlayingBeforePause = ps._isPlaying;
+        }
+        _pauseReason = reason;
+        ps._player.pause();
+        break;
+
+      case 'resume':
+        _resumeTimer?.cancel();
+        if (_pauseReason == null) break;
+        final delayMs = _resumeDelayFor(reason);
+        _resumeTimer = Timer(Duration(milliseconds: delayMs), () {
+          _resumeTimer = null;
+          if (_pauseReason == null) return;
+          if (!_wasPlayingBeforePause) {
+            _pauseReason = null;
+            return;
+          }
+          if (ps._currentIndex < 0) {
+            _pauseReason = null;
+            _wasPlayingBeforePause = false;
+            return;
+          }
+          _pauseReason = null;
+          _wasPlayingBeforePause = false;
+          try { ps._player.play(); } catch (_) {}
+        });
+        break;
+
+      case 'routeConnected':
+        _resumeTimer?.cancel();
+        if (_pauseReason == 'routeDisconnected' && _wasPlayingBeforePause) {
+          _resumeTimer = Timer(const Duration(milliseconds: 1500), () {
+            _resumeTimer = null;
+            _pauseReason = null;
+            _wasPlayingBeforePause = false;
+            try { ps._player.play(); } catch (_) {}
+          });
+        } else if (_pauseReason == null && !ps._isPlaying) {
+          _resumeTimer = Timer(const Duration(milliseconds: 2000), () {
+            _resumeTimer = null;
+            _autoPlayFavorites(ps);
+          });
+        }
+        break;
+    }
+  }
+
+  int _resumeDelayFor(String reason) {
+    switch (reason) {
+      case 'interruptionEnded':
+        return 1500;
+      case 'secondaryAudioEnded':
+        return 800;
+      case 'mediaServicesReset':
+        return 1000;
+      default:
+        return 1500;
+    }
   }
 
   void _updatePlaybackState() {

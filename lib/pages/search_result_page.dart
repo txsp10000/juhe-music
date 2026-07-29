@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../api/music_api.dart';
 import '../models/song.dart';
 import '../services/player_service.dart';
+import '../services/favorites_service.dart';
 import 'player_page.dart';
 
 class SearchResultPage extends StatefulWidget {
@@ -20,6 +21,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
   int _currentPage = 1;
   bool _hasMore = true;
   List<Song> _songs = [];
+  final Set<String> _favoriteIds = {};
   String _errorMsg = '';
 
   // ─── Design tokens ───
@@ -34,6 +36,16 @@ class _SearchResultPageState extends State<SearchResultPage> {
   void initState() {
     super.initState();
     _search();
+    _loadFavorites();
+  }
+
+  Future<void> _loadFavorites() async {
+    final favorites = await FavoritesService.load();
+    _favoriteIds.clear();
+    for (final s in favorites) {
+      _favoriteIds.add(s.id);
+    }
+    if (mounted) setState(() {});
   }
 
   Future<void> _search({bool append = false}) async {
@@ -105,6 +117,17 @@ class _SearchResultPageState extends State<SearchResultPage> {
     } else {
       Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
     }
+  }
+
+  Future<void> _toggleFavorite(Song song) async {
+    if (_favoriteIds.contains(song.id)) {
+      await FavoritesService.remove(song);
+      _favoriteIds.remove(song.id);
+    } else {
+      await FavoritesService.save(song);
+      _favoriteIds.add(song.id);
+    }
+    if (mounted) setState(() {});
   }
 
   @override
@@ -183,6 +206,22 @@ class _SearchResultPageState extends State<SearchResultPage> {
                                     Text(s.singer,
                                         style: const TextStyle(color: _textSecondary, fontSize: 12)),
                                   ],
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () => _toggleFavorite(s),
+                                behavior: HitTestBehavior.opaque,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                  child: Icon(
+                                    _favoriteIds.contains(s.id)
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    size: 22,
+                                    color: _favoriteIds.contains(s.id)
+                                        ? Colors.red
+                                        : Colors.white,
+                                  ),
                                 ),
                               ),
                             ],
