@@ -406,6 +406,7 @@ class PlayerService {
 class _AudioPlayerTask extends BaseAudioHandler {
   static const _nowPlayingChannel = MethodChannel('com.miaomiao.music/nowplaying');
   bool _audioInterrupted = false;
+  bool _wasPlayingBeforeInterruption = false;
   Timer? _resumeTimer;
 
   _AudioPlayerTask() {
@@ -419,22 +420,27 @@ class _AudioPlayerTask extends BaseAudioHandler {
               ? (call.arguments as Map)['active'] == true
               : false;
           if (active) {
-            // 中断开始：取消延迟恢复定时器，立即暂停
+            // 中断开始：记录播放状态，取消延迟恢复定时器，立即暂停
             _resumeTimer?.cancel();
             _resumeTimer = null;
             _audioInterrupted = true;
+            _wasPlayingBeforeInterruption = ps._isPlaying;
             await ps._player.pause();
           } else {
-            // 中断结束：延迟恢复，防止微信语音等场景的短暂中断间隙导致误恢复
+            // 中断结束：延迟恢复（仅当中断前正在播放时），防止微信语音等场景的短暂中断间隙导致误恢复
+            // _audioInterrupted 保持 true，直到真正恢复播放后才清除，防止通话期间误恢复
             _resumeTimer?.cancel();
-            _audioInterrupted = false;
-            if (ps._currentIndex >= 0) {
+            if (ps._currentIndex >= 0 && _wasPlayingBeforeInterruption) {
               _resumeTimer = Timer(const Duration(milliseconds: 2000), () {
                 _audioInterrupted = false;
+                _wasPlayingBeforeInterruption = false;
                 try {
                   ps._player.play();
                 } catch (_) {}
               });
+            } else {
+              _audioInterrupted = false;
+              _wasPlayingBeforeInterruption = false;
             }
           }
           break;
@@ -443,14 +449,18 @@ class _AudioPlayerTask extends BaseAudioHandler {
           _resumeTimer?.cancel();
           _resumeTimer = null;
           _audioInterrupted = true;
+          _wasPlayingBeforeInterruption = ps._isPlaying;
           await ps._player.pause();
           break;
         case 'audioRouteConnected':
-          // 蓝牙/CarPlay 自动连接，延迟后加载收藏列表并播放
+          // 蓝牙/CarPlay 连接：仅当中断前正在播放且当前未被中断（非通话中）时才恢复
           _resumeTimer?.cancel();
-          _resumeTimer = Timer(const Duration(milliseconds: 2000), () {
-            _autoPlayFavorites(ps);
-          });
+          if (_wasPlayingBeforeInterruption && !_audioInterrupted) {
+            _resumeTimer = Timer(const Duration(milliseconds: 2000), () {
+              _wasPlayingBeforeInterruption = false;
+              _autoPlayFavorites(ps);
+            });
+          }
           break;
         default:
           break;
