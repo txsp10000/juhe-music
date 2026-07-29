@@ -77,7 +77,7 @@ class _HomePageState extends State<HomePage> {
   void _openPlaylist(String name) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => SearchResultPage(keyword: name)),
+      MaterialPageRoute(builder: (_) => SearchResultPage(keyword: '$name歌单')),
     ).then((_) {
       _bindPlayer();
       _syncState();
