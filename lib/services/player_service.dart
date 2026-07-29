@@ -409,6 +409,7 @@ class _AudioPlayerTask extends BaseAudioHandler {
   String? _pauseReason;
   bool _wasPlayingBeforePause = false;
   Timer? _resumeTimer;
+  Timer? _fallbackResumeTimer;
 
   _AudioPlayerTask() {
     final ps = PlayerService();
@@ -475,15 +476,29 @@ class _AudioPlayerTask extends BaseAudioHandler {
       case 'pause':
         _resumeTimer?.cancel();
         _resumeTimer = null;
+        _fallbackResumeTimer?.cancel();
+        _fallbackResumeTimer = null;
         if (_pauseReason == null) {
           _wasPlayingBeforePause = ps._isPlaying;
         }
         _pauseReason = reason;
         ps._player.pause();
+        if (reason == 'secondaryAudio' || reason == 'resignActive' || reason == 'siriOverride') {
+          _fallbackResumeTimer = Timer(const Duration(seconds: 30), () {
+            _fallbackResumeTimer = null;
+            if (_pauseReason != null && _wasPlayingBeforePause) {
+              _pauseReason = null;
+              _wasPlayingBeforePause = false;
+              try { ps._player.play(); } catch (_) {}
+            }
+          });
+        }
         break;
 
       case 'resume':
         _resumeTimer?.cancel();
+        _fallbackResumeTimer?.cancel();
+        _fallbackResumeTimer = null;
         if (_pauseReason == null) break;
         final delayMs = _resumeDelayFor(reason);
         _resumeTimer = Timer(Duration(milliseconds: delayMs), () {
@@ -506,6 +521,8 @@ class _AudioPlayerTask extends BaseAudioHandler {
 
       case 'routeConnected':
         _resumeTimer?.cancel();
+        _fallbackResumeTimer?.cancel();
+        _fallbackResumeTimer = null;
         if (_pauseReason == 'routeDisconnected' && _wasPlayingBeforePause) {
           _resumeTimer = Timer(const Duration(milliseconds: 1500), () {
             _resumeTimer = null;
@@ -529,6 +546,8 @@ class _AudioPlayerTask extends BaseAudioHandler {
         return 1500;
       case 'secondaryAudioEnded':
         return 800;
+      case 'becomeActive':
+        return 500;
       case 'mediaServicesReset':
         return 1000;
       default:

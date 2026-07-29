@@ -9,6 +9,7 @@ import MediaPlayer
   private var cachedArtwork: MPMediaItemArtwork?
   private var nowPlayingChannel: FlutterMethodChannel?
   private var interruptionActive: Bool = false
+  private var wasPlayingBeforeResignActive: Bool = false
 
   override func application(
     _ application: UIApplication,
@@ -34,6 +35,20 @@ import MediaPlayer
     }
 
     return result
+  }
+
+  override func applicationWillResignActive(_ application: UIApplication) {
+    super.applicationWillResignActive(application)
+    if !interruptionActive {
+      sendEvent("pause", reason: "resignActive")
+    }
+  }
+
+  override func applicationDidBecomeActive(_ application: UIApplication) {
+    super.applicationDidBecomeActive(application)
+    if !interruptionActive {
+      sendEvent("resume", reason: "becomeActive")
+    }
   }
 
   // MARK: - Audio Session Observers

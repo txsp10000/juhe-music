@@ -93,9 +93,44 @@ class _HomePageState extends State<HomePage> {
       );
       return;
     }
-    final random = Random();
-    final pick = _pinnedPlaylists[random.nextInt(_pinnedPlaylists.length)];
-    _loadAndPlay(pick);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF171B26),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 14),
+              child: Text('随机播放', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.shuffle, color: Color(0xFF6C8CFF)),
+              title: const Text('自动随机选择歌单播放', style: TextStyle(color: Colors.white, fontSize: 15)),
+              onTap: () {
+                Navigator.pop(ctx);
+                final random = Random();
+                final pick = _pinnedPlaylists[random.nextInt(_pinnedPlaylists.length)];
+                _loadAndPlay(pick);
+              },
+            ),
+            const Divider(color: Color(0x14FFFFFF), height: 1),
+            ..._pinnedPlaylists.map((name) => ListTile(
+              leading: const Icon(Icons.queue_music, color: Color(0xFF8F919A)),
+              title: Text(name, style: const TextStyle(color: Colors.white, fontSize: 15)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _loadAndPlay(name);
+              },
+            )),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _loadAndPlay(String playlistName) async {
