@@ -9,7 +9,6 @@ import 'lyric_cache_service.dart';
 import 'audio_cache_service.dart';
 import 'cover_cache_service.dart';
 import 'settings_service.dart';
-import 'favorites_service.dart';
 
 class PlayerService {
   static final PlayerService _instance = PlayerService._();
@@ -407,9 +406,6 @@ class _AudioPlayerTask extends BaseAudioHandler {
   static const _nowPlayingChannel = MethodChannel('com.miaomiao.music/nowplaying');
 
   String? _pauseReason;
-  bool _wasPlayingBeforePause = false;
-  Timer? _resumeTimer;
-  Timer? _fallbackResumeTimer;
 
   _AudioPlayerTask() {
     final ps = PlayerService();
@@ -420,20 +416,10 @@ class _AudioPlayerTask extends BaseAudioHandler {
           final args = call.arguments as Map? ?? {};
           final event = args['event'] as String? ?? '';
           final reason = args['reason'] as String? ?? '';
-          _handleAudioEvent(ps, event, reason);
-          break;
-        case 'audioInterruption':
-          final active = call.arguments is Map
-              ? (call.arguments as Map)['active'] == true
-              : false;
-          _handleAudioEvent(ps, active ? 'pause' : 'resume',
-              active ? 'interruption' : 'interruptionEnded');
-          break;
-        case 'audioRouteDisconnected':
-          _handleAudioEvent(ps, 'pause', 'routeDisconnected');
-          break;
-        case 'audioRouteConnected':
-          _handleAudioEvent(ps, 'routeConnected', 'newDevice');
+          if (event == 'pause') {
+            _pauseReason = reason;
+            ps._player.pause();
+          }
           break;
         default:
           break;
@@ -441,9 +427,8 @@ class _AudioPlayerTask extends BaseAudioHandler {
     });
 
     ps._player.stream.playing.listen((playing) {
-      if (playing && _pauseReason != null && _resumeTimer == null) {
+      if (playing && _pauseReason != null) {
         _pauseReason = null;
-        _wasPlayingBeforePause = false;
       }
       _updatePlaybackState();
     });
@@ -469,88 +454,6 @@ class _AudioPlayerTask extends BaseAudioHandler {
         mediaItem.add(item);
       }
     });
-  }
-
-  void _handleAudioEvent(PlayerService ps, String event, String reason) {
-    switch (event) {
-      case 'pause':
-        _resumeTimer?.cancel();
-        _resumeTimer = null;
-        _fallbackResumeTimer?.cancel();
-        _fallbackResumeTimer = null;
-        if (_pauseReason == null) {
-          _wasPlayingBeforePause = ps._isPlaying;
-        }
-        _pauseReason = reason;
-        ps._player.pause();
-        if (reason == 'secondaryAudio' || reason == 'siriOverride') {
-          _fallbackResumeTimer = Timer(const Duration(seconds: 30), () {
-            _fallbackResumeTimer = null;
-            if (_pauseReason != null && _wasPlayingBeforePause) {
-              _pauseReason = null;
-              _wasPlayingBeforePause = false;
-              try { ps._player.play(); } catch (_) {}
-            }
-          });
-        }
-        break;
-
-      case 'resume':
-        _resumeTimer?.cancel();
-        _fallbackResumeTimer?.cancel();
-        _fallbackResumeTimer = null;
-        if (_pauseReason == null) break;
-        final delayMs = _resumeDelayFor(reason);
-        _resumeTimer = Timer(Duration(milliseconds: delayMs), () {
-          _resumeTimer = null;
-          if (_pauseReason == null) return;
-          if (!_wasPlayingBeforePause) {
-            _pauseReason = null;
-            return;
-          }
-          if (ps._currentIndex < 0) {
-            _pauseReason = null;
-            _wasPlayingBeforePause = false;
-            return;
-          }
-          _pauseReason = null;
-          _wasPlayingBeforePause = false;
-          try { ps._player.play(); } catch (_) {}
-        });
-        break;
-
-      case 'routeConnected':
-        _resumeTimer?.cancel();
-        _fallbackResumeTimer?.cancel();
-        _fallbackResumeTimer = null;
-        if (_pauseReason == 'routeDisconnected' && _wasPlayingBeforePause) {
-          _resumeTimer = Timer(const Duration(milliseconds: 1500), () {
-            _resumeTimer = null;
-            _pauseReason = null;
-            _wasPlayingBeforePause = false;
-            try { ps._player.play(); } catch (_) {}
-          });
-        } else if (_pauseReason == null && !ps._isPlaying) {
-          _resumeTimer = Timer(const Duration(milliseconds: 2000), () {
-            _resumeTimer = null;
-            _autoPlayFavorites(ps);
-          });
-        }
-        break;
-    }
-  }
-
-  int _resumeDelayFor(String reason) {
-    switch (reason) {
-      case 'interruptionEnded':
-        return 1500;
-      case 'secondaryAudioEnded':
-        return 800;
-      case 'mediaServicesReset':
-        return 1000;
-      default:
-        return 1500;
-    }
   }
 
   void _updatePlaybackState() {
@@ -581,24 +484,6 @@ class _AudioPlayerTask extends BaseAudioHandler {
       'playbackRate': ps._isPlaying ? 1.0 : 0.0,
       'artUri': item.artUri?.toString() ?? '',
     });
-  }
-
-  /// 蓝牙/CarPlay 连接后，自动加载收藏列表并从头播放
-  Future<void> _autoPlayFavorites(PlayerService ps) async {
-    // 如果已经在播放中，不打断
-    if (ps._isPlaying) return;
-
-    try {
-      final favorites = await FavoritesService.load();
-      if (favorites.isEmpty) return;
-
-      // 替换播放列表为收藏列表
-      ps.playlist.clear();
-      ps.playlist.addAll(favorites);
-
-      // 从第一首开始
-      await ps.playAt(0);
-    } catch (_) {}
   }
 
   @override

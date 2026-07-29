@@ -80,11 +80,6 @@ import MediaPlayer
     case .ended:
       interruptionActive = false
       try? AVAudioSession.sharedInstance().setActive(true)
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-        if !self.interruptionActive {
-          self.sendEvent("resume", reason: "interruptionEnded")
-        }
-      }
 
     @unknown default: break
     }
@@ -109,17 +104,10 @@ import MediaPlayer
       }
 
     case .newDeviceAvailable:
-      let hasExternalOutput = session.currentRoute.outputs.contains { output in
-        [.headphones, .bluetoothA2DP, .bluetoothHFP, .bluetoothLE, .carAudio].contains(output.portType)
-      }
-      if hasExternalOutput && !interruptionActive {
-        sendEvent("routeConnected", reason: "newDevice")
-      }
+      break
 
     case .override:
-      if !interruptionActive {
-        sendEvent("pause", reason: "siriOverride")
-      }
+      sendEvent("pause", reason: "siriOverride")
 
     case .categoryChange:
       break
@@ -134,9 +122,6 @@ import MediaPlayer
       try session.setCategory(.playback, mode: .default, policy: .longFormAudio)
       try session.setActive(true)
     } catch {}
-    if !interruptionActive {
-      sendEvent("resume", reason: "mediaServicesReset")
-    }
   }
 
   @objc private func handleSilenceSecondaryAudio(_ notification: Notification) {
@@ -147,9 +132,7 @@ import MediaPlayer
     case .begin:
       sendEvent("pause", reason: "secondaryAudio")
     case .end:
-      if !interruptionActive {
-        sendEvent("resume", reason: "secondaryAudioEnded")
-      }
+      break
     @unknown default: break
     }
   }

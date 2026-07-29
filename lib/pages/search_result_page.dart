@@ -41,7 +41,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
 
   Future<void> _initialLoad() async {
     await _search();
-    while (_hasMore && mounted) {
+    if (_hasMore && mounted) {
       _currentPage++;
       await _search(append: true);
     }
