@@ -39,6 +39,23 @@ class PlayerService {
 
   void Function(bool playing)? onPlayStateChanged;
 
+  final List<void Function(bool)> _playStateListeners = [];
+
+  void addPlayStateListener(void Function(bool) listener) {
+    _playStateListeners.add(listener);
+  }
+
+  void removePlayStateListener(void Function(bool) listener) {
+    _playStateListeners.remove(listener);
+  }
+
+  void _notifyPlayStateChanged(bool playing) {
+    onPlayStateChanged?.call(playing);
+    for (final l in List<void Function(bool)>.from(_playStateListeners)) {
+      l(playing);
+    }
+  }
+
   // Download progress: 0.0 to 1.0, null means not downloading
   double? _downloadProgress;
   double? get downloadProgress => _downloadProgress;
@@ -128,7 +145,7 @@ class PlayerService {
 
     instance._playingSub = instance._player.stream.playing.listen((playing) {
       instance._isPlaying = playing;
-      instance.onPlayStateChanged?.call(playing);
+      instance._notifyPlayStateChanged(playing);
     });
 
     instance._completedSub = instance._player.stream.completed.listen((completed) {
@@ -155,6 +172,32 @@ class PlayerService {
     if (playlist.isEmpty) return;
     final newIdx = _currentIndex < playlist.length - 1 ? _currentIndex + 1 : 0;
     playAt(newIdx);
+  }
+
+  Future<void> removeAt(int index) async {
+    if (index < 0 || index >= playlist.length) return;
+
+    final removingCurrent = index == _currentIndex;
+    playlist.removeAt(index);
+
+    if (playlist.isEmpty) {
+      _currentIndex = -1;
+      _currentMediaItem = null;
+      _currentUrl = null;
+      _position = Duration.zero;
+      _duration = Duration.zero;
+      await _player.stop();
+      _notifyPlayStateChanged(false);
+      _notifyDownloadProgress(null);
+      return;
+    }
+
+    if (removingCurrent) {
+      final nextIndex = index >= playlist.length ? playlist.length - 1 : index;
+      await playAt(nextIndex);
+    } else if (index < _currentIndex) {
+      _currentIndex--;
+    }
   }
 
   void togglePlayPause() {
@@ -332,42 +375,39 @@ class PlayerService {
     final song = currentSong;
     if (song == null) return;
     final currentGen = ++_playGeneration;
-
-    // Stop playback
-    await _player.stop();
-    _isPlaying = false;
-    onPlayStateChanged?.call(false);
+    final wasPlaying = _isPlaying;
+    final resumePosition = _position;
 
     // Check if we already have the right quality cached
     final audioCache = AudioCacheService();
-    final cached = await audioCache.findCachedFile(song.id);
-    if (cached != null) {
-      // Already have sufficient quality
-      _currentPlayingBr = _extractBrFromPath(cached);
-      await _player.open(Media('file://$cached'), play: true);
-      return;
-    }
+    String? localPath = await audioCache.findCachedFile(song.id);
 
     // Need to re-download
     if (currentGen != _playGeneration) return;
-    final url = await _fetchPlayUrl(song);
-    if (url == null || url.isEmpty) return;
-    if (currentGen != _playGeneration) return;
+    if (localPath == null) {
+      final url = await _fetchPlayUrl(song);
+      if (url == null || url.isEmpty) return;
+      if (currentGen != _playGeneration) return;
 
-    _notifyDownloadProgress(0.0);
-    final localPath = await audioCache.download(song.id, url, onProgress: (p) {
+      _notifyDownloadProgress(0.0);
+      localPath = await audioCache.download(song.id, url, onProgress: (p) {
+        if (currentGen == _playGeneration) {
+          _notifyDownloadProgress(p);
+        }
+      });
       if (currentGen == _playGeneration) {
-        _notifyDownloadProgress(p);
+        _notifyDownloadProgress(null);
       }
-    });
-    if (currentGen == _playGeneration) {
-      _notifyDownloadProgress(null);
+      if (currentGen != _playGeneration) return;
     }
-    if (currentGen != _playGeneration) return;
 
     if (localPath == null || localPath.isEmpty) return;
-    _currentPlayingBr = SettingsService().quality.br;
-    await _player.open(Media('file://$localPath'), play: true);
+    _currentPlayingBr = _extractBrFromPath(localPath);
+    await _player.open(Media('file://$localPath'), play: wasPlaying);
+    if (currentGen != _playGeneration) return;
+    if (resumePosition > Duration.zero) {
+      await _player.seek(resumePosition);
+    }
   }
 
   Future<String?> _fetchPlayUrl(Song song) async {
@@ -441,6 +481,7 @@ class _AudioPlayerTask extends BaseAudioHandler {
         _resumeAfterInterruption = false;
       }
       _updatePlaybackState();
+      _syncNowPlaying();
     });
 
     ps._player.stream.position.listen((_) {

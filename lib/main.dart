@@ -8,8 +8,8 @@ import 'services/wifi_cache_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SettingsService().load();
-  AudioCacheService().cleanupIncomplete();
-  AudioCacheService().migrateOldFiles();
+  await AudioCacheService().cleanupIncomplete();
+  await AudioCacheService().migrateOldFiles();
   await PlayerService.init();
   WifiCacheService().init();
   runApp(const MusicApp());

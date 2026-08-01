@@ -41,7 +41,7 @@ class _PlayerPageState extends State<PlayerPage> {
     _player.addProgressListener(_onProgressUpdate);
     _player.addSongChangeListener(_onSongChange);
     _player.addDownloadProgressListener(_onDownloadProgress);
-    _player.onPlayStateChanged = (_) => mounted ? setState(() {}) : null;
+    _player.addPlayStateListener(_onPlayStateChange);
     _syncState();
     _checkFavorite();
   }
@@ -81,11 +81,16 @@ class _PlayerPageState extends State<PlayerPage> {
     }
   }
 
+  void _onPlayStateChange(bool _) {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
     _player.removeProgressListener(_onProgressUpdate);
     _player.removeSongChangeListener(_onSongChange);
     _player.removeDownloadProgressListener(_onDownloadProgress);
+    _player.removePlayStateListener(_onPlayStateChange);
     super.dispose();
   }
 

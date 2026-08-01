@@ -59,11 +59,16 @@ class _HomePageState extends State<HomePage> {
   void _bindPlayer() {
     _player.removeSongChangeListener(_onSongChange);
     _player.addSongChangeListener(_onSongChange);
-    _player.onPlayStateChanged = (_) => mounted ? setState(() {}) : null;
+    _player.removePlayStateListener(_onPlayStateChange);
+    _player.addPlayStateListener(_onPlayStateChange);
   }
 
   void _onSongChange(Song song) {
     if (mounted) setState(() => _currentSong = song);
+  }
+
+  void _onPlayStateChange(bool _) {
+    if (mounted) setState(() {});
   }
 
   void _syncState() {
@@ -73,6 +78,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _player.removeSongChangeListener(_onSongChange);
+    _player.removePlayStateListener(_onPlayStateChange);
     super.dispose();
   }
 

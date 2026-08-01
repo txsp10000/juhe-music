@@ -95,7 +95,9 @@ class _PlaylistPageState extends State<PlaylistPage> {
                   actionLabel: '删除',
                   actionColor: const Color(0xFFFF5E5E),
                   onAction: () {
-                    setState(() => _player.playlist.removeAt(i));
+                    _player.removeAt(i).then((_) {
+                      if (mounted) setState(() {});
+                    });
                   },
                   child: InkWell(
                     onTap: () => _playAt(i),

@@ -121,7 +121,7 @@ class AudioCacheService {
   }
 
   /// Delete all cached files for a songId (all qualities)
-  Future<void> _deleteAllForSong(String songId) async {
+  Future<void> _deleteAllForSong(String songId, {String? exceptPath}) async {
     final dir = await _getCacheDir();
     if (!await dir.exists()) return;
     final prefix = '${songId}_';
@@ -129,7 +129,9 @@ class AudioCacheService {
       await for (final entity in dir.list()) {
         if (entity is File) {
           final name = entity.path.split('/').last.split('\\').last;
-          if (name.startsWith(prefix) && !name.endsWith('.tmp')) {
+          if (name.startsWith(prefix) &&
+              !name.endsWith('.tmp') &&
+              entity.path != exceptPath) {
             await entity.delete();
           }
         }
@@ -170,9 +172,6 @@ class AudioCacheService {
         return path;
       }
 
-      // Delete any lower quality cached files for this song
-      await _deleteAllForSong(songId);
-
       // Download to a temporary file first
       final tmpPath = '$path.tmp';
       final tmpFile = File(tmpPath);
@@ -210,6 +209,7 @@ class AudioCacheService {
             return null;
           }
           await tmpFile.rename(path);
+          await _deleteAllForSong(songId, exceptPath: path);
           onProgress?.call(1.0);
           return path;
         }
