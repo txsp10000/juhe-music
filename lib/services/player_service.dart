@@ -406,6 +406,7 @@ class _AudioPlayerTask extends BaseAudioHandler {
   static const _nowPlayingChannel = MethodChannel('com.miaomiao.music/nowplaying');
 
   String? _pauseReason;
+  bool _resumeAfterInterruption = false;
 
   _AudioPlayerTask() {
     final ps = PlayerService();
@@ -417,8 +418,16 @@ class _AudioPlayerTask extends BaseAudioHandler {
           final event = args['event'] as String? ?? '';
           final reason = args['reason'] as String? ?? '';
           if (event == 'pause') {
+            final wasPlaying = args['wasPlaying'] as bool? ?? ps._isPlaying;
+            _resumeAfterInterruption = reason == 'interruption' && wasPlaying;
             _pauseReason = reason;
-            ps._player.pause();
+            await ps._player.pause();
+          } else if (event == 'resume') {
+            if (reason == 'interruption' && _resumeAfterInterruption) {
+              _resumeAfterInterruption = false;
+              _pauseReason = null;
+              await ps._player.play();
+            }
           }
           break;
         default:
@@ -429,6 +438,7 @@ class _AudioPlayerTask extends BaseAudioHandler {
     ps._player.stream.playing.listen((playing) {
       if (playing && _pauseReason != null) {
         _pauseReason = null;
+        _resumeAfterInterruption = false;
       }
       _updatePlaybackState();
     });

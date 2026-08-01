@@ -8,8 +8,8 @@ import MediaPlayer
   private var lastArtUri: String = ""
   private var cachedArtwork: MPMediaItemArtwork?
   private var nowPlayingChannel: FlutterMethodChannel?
-  private var interruptionActive: Bool = false
-  private var wasPlayingBeforeResignActive: Bool = false
+  private var isPlaybackActive: Bool = false
+  private var wasPlayingBeforeInterruption: Bool = false
 
   override func application(
     _ application: UIApplication,
@@ -59,12 +59,12 @@ import MediaPlayer
                    name: AVAudioSession.silenceSecondaryAudioHintNotification, object: nil)
   }
 
-  private func sendEvent(_ event: String, reason: String) {
+  private func sendEvent(_ event: String, reason: String, extra: [String: Any] = [:]) {
     DispatchQueue.main.async {
-      self.nowPlayingChannel?.invokeMethod("audioEvent", arguments: [
-        "event": event,
-        "reason": reason
-      ])
+      var arguments = extra
+      arguments["event"] = event
+      arguments["reason"] = reason
+      self.nowPlayingChannel?.invokeMethod("audioEvent", arguments: arguments)
     }
   }
 
@@ -74,12 +74,20 @@ import MediaPlayer
 
     switch type {
     case .began:
-      interruptionActive = true
-      sendEvent("pause", reason: "interruption")
+      wasPlayingBeforeInterruption = isPlaybackActive
+      sendEvent("pause", reason: "interruption", extra: [
+        "wasPlaying": wasPlayingBeforeInterruption
+      ])
 
     case .ended:
-      interruptionActive = false
       try? AVAudioSession.sharedInstance().setActive(true)
+      let optionsValue = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+      let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+      let shouldResume = options.contains(.shouldResume) && wasPlayingBeforeInterruption
+      wasPlayingBeforeInterruption = false
+      if shouldResume {
+        sendEvent("resume", reason: "interruption")
+      }
 
     @unknown default: break
     }
@@ -163,7 +171,9 @@ import MediaPlayer
         if let elapsed = args["elapsedTime"] as? Double {
           info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = NSNumber(value: elapsed)
         }
-        info[MPNowPlayingInfoPropertyPlaybackRate] = (args["playbackRate"] as? Double) ?? 1.0
+        let playbackRate = (args["playbackRate"] as? Double) ?? 1.0
+        self.isPlaybackActive = playbackRate > 0
+        info[MPNowPlayingInfoPropertyPlaybackRate] = playbackRate
 
         if let artwork = self.cachedArtwork {
           info[MPMediaItemPropertyArtwork] = artwork

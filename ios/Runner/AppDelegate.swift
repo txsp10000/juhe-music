@@ -8,6 +8,8 @@ import MediaPlayer
   private var lastArtUri: String = ""
   private var cachedArtwork: MPMediaItemArtwork?
   private var nowPlayingChannel: FlutterMethodChannel?
+  private var isPlaybackActive: Bool = false
+  private var wasPlayingBeforeInterruption: Bool = false
 
   override func application(
     _ application: UIApplication,
@@ -22,6 +24,7 @@ import MediaPlayer
     } catch {}
 
     UIApplication.shared.beginReceivingRemoteControlEvents()
+    setupAudioObservers()
 
     let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
 
@@ -32,6 +35,106 @@ import MediaPlayer
     }
 
     return result
+  }
+
+  // MARK: - Audio Session Observers
+
+  private func setupAudioObservers() {
+    let nc = NotificationCenter.default
+    nc.addObserver(self, selector: #selector(handleInterruption(_:)),
+                   name: AVAudioSession.interruptionNotification, object: nil)
+    nc.addObserver(self, selector: #selector(handleRouteChange(_:)),
+                   name: AVAudioSession.routeChangeNotification, object: nil)
+    nc.addObserver(self, selector: #selector(handleMediaServicesReset(_:)),
+                   name: AVAudioSession.mediaServicesWereResetNotification, object: nil)
+    nc.addObserver(self, selector: #selector(handleSilenceSecondaryAudio(_:)),
+                   name: AVAudioSession.silenceSecondaryAudioHintNotification, object: nil)
+  }
+
+  private func sendEvent(_ event: String, reason: String, extra: [String: Any] = [:]) {
+    DispatchQueue.main.async {
+      var arguments = extra
+      arguments["event"] = event
+      arguments["reason"] = reason
+      self.nowPlayingChannel?.invokeMethod("audioEvent", arguments: arguments)
+    }
+  }
+
+  @objc private func handleInterruption(_ notification: Notification) {
+    guard let typeValue = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+          let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
+
+    switch type {
+    case .began:
+      wasPlayingBeforeInterruption = isPlaybackActive
+      sendEvent("pause", reason: "interruption", extra: [
+        "wasPlaying": wasPlayingBeforeInterruption
+      ])
+
+    case .ended:
+      try? AVAudioSession.sharedInstance().setActive(true)
+      let optionsValue = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+      let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+      let shouldResume = options.contains(.shouldResume) && wasPlayingBeforeInterruption
+      wasPlayingBeforeInterruption = false
+      if shouldResume {
+        sendEvent("resume", reason: "interruption")
+      }
+
+    @unknown default: break
+    }
+  }
+
+  @objc private func handleRouteChange(_ notification: Notification) {
+    guard let reasonValue = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+          let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else { return }
+
+    let session = AVAudioSession.sharedInstance()
+
+    switch reason {
+    case .oldDeviceUnavailable:
+      if let previousRoute = notification.userInfo?[AVAudioSessionRouteChangePreviousRouteKey] as? AVAudioSessionRouteDescription {
+        let hadExternalOutput = previousRoute.outputs.contains { output in
+          [.headphones, .bluetoothA2DP, .bluetoothHFP, .bluetoothLE, .carAudio].contains(output.portType)
+        }
+        let nowSpeaker = session.currentRoute.outputs.contains { $0.portType == .builtInSpeaker }
+        if hadExternalOutput && nowSpeaker {
+          sendEvent("pause", reason: "routeDisconnected")
+        }
+      }
+
+    case .newDeviceAvailable:
+      break
+
+    case .override:
+      sendEvent("pause", reason: "siriOverride")
+
+    case .categoryChange:
+      break
+
+    default: break
+    }
+  }
+
+  @objc private func handleMediaServicesReset(_ notification: Notification) {
+    do {
+      let session = AVAudioSession.sharedInstance()
+      try session.setCategory(.playback, mode: .default, policy: .longFormAudio)
+      try session.setActive(true)
+    } catch {}
+  }
+
+  @objc private func handleSilenceSecondaryAudio(_ notification: Notification) {
+    guard let typeValue = notification.userInfo?[AVAudioSessionSilenceSecondaryAudioHintTypeKey] as? UInt,
+          let type = AVAudioSession.SilenceSecondaryAudioHintType(rawValue: typeValue) else { return }
+
+    switch type {
+    case .begin:
+      sendEvent("pause", reason: "secondaryAudio")
+    case .end:
+      break
+    @unknown default: break
+    }
   }
 
   private func setupNowPlayingChannel(messenger: FlutterBinaryMessenger) {
@@ -60,7 +163,9 @@ import MediaPlayer
         if let elapsed = args["elapsedTime"] as? Double {
           info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = NSNumber(value: elapsed)
         }
-        info[MPNowPlayingInfoPropertyPlaybackRate] = (args["playbackRate"] as? Double) ?? 1.0
+        let playbackRate = (args["playbackRate"] as? Double) ?? 1.0
+        self.isPlaybackActive = playbackRate > 0
+        info[MPNowPlayingInfoPropertyPlaybackRate] = playbackRate
 
         if let artwork = self.cachedArtwork {
           info[MPMediaItemPropertyArtwork] = artwork
