@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/categories.dart';
+import '../api/music_api.dart';
 import '../utils/toast.dart';
 
 class ModeDrawer extends StatefulWidget {
@@ -22,11 +23,13 @@ class ModeDrawer extends StatefulWidget {
 class _ModeDrawerState extends State<ModeDrawer> {
   static const _pinKey = 'pinned_playlists';
   final List<PlaylistInfo> _pinnedPlaylists = [];
+  final Map<String, String> _covers = {}; // id → coverUrl
 
   @override
   void initState() {
     super.initState();
     _loadPinned();
+    _loadCovers();
   }
 
   static String _encode(PlaylistInfo p) => '${p.id}|${p.name}';
@@ -68,6 +71,16 @@ class _ModeDrawerState extends State<ModeDrawer> {
     _pinnedPlaylists.removeWhere((e) => e.id == p.id);
     await _savePinned();
     if (mounted) setState(() {});
+  }
+
+  Future<void> _loadCovers() async {
+    for (final entry in playlistCategories.entries) {
+      for (final p in entry.value) {
+        MusicApi.getPlaylistCover(p.id).then((url) {
+          if (url.isNotEmpty && mounted) setState(() => _covers[p.id] = url);
+        });
+      }
+    }
   }
 
   @override
@@ -264,7 +277,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
   }
 
   Widget _buildPlaylistTile(PlaylistInfo p) {
-    final icon = playlistIcons[p.name] ?? Icons.music_note_outlined;
+    final cover = _covers[p.id];
     return GestureDetector(
       onTap: () {
         Navigator.pop(context);
@@ -279,7 +292,23 @@ class _ModeDrawerState extends State<ModeDrawer> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: Colors.white, size: 20),
+            if (cover != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Image.network(
+                  cover,
+                  width: 28,
+                  height: 28,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Icon(
+                      Icons.music_note_outlined,
+                      color: Colors.white,
+                      size: 20),
+                ),
+              )
+            else
+              const Icon(Icons.music_note_outlined,
+                  color: Colors.white, size: 20),
             const SizedBox(height: 4),
             Text(
               p.name,

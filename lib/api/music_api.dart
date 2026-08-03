@@ -1,6 +1,7 @@
 import '../services/settings_service.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/song.dart';
 
 class MusicApi {
@@ -94,6 +95,34 @@ class MusicApi {
       if (attempt < 30) await Future.delayed(const Duration(seconds: 1));
     }
     return [];
+  }
+
+  /// 获取歌单封面URL（每次启动从网络刷新，本地缓存仅作网络失败兜底）
+  static final Map<String, String> _playlistCoverCache = {};
+
+  static Future<String> getPlaylistCover(String id) async {
+    if (_playlistCoverCache.containsKey(id)) return _playlistCoverCache[id]!;
+    try {
+      final url = '$_base?types=playlist&id=${_enc(id)}';
+      final body = await _httpGet(url);
+      final json = jsonDecode(body);
+      if (json is Map && json['code'] == 200) {
+        final cover = json['playlist']?['coverImgUrl']?.toString() ?? '';
+        if (cover.isNotEmpty) {
+          _playlistCoverCache[id] = cover;
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('playlist_cover_$id', cover);
+          return cover;
+        }
+      }
+    } catch (_) {}
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString('playlist_cover_$id');
+    if (cached != null && cached.isNotEmpty) {
+      _playlistCoverCache[id] = cached;
+      return cached;
+    }
+    return '';
   }
 
   /// 获取播放URL（999=24bit FLAC无损，最多重试30次）
