@@ -67,35 +67,28 @@ class _MainPageState extends State<MainPage> {
     final hasSong = _player.currentSong != null;
     final onPlayerTab = _tab == 0;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: Color(0xFF1A1A1A), width: 0.5)),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildTextTab('收藏', 1),
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: onPlayerTab
-                ? (hasSong ? () => _player.togglePlayPause() : null)
-                : () => setState(() => _tab = 0),
-            child: SizedBox(width: 72, height: 52, child: Center(
-              child: onPlayerTab
-                  ? Container(
-                      width: 44, height: 44,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: hasSong ? _accent : const Color(0xFF666666), width: 2.5),
-                      ),
-                      child: Center(child: Icon(
-                        _player.isPlaying ? Icons.pause : Icons.play_arrow,
-                        color: hasSong ? _accent : const Color(0xFF666666), size: 22)),
-                    )
-                  : _MusicIndicator(playing: _player.isPlaying, color: _accent),
-            )),
-          ),
-          _buildTextTab('搜索', 2),
+          Expanded(child: _buildTextTab('收藏', 1)),
+          SizedBox(width: 64, height: 44, child: Center(
+            child: onPlayerTab
+                ? Container(
+                    width: 38, height: 38,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: hasSong ? _accent : const Color(0xFF666666), width: 2),
+                    ),
+                    child: Center(child: Icon(
+                      _player.isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: hasSong ? _accent : const Color(0xFF666666), size: 20)),
+                  )
+                : _MusicIndicator(playing: _player.isPlaying, color: _accent),
+          )),
+          Expanded(child: _buildTextTab('搜索', 2)),
         ],
       ),
     );
@@ -106,14 +99,13 @@ class _MainPageState extends State<MainPage> {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => setState(() => _tab = _tab == tabIndex ? 0 : tabIndex),
-      child: SizedBox(
-        width: 88, height: 48,
-        child: Center(
-          child: Text(label,
-            style: TextStyle(
-              color: active ? Colors.white : const Color(0xFF999999),
-              fontSize: 16, fontWeight: FontWeight.w500)),
-        ),
+      child: Container(
+        height: 44,
+        alignment: Alignment.center,
+        child: Text(label,
+          style: TextStyle(
+            color: active ? _accent : const Color(0xFF999999),
+            fontSize: 15, fontWeight: FontWeight.w500)),
       ),
     );
   }
