@@ -218,14 +218,16 @@ class _ModeDrawerState extends State<ModeDrawer> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: _pinnedPlaylists.map((p) => GestureDetector(
+          children: _pinnedPlaylists.map((p) {
+            final cover = _covers[p.id];
+            return GestureDetector(
             onTap: () {
               Navigator.pop(context);
               widget.onSelectPlaylist(p);
             },
             onLongPress: () => _unpinPlaylist(p),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: const Color(0xFF1A1A1A),
                 borderRadius: BorderRadius.circular(20),
@@ -233,13 +235,28 @@ class _ModeDrawerState extends State<ModeDrawer> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.push_pin_outlined, color: Colors.white, size: 14),
-                  const SizedBox(width: 4),
+                  if (cover != null)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: Image.network(
+                          cover,
+                          width: 20,
+                          height: 20,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(
+                              Icons.music_note_outlined,
+                              color: Colors.white,
+                              size: 16),
+                        ),
+                      ),
+                    ),
                   Text(p.name, style: const TextStyle(color: Colors.white, fontSize: 13)),
                 ],
               ),
             ),
-          )).toList(),
+          );}).toList(),
         ),
       ],
     );
