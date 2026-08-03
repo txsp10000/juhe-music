@@ -3,7 +3,8 @@ import '../services/favorites_service.dart';
 import 'search_result_page.dart';
 
 class SearchPage extends StatefulWidget {
-  const SearchPage({super.key});
+  final bool embedded;
+  const SearchPage({super.key, this.embedded = false});
 
   @override
   State<SearchPage> createState() => _SearchPageState();
@@ -54,10 +55,13 @@ class _SearchPageState extends State<SearchPage> {
       backgroundColor: _bg,
       appBar: AppBar(
         backgroundColor: _bg,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: _textSecondary),
-          onPressed: () => Navigator.pop(context),
-        ),
+        automaticallyImplyLeading: false,
+        leading: widget.embedded
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back, color: _textSecondary),
+                onPressed: () => Navigator.pop(context),
+              ),
         title: TextField(
           controller: _controller,
           autofocus: true,

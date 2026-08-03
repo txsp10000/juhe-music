@@ -512,7 +512,7 @@ class _PlayerPageState extends State<PlayerPage> {
             if (song != null) _buildDownloadProgress(),
             if (song != null) _buildBottomActions(),
             if (song != null) _buildTimeBar(),
-            if (widget.isRoot) _buildBottomTab(),
+            if (!widget.isRoot) _buildBottomTab(),
           ],
         ),
       ),
@@ -645,11 +645,11 @@ class _PlayerPageState extends State<PlayerPage> {
         padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Column(
           children: [
-            const SizedBox(height: 32),
-            // 封面图
+            const SizedBox(height: 16),
+            // 封面图（缩小）
             Container(
-              width: MediaQuery.of(context).size.width * 0.75,
-              height: MediaQuery.of(context).size.width * 0.75,
+              width: MediaQuery.of(context).size.width * 0.6,
+              height: MediaQuery.of(context).size.width * 0.6,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 color: _cardColor,
@@ -658,16 +658,16 @@ class _PlayerPageState extends State<PlayerPage> {
               child: _coverBytes != null
                   ? Image.memory(_coverBytes!, fit: BoxFit.cover)
                   : const Center(
-                      child: Icon(Icons.music_note, color: _textTertiary, size: 64),
+                      child: Icon(Icons.music_note, color: _textTertiary, size: 56),
                     ),
             ),
-            const SizedBox(height: 24),
-            // 歌词区域
+            const SizedBox(height: 16),
+            // 歌词区域（上移）
             if (hasLrc)
               _buildLyricArea()
             else
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text(
                   _firstLyric(song.lyric),
                   style: const TextStyle(color: _textSecondary, fontSize: 18),
@@ -804,7 +804,7 @@ class _PlayerPageState extends State<PlayerPage> {
   Widget _buildBottomTab() {
     final hasSong = _player.currentSong != null;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: Color(0xFF1A1A1A), width: 0.5)),
       ),
@@ -814,13 +814,14 @@ class _PlayerPageState extends State<PlayerPage> {
           GestureDetector(
             onTap: () => Navigator.push(
                 context, MaterialPageRoute(builder: (_) => const SearchPage())),
-            child: const Icon(Icons.search, color: _textSecondary, size: 26),
+            child: const Text('搜索',
+                style: TextStyle(color: _textSecondary, fontSize: 16, fontWeight: FontWeight.w500)),
           ),
           GestureDetector(
             onTap: hasSong ? () => _player.togglePlayPause() : null,
             child: Container(
-              width: 50,
-              height: 50,
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
@@ -838,7 +839,8 @@ class _PlayerPageState extends State<PlayerPage> {
           GestureDetector(
             onTap: () => Navigator.push(
                 context, MaterialPageRoute(builder: (_) => const FavoritesPage())),
-            child: const Icon(Icons.favorite_border, color: _textSecondary, size: 26),
+            child: const Text('收藏',
+                style: TextStyle(color: _textSecondary, fontSize: 16, fontWeight: FontWeight.w500)),
           ),
         ],
       ),
@@ -847,7 +849,7 @@ class _PlayerPageState extends State<PlayerPage> {
 
   Widget _buildBottomActions() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -856,28 +858,28 @@ class _PlayerPageState extends State<PlayerPage> {
             child: Icon(
               _isFavorite ? Icons.favorite : Icons.favorite_border,
               color: _isFavorite ? Colors.red : _textSecondary,
-              size: 26,
+              size: 30,
             ),
           ),
           GestureDetector(
             onTap: _showSearchSameSheet,
-            child: const Icon(Icons.search, color: _textSecondary, size: 26),
+            child: const Icon(Icons.search, color: _textSecondary, size: 30),
           ),
           GestureDetector(
             onTap: _showQualityPicker,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: _textTertiary),
               ),
               child: Text(_qualityLabel(),
-                  style: const TextStyle(color: _textSecondary, fontSize: 13)),
+                  style: const TextStyle(color: _textSecondary, fontSize: 14)),
             ),
           ),
           GestureDetector(
             onTap: _showPlaylistSheet,
-            child: const Icon(Icons.queue_music, color: _textSecondary, size: 26),
+            child: const Icon(Icons.queue_music, color: _textSecondary, size: 30),
           ),
         ],
       ),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'pages/player_page.dart';
+import 'pages/main_page.dart';
 import 'services/player_service.dart';
 import 'services/settings_service.dart';
 import 'services/audio_cache_service.dart';
@@ -33,7 +33,7 @@ class MusicApp extends StatelessWidget {
         ),
         fontFamily: 'sans-serif',
       ),
-      home: const PlayerPage(isRoot: true),
+      home: const MainPage(),
     );
   }
 }

@@ -6,121 +6,92 @@
 <title>苗苗Music - 最新界面预览</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', sans-serif;
-  background: #111;
-  color: #fff;
-  padding: 40px 20px;
-}
-h1 { text-align: center; font-size: 28px; font-weight: 700; margin-bottom: 8px; color: #fff; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', sans-serif; background: #111; color: #fff; padding: 40px 20px; }
+h1 { text-align: center; font-size: 28px; font-weight: 700; margin-bottom: 8px; }
 .subtitle { text-align: center; color: #999; font-size: 14px; margin-bottom: 48px; }
 .screens { display: flex; flex-wrap: wrap; justify-content: center; gap: 32px; }
-.phone {
-  width: 375px; min-height: 750px;
-  border-radius: 40px; border: 3px solid #333;
-  overflow: hidden; position: relative;
-  background: #000;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.8);
-}
+.phone { width: 375px; min-height: 780px; border-radius: 40px; border: 3px solid #333; overflow: hidden; background: #000; box-shadow: 0 20px 60px rgba(0,0,0,0.8); display: flex; flex-direction: column; }
 .phone-label { text-align: center; color: #999; font-size: 13px; margin-top: 12px; font-weight: 500; }
-.status-bar { height: 44px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: #fff; background: #000; }
-
-/* ===== Common ===== */
-.top-bar { display: flex; align-items: center; padding: 8px 16px 0; }
-.top-bar .left { display: flex; align-items: center; gap: 6px; color: #fff; font-size: 14px; font-weight: 500; }
-.top-bar .left .menu-icon { font-size: 20px; }
+.status-bar { height: 44px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: #fff; flex-shrink: 0; }
+.top-bar { display: flex; align-items: center; padding: 8px 16px 0; flex-shrink: 0; }
+.top-bar .left { font-size: 22px; color: #fff; width: 40px; }
 .top-bar .center { flex: 1; text-align: center; }
-.top-bar .right { font-size: 22px; color: #fff; padding: 0 4px; }
+.top-bar .center .name { font-size: 18px; font-weight: 600; }
+.top-bar .center .meta { font-size: 13px; color: #999; margin-top: 2px; }
+.top-bar .right { width: 40px; }
 
-/* ===== 播放器 - 空状态 ===== */
-.player-empty { background: #000; display: flex; flex-direction: column; min-height: 706px; }
-.empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.empty-state .icon { font-size: 72px; color: #666; }
-.empty-state .text { color: #999; font-size: 15px; margin-top: 20px; }
-.empty-state .btn { margin-top: 16px; padding: 12px 24px; border: 1px solid #666; border-radius: 24px; color: #fff; font-size: 14px; }
-.controls-row { display: flex; align-items: center; justify-content: center; gap: 24px; padding: 12px 0 20px; }
-.ctrl-icon { font-size: 30px; }
-.play-btn { width: 64px; height: 64px; border-radius: 50%; border: 2.5px solid; display: flex; align-items: center; justify-content: center; font-size: 28px; }
-.disabled { color: #666; border-color: #666; }
-.enabled { color: #fff; border-color: #fff; }
+/* 内容区 */
+.content { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 8px 32px; overflow: hidden; }
+.cover { width: 225px; height: 225px; border-radius: 16px; background: #1A1A1A; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.cover .img { width: 100%; height: 100%; border-radius: 16px; background: linear-gradient(135deg, #1a1530 0%, #0f1a2a 50%, #0a0f1a 100%); display: flex; align-items: center; justify-content: center; font-size: 42px; color: #666; }
+.lyrics { margin-top: 14px; text-align: center; width: 100%; }
+.lyrics .line { font-size: 15px; color: #666; line-height: 2.2; }
+.lyrics .line.active { color: #fff; font-size: 20px; font-weight: 600; }
 
-/* ===== 播放器 - 播放中 ===== */
-.player-playing { background: #000; display: flex; flex-direction: column; min-height: 706px; }
-.cover-area { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 20px 32px 0; overflow: hidden; }
-.cover-img { width: 280px; height: 280px; border-radius: 16px; background: #1A1A1A; display: flex; align-items: center; justify-content: center; }
-.cover-img .mock { width: 100%; height: 100%; background: linear-gradient(135deg, #2a1a3a 0%, #1a2a3a 50%, #0a1a2a 100%); display: flex; align-items: center; justify-content: center; font-size: 48px; border-radius: 16px; }
-.lyric-section { margin-top: 20px; text-align: center; width: 100%; }
-.lyric-line { font-size: 15px; color: #666; line-height: 2.2; }
-.lyric-line.active { color: #fff; font-size: 20px; font-weight: 600; }
-
-/* 功能按钮行 - 在进度条上方 */
-.action-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 32px 4px; }
-.action-row .action { font-size: 18px; color: #999; }
-.action-row .action.fav { color: #ff4444; }
-.action-row .q-badge { font-size: 11px; color: #999; border: 1px solid #666; border-radius: 10px; padding: 3px 8px; }
+/* 功能按钮行（加大+上移） */
+.actions { display: flex; justify-content: space-between; align-items: center; padding: 12px 28px; flex-shrink: 0; }
+.actions .act { font-size: 27px; color: #999; }
+.actions .act.fav { color: #ff4444; }
+.actions .q-badge { font-size: 14px; color: #999; border: 1px solid #666; border-radius: 12px; padding: 5px 12px; }
 
 /* 进度条 */
-.seek-bar { padding: 0 24px; }
-.seek-track { width: 100%; height: 2.5px; background: #333; border-radius: 2px; position: relative; }
+.seek { padding: 0 24px; flex-shrink: 0; }
+.seek-track { width: 100%; height: 2.5px; background: #333; border-radius: 2px; position: relative; margin-bottom: 6px; }
 .seek-fill { width: 35%; height: 100%; background: #fff; border-radius: 2px; }
 .seek-thumb { width: 10px; height: 10px; border-radius: 50%; background: #fff; position: absolute; top: -3.5px; left: 35%; transform: translateX(-50%); }
-.seek-times { display: flex; justify-content: space-between; font-size: 11px; color: #999; margin-top: 6px; }
+.seek-times { display: flex; justify-content: space-between; font-size: 11px; color: #999; }
 
-/* ===== 底部半屏弹窗 ===== */
-.sheet-overlay { position: absolute; bottom: 0; left: 0; right: 0; top: 0; }
-.sheet-bg { position: absolute; inset: 0; background: rgba(0,0,0,0.5); }
-.sheet-panel {
-  position: absolute; bottom: 0; left: 0; right: 0;
-  background: #1A1A1A;
-  border-radius: 16px 16px 0 0;
-  padding: 0 0 20px;
-}
+/* 底部Tab（文字版） */
+.tab-bar { display: flex; align-items: center; justify-content: space-evenly; padding: 14px 0; border-top: 0.5px solid #1A1A1A; flex-shrink: 0; }
+.tab-bar .tab-text { font-size: 16px; color: #999; font-weight: 500; }
+.tab-bar .play-btn { width: 52px; height: 52px; border-radius: 50%; border: 2.5px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 22px; color: #fff; }
+.tab-bar .play-btn.disabled { border-color: #666; color: #666; }
+
+/* 空状态 */
+.empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.empty .icon { font-size: 72px; color: #666; }
+.empty .text { color: #999; font-size: 15px; margin-top: 20px; }
+.empty .btn { margin-top: 16px; padding: 12px 24px; border: 1px solid #666; border-radius: 24px; font-size: 14px; color: #fff; }
+
+/* 抽屉 */
+.drawer-wrap { display: flex; min-height: 736px; }
+.drawer { width: 85%; background: #000; padding: 16px; overflow-y: auto; }
+.drawer-bg { width: 15%; background: rgba(0,0,0,0.6); }
+.drawer h2 { font-size: 24px; font-weight: 700; margin-bottom: 20px; padding: 0 4px; }
+.mode-btn { width: 100%; padding: 14px; background: #1A1A1A; border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; font-weight: 500; margin-bottom: 10px; }
+.mode-btn .m-icon { font-size: 18px; }
+.section-title { font-size: 14px; color: #999; font-weight: 500; margin: 20px 0 10px; }
+.cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.cat-tile { background: #1A1A1A; border-radius: 10px; padding: 12px 4px; text-align: center; }
+.cat-tile .c-icon { font-size: 18px; color: #fff; }
+.cat-tile .c-label { font-size: 12px; color: #fff; margin-top: 4px; }
+.pinned-area { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.pinned-chip { background: #1A1A1A; border-radius: 20px; padding: 8px 14px; font-size: 13px; display: flex; align-items: center; gap: 4px; }
+.pinned-chip .p-icon { font-size: 12px; color: #fff; }
+
+/* 半屏弹窗 */
+.sheet-wrap { position: relative; min-height: 736px; display: flex; flex-direction: column; }
+.sheet-bg-dim { position: absolute; inset: 0; background: rgba(0,0,0,0.5); }
+.sheet { position: absolute; bottom: 0; left: 0; right: 0; background: #1A1A1A; border-radius: 16px 16px 0 0; padding-bottom: 16px; }
 .sheet-handle { width: 36px; height: 4px; background: #666; border-radius: 2px; margin: 8px auto 16px; }
 .sheet-title { text-align: center; font-size: 16px; font-weight: 600; margin-bottom: 12px; }
 .sheet-item { display: flex; align-items: center; padding: 14px 20px; }
-.sheet-item .label { flex: 1; font-size: 15px; color: #999; }
-.sheet-item .label.sel { color: #fff; font-weight: 600; }
-.sheet-item .check { color: #fff; font-size: 18px; }
-.sheet-item .icon { color: #fff; margin-right: 14px; font-size: 18px; }
+.sheet-item .s-label { flex: 1; font-size: 15px; color: #999; }
+.sheet-item .s-label.sel { color: #fff; font-weight: 600; }
+.sheet-item .s-check { color: #fff; font-size: 18px; }
 
-/* 播放列表弹窗 */
-.playlist-item { display: flex; align-items: center; padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.03); }
-.playlist-item.current { background: rgba(255,255,255,0.05); }
-.pl-idx { width: 26px; text-align: center; font-size: 13px; color: #666; }
-.pl-idx.active { color: #fff; font-size: 15px; }
-.pl-info { flex: 1; margin-left: 14px; }
-.pl-name { font-size: 15px; color: #999; }
-.pl-name.active { color: #fff; font-weight: 600; }
-.pl-artist { font-size: 12px; color: #666; margin-top: 3px; }
-
-/* ===== 模式选择抽屉 ===== */
-.drawer-screen { background: #000; display: flex; min-height: 706px; }
-.drawer-panel { width: 85%; background: #000; padding: 16px; overflow-y: auto; }
-.drawer-right { width: 15%; background: rgba(0,0,0,0.6); }
-.drawer-header { display: flex; align-items: center; justify-content: space-between; padding: 0 4px 20px; }
-.drawer-header h2 { font-size: 24px; font-weight: 700; }
-.drawer-header .close { font-size: 20px; color: #999; }
-.mode-btn { width: 100%; padding: 14px; background: #1A1A1A; border-radius: 12px; text-align: center; font-size: 16px; font-weight: 500; color: #fff; margin-bottom: 10px; }
-.drawer-section-title { font-size: 14px; color: #999; font-weight: 500; margin: 20px 0 10px; }
-.pinned-area { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-.pinned-chip { background: #1A1A1A; border-radius: 20px; padding: 8px 14px; font-size: 13px; color: #fff; }
-.cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.cat-tile { background: #1A1A1A; border-radius: 10px; padding: 12px 4px; text-align: center; }
-.cat-tile .icon { font-size: 20px; color: #fff; }
-.cat-tile .label { font-size: 12px; color: #fff; margin-top: 4px; }
-
-/* ===== 搜索页 ===== */
-.search-screen { background: #000; min-height: 706px; }
+/* 搜索页 */
+.search-screen { background: #000; min-height: 736px; }
 .search-header { display: flex; align-items: center; padding: 12px 16px; gap: 12px; }
 .search-header .back { font-size: 20px; color: #999; }
 .search-input { flex: 1; background: #1A1A1A; border-radius: 8px; padding: 10px 14px; color: #fff; font-size: 15px; }
-.search-list-item { display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.03); }
-.search-list-item .s-icon { color: #999; margin-right: 14px; font-size: 16px; }
-.search-list-item .s-text { color: #fff; font-size: 15px; flex: 1; }
-.search-list-item .s-del { color: #666; font-size: 14px; }
+.search-item { display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.search-item .si-icon { color: #999; margin-right: 14px; }
+.search-item .si-text { flex: 1; font-size: 15px; }
+.search-item .si-del { color: #666; font-size: 14px; }
 
-/* ===== 收藏页 ===== */
-.fav-screen { background: #000; min-height: 706px; }
+/* 收藏页 */
+.fav-screen { background: #000; min-height: 736px; }
 .fav-header { display: flex; align-items: center; padding: 12px 16px; }
 .fav-header .back { font-size: 20px; color: #999; }
 .fav-header .title { flex: 1; text-align: center; font-size: 17px; font-weight: 600; }
@@ -128,281 +99,247 @@ h1 { text-align: center; font-size: 28px; font-weight: 700; margin-bottom: 8px; 
 .fav-item { display: flex; align-items: center; padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.03); }
 .fav-item.playing { background: rgba(255,255,255,0.05); }
 .fav-idx { width: 26px; text-align: center; font-size: 13px; color: #666; }
-.fav-idx.active { color: #fff; font-size: 15px; }
+.fav-idx.active { color: #fff; }
 .fav-info { flex: 1; margin-left: 14px; }
-.fav-name { font-size: 15px; color: #fff; }
+.fav-name { font-size: 15px; }
 .fav-name.active { font-weight: 600; }
 .fav-artist { font-size: 12px; color: #999; margin-top: 3px; }
+
+/* 滑动提示 */
+.swipe-hint { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); background: rgba(26,26,26,0.9); border-radius: 12px; padding: 12px 20px; text-align: center; }
+.swipe-hint .arrow { font-size: 20px; color: #fff; }
+.swipe-hint .hint-text { font-size: 12px; color: #999; margin-top: 4px; }
 </style>
 </head>
 <body>
 
 <h1>苗苗Music</h1>
-<p class="subtitle">iOS 界面设计预览 — 纯黑极简风格 (最新版)</p>
+<p class="subtitle">iOS 界面设计预览 — 最新版（小封面 · 大按钮 · 文字Tab）</p>
 
 <div class="screens">
 
-<!-- ===== 播放器 - 空状态 ===== -->
+<!-- 空状态 -->
 <div>
 <div class="phone">
   <div class="status-bar">9:41</div>
-  <div class="player-empty">
-    <div class="top-bar">
-      <div class="left"><span class="menu-icon">☰</span><span>模式选择</span></div>
-      <div class="center"></div>
-      <div class="right">🔍</div>
-    </div>
-    <div class="empty-state">
-      <div class="icon">♪</div>
-      <div class="text">点击左上角「模式选择」开始听歌</div>
-      <div class="btn">选择模式</div>
-    </div>
-    <div class="controls-row">
-      <span class="ctrl-icon disabled">⏮</span>
-      <div class="play-btn disabled">▶</div>
-      <span class="ctrl-icon disabled">⏭</span>
-    </div>
+  <div class="top-bar">
+    <div class="left">☰</div>
+    <div class="center"></div>
+    <div class="right"></div>
+  </div>
+  <div class="empty">
+    <div class="icon">♪</div>
+    <div class="text">点击左上角选择听歌模式</div>
+    <div class="btn">选择模式</div>
+  </div>
+  <div class="tab-bar">
+    <span class="tab-text">搜索</span>
+    <div class="play-btn disabled">▶</div>
+    <span class="tab-text">收藏</span>
   </div>
 </div>
 <p class="phone-label">主页 - 空状态</p>
 </div>
 
-<!-- ===== 播放器 - 播放中 ===== -->
+<!-- 播放中 -->
 <div>
 <div class="phone">
   <div class="status-bar">9:41</div>
-  <div class="player-playing">
-    <div class="top-bar">
-      <div class="left"><span class="menu-icon">☰</span><span>模式选择</span></div>
-      <div class="center" style="font-size:14px;">
-        <div style="font-weight:600">一笑江湖</div>
-        <div style="font-size:12px;color:#999;margin-top:2px">栖言  320kbps</div>
-      </div>
-      <div class="right">🔍</div>
+  <div class="top-bar">
+    <div class="left">☰</div>
+    <div class="center">
+      <div class="name">一笑江湖</div>
+      <div class="meta">栖言  320kbps</div>
     </div>
-    <div class="cover-area">
-      <div class="cover-img"><div class="mock">🎵</div></div>
-      <div class="lyric-section">
-        <div class="lyric-line">故事的小黄花</div>
-        <div class="lyric-line active">看惯刀光照亮过黑夜</div>
-        <div class="lyric-line">侠骨魔心如何来分辨</div>
-      </div>
+    <div class="right"></div>
+  </div>
+  <div class="content" style="position:relative">
+    <div class="cover"><div class="img">🎵</div></div>
+    <div class="lyrics">
+      <div class="line">故事的小黄花</div>
+      <div class="line active">看惯刀光照亮过黑夜</div>
+      <div class="line">侠骨魔心如何来分辨</div>
     </div>
-    <!-- 功能按钮在进度条上方 -->
-    <div class="action-row">
-      <span class="action fav">❤</span>
-      <span class="action">🔍</span>
-      <span class="q-badge">320k</span>
-      <span class="action">☰</span>
+    <div class="swipe-hint">
+      <div class="arrow">↕</div>
+      <div class="hint-text">上下滑动切歌</div>
     </div>
-    <div class="seek-bar">
-      <div class="seek-track"><div class="seek-fill"></div><div class="seek-thumb"></div></div>
-      <div class="seek-times"><span>1:23</span><span>4:02</span></div>
-    </div>
-    <div class="controls-row">
-      <span class="ctrl-icon enabled">⏮</span>
-      <div class="play-btn enabled">⏸</div>
-      <span class="ctrl-icon enabled">⏭</span>
-    </div>
+  </div>
+  <div class="actions">
+    <span class="act fav">❤</span>
+    <span class="act">🔍</span>
+    <span class="q-badge">320k</span>
+    <span class="act">☰</span>
+  </div>
+  <div class="seek">
+    <div class="seek-track"><div class="seek-fill"></div><div class="seek-thumb"></div></div>
+    <div class="seek-times"><span>1:23</span><span>4:02</span></div>
+  </div>
+  <div class="tab-bar">
+    <span class="tab-text">搜索</span>
+    <div class="play-btn">⏸</div>
+    <span class="tab-text">收藏</span>
   </div>
 </div>
 <p class="phone-label">主页 - 播放中</p>
 </div>
 
-<!-- ===== 音质选择 (底部半屏弹窗) ===== -->
+<!-- 模式选择抽屉 -->
 <div>
 <div class="phone">
   <div class="status-bar">9:41</div>
-  <div class="player-playing" style="position:relative">
-    <div class="top-bar">
-      <div class="left"><span class="menu-icon">☰</span><span>模式选择</span></div>
-      <div class="center" style="font-size:14px;"><div style="font-weight:600">一笑江湖</div></div>
-      <div class="right">🔍</div>
-    </div>
-    <div class="cover-area" style="opacity:0.4">
-      <div class="cover-img"><div class="mock">🎵</div></div>
-    </div>
-    <!-- 半屏弹窗 -->
-    <div class="sheet-overlay">
-      <div class="sheet-bg"></div>
-      <div class="sheet-panel">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title">音质</div>
-        <div class="sheet-item"><span class="label">标准 (128kbps)</span></div>
-        <div class="sheet-item"><span class="label">较高 (192kbps)</span></div>
-        <div class="sheet-item"><span class="label sel">高品质 (320kbps)</span><span class="check">✓</span></div>
-        <div class="sheet-item"><span class="label">无损 16bit (FLAC)</span></div>
-        <div class="sheet-item"><span class="label">无损 24bit (Hi-Res)</span></div>
-      </div>
-    </div>
-  </div>
-</div>
-<p class="phone-label">音质选择 (半屏弹窗)</p>
-</div>
-
-<!-- ===== 播放列表 (底部半屏弹窗) ===== -->
-<div>
-<div class="phone">
-  <div class="status-bar">9:41</div>
-  <div class="player-playing" style="position:relative">
-    <div class="top-bar">
-      <div class="left"><span class="menu-icon">☰</span><span>模式选择</span></div>
-      <div class="center" style="font-size:14px;"><div style="font-weight:600">一笑江湖</div></div>
-      <div class="right">🔍</div>
-    </div>
-    <div class="cover-area" style="opacity:0.4">
-      <div class="cover-img"><div class="mock">🎵</div></div>
-    </div>
-    <!-- 播放列表半屏弹窗 -->
-    <div class="sheet-overlay">
-      <div class="sheet-bg"></div>
-      <div class="sheet-panel" style="max-height: 55%;">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title">播放列表 (5)</div>
-        <div class="playlist-item current">
-          <span class="pl-idx active">🔊</span>
-          <div class="pl-info"><div class="pl-name active">一笑江湖</div><div class="pl-artist">栖言</div></div>
-        </div>
-        <div class="playlist-item">
-          <span class="pl-idx">2</span>
-          <div class="pl-info"><div class="pl-name">晴天</div><div class="pl-artist">周杰伦</div></div>
-        </div>
-        <div class="playlist-item">
-          <span class="pl-idx">3</span>
-          <div class="pl-info"><div class="pl-name">稻香</div><div class="pl-artist">周杰伦</div></div>
-        </div>
-        <div class="playlist-item">
-          <span class="pl-idx">4</span>
-          <div class="pl-info"><div class="pl-name">起风了</div><div class="pl-artist">买辣椒也用券</div></div>
-        </div>
-        <div class="playlist-item">
-          <span class="pl-idx">5</span>
-          <div class="pl-info"><div class="pl-name">平凡之路</div><div class="pl-artist">朴树</div></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-<p class="phone-label">播放列表 (半屏弹窗)</p>
-</div>
-
-<!-- ===== 模式选择抽屉 ===== -->
-<div>
-<div class="phone">
-  <div class="status-bar">9:41</div>
-  <div class="drawer-screen">
-    <div class="drawer-panel">
-      <div class="drawer-header">
-        <h2>听歌模式</h2>
-        <span class="close">✕</span>
-      </div>
-      <div class="mode-btn">▶  默认模式</div>
-      <div class="mode-btn">♡  收藏模式</div>
-      <div class="mode-btn">⟳  随机模式</div>
-      <div class="drawer-section-title">已置顶</div>
+  <div class="drawer-wrap">
+    <div class="drawer">
+      <h2>听歌模式</h2>
+      <div class="mode-btn"><span class="m-icon">▶</span> 默认模式</div>
+      <div class="mode-btn"><span class="m-icon">♡</span> 收藏模式</div>
+      <div class="mode-btn"><span class="m-icon">⟳</span> 随机模式</div>
+      <div class="section-title">已置顶</div>
       <div class="pinned-area">
-        <div class="pinned-chip">📌 华语</div>
-        <div class="pinned-chip">📌 流行</div>
-        <div class="pinned-chip">📌 助眠</div>
+        <div class="pinned-chip"><span class="p-icon">📌</span> 华语</div>
+        <div class="pinned-chip"><span class="p-icon">📌</span> 流行</div>
+        <div class="pinned-chip"><span class="p-icon">📌</span> 助眠</div>
       </div>
-      <div class="drawer-section-title">语种</div>
+      <div class="section-title">语种</div>
       <div class="cat-grid">
-        <div class="cat-tile"><div class="icon">♪</div><div class="label">华语</div></div>
-        <div class="cat-tile"><div class="icon">♫</div><div class="label">欧美</div></div>
-        <div class="cat-tile"><div class="icon">〄</div><div class="label">日语</div></div>
-        <div class="cat-tile"><div class="icon">♩</div><div class="label">韩语</div></div>
-        <div class="cat-tile"><div class="icon">♬</div><div class="label">粤语</div></div>
-        <div class="cat-tile"><div class="icon">◎</div><div class="label">小语种</div></div>
+        <div class="cat-tile"><div class="c-icon">♪</div><div class="c-label">华语</div></div>
+        <div class="cat-tile"><div class="c-icon">🌐</div><div class="c-label">欧美</div></div>
+        <div class="cat-tile"><div class="c-icon">⚑</div><div class="c-label">日语</div></div>
+        <div class="cat-tile"><div class="c-icon">文</div><div class="c-label">韩语</div></div>
+        <div class="cat-tile"><div class="c-icon">🎤</div><div class="c-label">粤语</div></div>
+        <div class="cat-tile"><div class="c-icon">◎</div><div class="c-label">小语种</div></div>
       </div>
-      <div class="drawer-section-title">场景</div>
+      <div class="section-title">场景</div>
       <div class="cat-grid">
-        <div class="cat-tile"><div class="icon">☀</div><div class="label">清晨</div></div>
-        <div class="cat-tile"><div class="icon">☽</div><div class="label">夜晚</div></div>
-        <div class="cat-tile"><div class="icon">☾</div><div class="label">助眠</div></div>
-        <div class="cat-tile"><div class="icon">✎</div><div class="label">学习</div></div>
-        <div class="cat-tile"><div class="icon">⚙</div><div class="label">工作</div></div>
-        <div class="cat-tile"><div class="icon">⚽</div><div class="label">运动</div></div>
+        <div class="cat-tile"><div class="c-icon">☀</div><div class="c-label">清晨</div></div>
+        <div class="cat-tile"><div class="c-icon">🌙</div><div class="c-label">夜晚</div></div>
+        <div class="cat-tile"><div class="c-icon">⏰</div><div class="c-label">助眠</div></div>
+        <div class="cat-tile"><div class="c-icon">📖</div><div class="c-label">学习</div></div>
+        <div class="cat-tile"><div class="c-icon">⚙</div><div class="c-label">工作</div></div>
+        <div class="cat-tile"><div class="c-icon">🏋</div><div class="c-label">运动</div></div>
       </div>
-      <div class="drawer-section-title">心情</div>
+      <div class="section-title">心情</div>
       <div class="cat-grid">
-        <div class="cat-tile"><div class="icon">☹</div><div class="label">伤感</div></div>
-        <div class="cat-tile"><div class="icon">✚</div><div class="label">治愈</div></div>
-        <div class="cat-tile"><div class="icon">☺</div><div class="label">快乐</div></div>
-        <div class="cat-tile"><div class="icon">⚑</div><div class="label">励志</div></div>
-        <div class="cat-tile"><div class="icon">∼</div><div class="label">放松</div></div>
-        <div class="cat-tile"><div class="icon">☁</div><div class="label">慵懒</div></div>
+        <div class="cat-tile"><div class="c-icon">😢</div><div class="c-label">伤感</div></div>
+        <div class="cat-tile"><div class="c-icon">✚</div><div class="c-label">治愈</div></div>
+        <div class="cat-tile"><div class="c-icon">😊</div><div class="c-label">快乐</div></div>
+        <div class="cat-tile"><div class="c-icon">⚑</div><div class="c-label">励志</div></div>
+        <div class="cat-tile"><div class="c-icon">~</div><div class="c-label">放松</div></div>
+        <div class="cat-tile"><div class="c-icon">☁</div><div class="c-label">慵懒</div></div>
       </div>
     </div>
-    <div class="drawer-right"></div>
+    <div class="drawer-bg"></div>
   </div>
 </div>
 <p class="phone-label">模式选择抽屉</p>
 </div>
 
-<!-- ===== 搜索页 ===== -->
+<!-- 音质弹窗 -->
 <div>
 <div class="phone">
   <div class="status-bar">9:41</div>
-  <div class="search-screen">
+  <div class="sheet-wrap">
+    <div class="top-bar" style="position:relative;z-index:1">
+      <div class="left">☰</div>
+      <div class="center"><div class="name" style="opacity:0.4">一笑江湖</div></div>
+      <div class="right"></div>
+    </div>
+    <div class="content" style="opacity:0.3;position:relative;z-index:1">
+      <div class="cover"><div class="img">🎵</div></div>
+    </div>
+    <div class="sheet-bg-dim"></div>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">音质</div>
+      <div class="sheet-item"><span class="s-label">标准 (128kbps)</span></div>
+      <div class="sheet-item"><span class="s-label">较高 (192kbps)</span></div>
+      <div class="sheet-item"><span class="s-label sel">高品质 (320kbps)</span><span class="s-check">✓</span></div>
+      <div class="sheet-item"><span class="s-label">无损 16bit (FLAC)</span></div>
+      <div class="sheet-item"><span class="s-label">无损 24bit (Hi-Res)</span></div>
+    </div>
+  </div>
+</div>
+<p class="phone-label">音质选择（半屏弹窗）</p>
+</div>
+
+<!-- 播放列表弹窗 -->
+<div>
+<div class="phone">
+  <div class="status-bar">9:41</div>
+  <div class="sheet-wrap">
+    <div class="top-bar" style="position:relative;z-index:1">
+      <div class="left">☰</div>
+      <div class="center"><div class="name" style="opacity:0.4">一笑江湖</div></div>
+      <div class="right"></div>
+    </div>
+    <div class="content" style="opacity:0.3;position:relative;z-index:1">
+      <div class="cover"><div class="img">🎵</div></div>
+    </div>
+    <div class="sheet-bg-dim"></div>
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">播放列表 (5)</div>
+      <div class="fav-item playing"><span class="fav-idx active">🔊</span><div class="fav-info"><div class="fav-name active">一笑江湖</div><div class="fav-artist">栖言</div></div></div>
+      <div class="fav-item"><span class="fav-idx">2</span><div class="fav-info"><div class="fav-name">晴天</div><div class="fav-artist">周杰伦</div></div></div>
+      <div class="fav-item"><span class="fav-idx">3</span><div class="fav-info"><div class="fav-name">稻香</div><div class="fav-artist">周杰伦</div></div></div>
+      <div class="fav-item"><span class="fav-idx">4</span><div class="fav-info"><div class="fav-name">起风了</div><div class="fav-artist">买辣椒也用券</div></div></div>
+      <div class="fav-item"><span class="fav-idx">5</span><div class="fav-info"><div class="fav-name">平凡之路</div><div class="fav-artist">朴树</div></div></div>
+    </div>
+  </div>
+</div>
+<p class="phone-label">播放列表（半屏弹窗）</p>
+</div>
+
+<!-- 搜索页 -->
+<div>
+<div class="phone">
+  <div class="status-bar">9:41</div>
+  <div class="search-screen" style="flex:1;min-height:0;display:flex;flex-direction:column">
     <div class="search-header">
-      <span class="back">←</span>
       <div class="search-input">周杰伦</div>
     </div>
-    <div class="search-list-item"><span class="s-icon">⏱</span><span class="s-text">周杰伦</span><span class="s-del">✕</span></div>
-    <div class="search-list-item"><span class="s-icon">⏱</span><span class="s-text">起风了</span><span class="s-del">✕</span></div>
-    <div class="search-list-item"><span class="s-icon">⏱</span><span class="s-text">流行歌单</span><span class="s-del">✕</span></div>
-    <div class="search-list-item"><span class="s-icon">⏱</span><span class="s-text">助眠</span><span class="s-del">✕</span></div>
-    <div class="search-list-item"><span class="s-icon">⏱</span><span class="s-text">民谣</span><span class="s-del">✕</span></div>
-    <div class="search-list-item"><span class="s-icon">⏱</span><span class="s-text">陈奕迅</span><span class="s-del">✕</span></div>
+    <div class="search-item"><span class="si-icon">⏱</span><span class="si-text">周杰伦</span><span class="si-del">✕</span></div>
+    <div class="search-item"><span class="si-icon">⏱</span><span class="si-text">起风了</span><span class="si-del">✕</span></div>
+    <div class="search-item"><span class="si-icon">⏱</span><span class="si-text">流行歌单</span><span class="si-del">✕</span></div>
+    <div class="search-item"><span class="si-icon">⏱</span><span class="si-text">助眠</span><span class="si-del">✕</span></div>
+    <div class="search-item"><span class="si-icon">⏱</span><span class="si-text">民谣</span><span class="si-del">✕</span></div>
+    <div class="search-item"><span class="si-icon">⏱</span><span class="si-text">陈奕迅</span><span class="si-del">✕</span></div>
+  </div>
+  <div class="tab-bar">
+    <span class="tab-text" style="color:#fff">搜索</span>
+    <div class="play-btn">⏸</div>
+    <span class="tab-text">收藏</span>
   </div>
 </div>
-<p class="phone-label">搜索 Search</p>
+<p class="phone-label">搜索Tab（底部栏常驻）</p>
 </div>
 
-<!-- ===== 收藏页 ===== -->
+<!-- 收藏页 -->
 <div>
 <div class="phone">
   <div class="status-bar">9:41</div>
-  <div class="fav-screen">
+  <div class="fav-screen" style="flex:1;min-height:0">
     <div class="fav-header">
-      <span class="back">←</span>
-      <span class="title">我的收藏 (7)</span>
-      <span class="edit">🗑</span>
+      <span class="title" style="flex:1;text-align:center">我的收藏 (7)</span>
     </div>
-    <div class="fav-item playing">
-      <span class="fav-idx active">🔊</span>
-      <div class="fav-info"><div class="fav-name active">一笑江湖</div><div class="fav-artist">栖言</div></div>
-    </div>
-    <div class="fav-item">
-      <span class="fav-idx">2</span>
-      <div class="fav-info"><div class="fav-name">晴天</div><div class="fav-artist">周杰伦</div></div>
-    </div>
-    <div class="fav-item">
-      <span class="fav-idx">3</span>
-      <div class="fav-info"><div class="fav-name">稻香</div><div class="fav-artist">周杰伦</div></div>
-    </div>
-    <div class="fav-item">
-      <span class="fav-idx">4</span>
-      <div class="fav-info"><div class="fav-name">起风了</div><div class="fav-artist">买辣椒也用券</div></div>
-    </div>
-    <div class="fav-item">
-      <span class="fav-idx">5</span>
-      <div class="fav-info"><div class="fav-name">平凡之路</div><div class="fav-artist">朴树</div></div>
-    </div>
-    <div class="fav-item">
-      <span class="fav-idx">6</span>
-      <div class="fav-info"><div class="fav-name">漠河舞厅</div><div class="fav-artist">柳爽</div></div>
-    </div>
-    <div class="fav-item">
-      <span class="fav-idx">7</span>
-      <div class="fav-info"><div class="fav-name">孤勇者</div><div class="fav-artist">陈奕迅</div></div>
-    </div>
+    <div class="fav-item playing"><span class="fav-idx active">🔊</span><div class="fav-info"><div class="fav-name active">一笑江湖</div><div class="fav-artist">栖言</div></div></div>
+    <div class="fav-item"><span class="fav-idx">2</span><div class="fav-info"><div class="fav-name">晴天</div><div class="fav-artist">周杰伦</div></div></div>
+    <div class="fav-item"><span class="fav-idx">3</span><div class="fav-info"><div class="fav-name">稻香</div><div class="fav-artist">周杰伦</div></div></div>
+    <div class="fav-item"><span class="fav-idx">4</span><div class="fav-info"><div class="fav-name">起风了</div><div class="fav-artist">买辣椒也用券</div></div></div>
+    <div class="fav-item"><span class="fav-idx">5</span><div class="fav-info"><div class="fav-name">平凡之路</div><div class="fav-artist">朴树</div></div></div>
+    <div class="fav-item"><span class="fav-idx">6</span><div class="fav-info"><div class="fav-name">漠河舞厅</div><div class="fav-artist">柳爽</div></div></div>
+    <div class="fav-item"><span class="fav-idx">7</span><div class="fav-info"><div class="fav-name">孤勇者</div><div class="fav-artist">陈奕迅</div></div></div>
+  </div>
+  <div class="tab-bar">
+    <span class="tab-text">搜索</span>
+    <div class="play-btn">⏸</div>
+    <span class="tab-text" style="color:#fff">收藏</span>
   </div>
 </div>
-<p class="phone-label">收藏 Favorites</p>
+<p class="phone-label">收藏Tab（底部栏常驻）</p>
 </div>
 
 </div>
-<p style="text-align:center; color:#666; font-size:12px; margin-top:48px;">苗苗Music iOS — 纯黑极简风 — 基于最新源码</p>
+<p style="text-align:center; color:#666; font-size:12px; margin-top:48px;">苗苗Music iOS — 纯黑极简 · 滑动切歌 · 文字Tab</p>
 </body>
 </html>

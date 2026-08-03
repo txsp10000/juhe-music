@@ -8,7 +8,8 @@ import 'player_page.dart';
 
 class FavoritesPage extends StatefulWidget {
   final bool fromPlayer;
-  const FavoritesPage({super.key, this.fromPlayer = false});
+  final bool embedded;
+  const FavoritesPage({super.key, this.fromPlayer = false, this.embedded = false});
 
   @override
   State<FavoritesPage> createState() => _FavoritesPageState();
@@ -134,16 +135,19 @@ class _FavoritesPageState extends State<FavoritesPage> {
           _editMode ? '已选 ${_selected.length} 首' : '我的收藏 (${_songs.length})',
           style: const TextStyle(color: _textPrimary, fontSize: 17, fontWeight: FontWeight.w600),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: _textSecondary),
-          onPressed: () {
-            if (_editMode) {
-              setState(() { _editMode = false; _selected.clear(); });
-            } else {
-              Navigator.pop(context);
-            }
-          },
-        ),
+        automaticallyImplyLeading: false,
+        leading: widget.embedded && !_editMode
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back, color: _textSecondary),
+                onPressed: () {
+                  if (_editMode) {
+                    setState(() { _editMode = false; _selected.clear(); });
+                  } else {
+                    Navigator.pop(context);
+                  }
+                },
+              ),
         actions: [
           if (!_editMode && _songs.isNotEmpty)
             IconButton(
