@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'pages/home_page.dart';
+import 'pages/player_page.dart';
 import 'services/player_service.dart';
 import 'services/settings_service.dart';
 import 'services/audio_cache_service.dart';
@@ -25,15 +25,15 @@ class MusicApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        primaryColor: const Color(0xFF6890F9),
-        scaffoldBackgroundColor: const Color(0xFF0D0F14),
+        primaryColor: Colors.white,
+        scaffoldBackgroundColor: const Color(0xFF000000),
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF6890F9),
-          surface: Color(0xFF171B26),
+          primary: Colors.white,
+          surface: Color(0xFF1A1A1A),
         ),
         fontFamily: 'sans-serif',
       ),
-      home: const HomePage(),
+      home: const PlayerPage(isRoot: true),
     );
   }
 }

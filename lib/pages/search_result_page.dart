@@ -25,12 +25,12 @@ class _SearchResultPageState extends State<SearchResultPage> {
   String _errorMsg = '';
 
   // ─── Design tokens ───
-  static const _bg = Color(0xFF07080C);
-  static const _surface = Color(0xFF0F1116);
-  static const _accent = Color(0xFF5A78F0);
-  static const _textPrimary = Color(0xFFEDEDF2);
-  static const _textSecondary = Color(0xFF7C7F8C);
-  static const _textTertiary = Color(0xFF4E515E);
+  static const _bg = Color(0xFF000000);
+  static const _surface = Color(0xFF1A1A1A);
+  static const _accent = Color(0xFFFFFFFF);
+  static const _textPrimary = Color(0xFFFFFFFF);
+  static const _textSecondary = Color(0xFF999999);
+  static const _textTertiary = Color(0xFF666666);
 
   @override
   void initState() {
