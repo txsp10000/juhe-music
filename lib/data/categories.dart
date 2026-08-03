@@ -62,7 +62,7 @@ const categoryIcons = <String, IconData>{
   '爵士': Icons.nightlife_outlined,
   '蓝调': Icons.water_drop_outlined,
   '乡村': Icons.cottage_outlined,
-  '雷鬼': Icons.sunny_outlined,
+  '雷鬼': Icons.wb_sunny_outlined,
   '拉丁音乐': Icons.directions_walk_outlined,
   '舞曲': Icons.music_video_outlined,
   '网络歌曲': Icons.wifi_outlined,
