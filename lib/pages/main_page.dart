@@ -19,6 +19,7 @@ class _MainPageState extends State<MainPage> {
   final _player = PlayerService();
   int _tab = 0; // 0=播放器, 1=收藏, 2=搜索
   Color _accent = Colors.white;
+  Color _bgHint = const Color(0xFF000000);
 
   @override
   void initState() {
@@ -27,9 +28,15 @@ class _MainPageState extends State<MainPage> {
     _player.addSongChangeListener(_onSongChange);
     _onThemeChange();
     ThemeService.accentColor.addListener(_onThemeChange);
+    ThemeService.bgHint.addListener(_onThemeChange);
   }
 
-  void _onThemeChange() { if (mounted) setState(() => _accent = ThemeService.accentColor.value); }
+  void _onThemeChange() {
+    if (mounted) setState(() {
+      _accent = ThemeService.accentColor.value;
+      _bgHint = ThemeService.bgHint.value;
+    });
+  }
   void _onPlayState(bool _) { if (mounted) setState(() {}); }
   void _onSongChange(Song _) { if (mounted) setState(() {}); }
 
@@ -38,13 +45,14 @@ class _MainPageState extends State<MainPage> {
     _player.removePlayStateListener(_onPlayState);
     _player.removeSongChangeListener(_onSongChange);
     ThemeService.accentColor.removeListener(_onThemeChange);
+    ThemeService.bgHint.removeListener(_onThemeChange);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF000000),
+      backgroundColor: _bgHint,
       body: Column(
         children: [
           Expanded(
@@ -67,27 +75,31 @@ class _MainPageState extends State<MainPage> {
     final hasSong = _player.currentSong != null;
     final onPlayerTab = _tab == 0;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0xFF1A1A1A), width: 0.5)),
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      color: _bgHint,
       child: Row(
         children: [
           Expanded(child: _buildTextTab('收藏', 1)),
-          SizedBox(width: 64, height: 44, child: Center(
-            child: onPlayerTab
-                ? Container(
-                    width: 38, height: 38,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: hasSong ? _accent : const Color(0xFF666666), width: 2),
-                    ),
-                    child: Center(child: Icon(
-                      _player.isPlaying ? Icons.pause : Icons.play_arrow,
-                      color: hasSong ? _accent : const Color(0xFF666666), size: 20)),
-                  )
-                : _MusicIndicator(playing: _player.isPlaying, color: _accent),
-          )),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onPlayerTab
+                ? (hasSong ? () => _player.togglePlayPause() : null)
+                : () => setState(() => _tab = 0),
+            child: SizedBox(width: 56, height: 36, child: Center(
+              child: onPlayerTab
+                  ? Container(
+                      width: 34, height: 34,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: hasSong ? _accent : const Color(0xFF555555), width: 2),
+                      ),
+                      child: Center(child: Icon(
+                        _player.isPlaying ? Icons.pause : Icons.play_arrow,
+                        color: hasSong ? _accent : const Color(0xFF555555), size: 18)),
+                    )
+                  : _MusicIndicator(playing: _player.isPlaying, color: _accent),
+            )),
+          ),
           Expanded(child: _buildTextTab('搜索', 2)),
         ],
       ),
@@ -98,14 +110,14 @@ class _MainPageState extends State<MainPage> {
     final active = _tab == tabIndex;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => setState(() => _tab = _tab == tabIndex ? 0 : tabIndex),
+      onTap: () => setState(() => _tab = tabIndex),
       child: Container(
-        height: 44,
+        height: 36,
         alignment: Alignment.center,
         child: Text(label,
           style: TextStyle(
             color: active ? _accent : const Color(0xFF999999),
-            fontSize: 15, fontWeight: FontWeight.w500)),
+            fontSize: 14, fontWeight: FontWeight.w500)),
       ),
     );
   }
@@ -146,18 +158,19 @@ class _MusicIndicatorState extends State<_MusicIndicator>
       animation: _controller,
       builder: (_, __) {
         final t = _controller.value * 2 * pi;
-        final heights = [10.0 + 6 * sin(t), 10.0 + 6 * sin(t + 2.1), 10.0 + 6 * sin(t + 4.2)];
+        final heights = [8.0 + 4 * sin(t), 8.0 + 4 * sin(t + 2.1), 8.0 + 4 * sin(t + 4.2)];
         return Container(
-          width: 40, height: 40,
-          decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(8)),
+          width: 32, height: 32,
+          decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(6)),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Row(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.center, children: List.generate(3, (i) => Container(
-              width: 3, height: heights[i].clamp(4.0, 14.0),
-              margin: const EdgeInsets.symmetric(horizontal: 1.5),
-              decoration: BoxDecoration(color: widget.color, borderRadius: BorderRadius.circular(1.5)),
-            ))),
+            Row(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.center,
+              children: List.generate(3, (i) => Container(
+                width: 2.5, height: heights[i].clamp(3.0, 12.0),
+                margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                decoration: BoxDecoration(color: widget.color, borderRadius: BorderRadius.circular(1.5)),
+              ))),
             const SizedBox(height: 1),
-            Text('音乐', style: TextStyle(color: widget.color, fontSize: 8, fontWeight: FontWeight.w500)),
+            Text('音乐', style: TextStyle(color: widget.color, fontSize: 7, fontWeight: FontWeight.w500)),
           ]),
         );
       },
