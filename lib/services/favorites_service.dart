@@ -1,9 +1,13 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/song.dart';
 
 class FavoritesService {
   static const _key = 'favorites';
+
+  /// 收藏变更通知（版本号递增），页面监听后可实时刷新
+  static final ValueNotifier<int> version = ValueNotifier(0);
 
   static Future<List<Song>> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -21,6 +25,7 @@ class FavoritesService {
     if (exists) return;
     raw.add(jsonEncode(song.toJson()));
     await prefs.setStringList(_key, raw);
+    version.value++;
   }
 
   static Future<void> remove(Song song) async {
@@ -31,6 +36,7 @@ class FavoritesService {
       return item.id == song.id;
     });
     await prefs.setStringList(_key, raw);
+    version.value++;
   }
 
   static Future<bool> isFavorite(Song song) async {

@@ -35,6 +35,11 @@ class _FavoritesPageState extends State<FavoritesPage> {
     super.initState();
     _load();
     _player.addSongChangeListener(_onSongChange);
+    FavoritesService.version.addListener(_onFavoritesChanged);
+  }
+
+  void _onFavoritesChanged() {
+    _load();
   }
 
   void _onSongChange(Song _) {
@@ -45,6 +50,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
   void dispose() {
     _scrollController.dispose();
     _player.removeSongChangeListener(_onSongChange);
+    FavoritesService.version.removeListener(_onFavoritesChanged);
     super.dispose();
   }
 

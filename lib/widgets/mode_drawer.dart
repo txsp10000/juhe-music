@@ -1,11 +1,10 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/categories.dart';
 import '../utils/toast.dart';
 
 class ModeDrawer extends StatefulWidget {
-  final void Function(String playlistName) onSelectPlaylist;
+  final void Function(PlaylistInfo playlist) onSelectPlaylist;
   final VoidCallback onOpenFavorites;
   final VoidCallback onRandomPlay;
 
@@ -22,7 +21,7 @@ class ModeDrawer extends StatefulWidget {
 
 class _ModeDrawerState extends State<ModeDrawer> {
   static const _pinKey = 'pinned_playlists';
-  final List<String> _pinnedPlaylists = [];
+  final List<PlaylistInfo> _pinnedPlaylists = [];
 
   @override
   void initState() {
@@ -30,93 +29,45 @@ class _ModeDrawerState extends State<ModeDrawer> {
     _loadPinned();
   }
 
+  static String _encode(PlaylistInfo p) => '${p.id}|${p.name}';
+
+  static PlaylistInfo? _decode(String s) {
+    final idx = s.indexOf('|');
+    if (idx <= 0) return null;
+    return PlaylistInfo(s.substring(idx + 1), s.substring(0, idx));
+  }
+
   Future<void> _loadPinned() async {
     final prefs = await SharedPreferences.getInstance();
     final list = prefs.getStringList(_pinKey) ?? [];
     _pinnedPlaylists.clear();
-    _pinnedPlaylists.addAll(list);
+    for (final s in list) {
+      final p = _decode(s);
+      if (p != null) _pinnedPlaylists.add(p);
+    }
     if (mounted) setState(() {});
   }
 
   Future<void> _savePinned() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_pinKey, List.from(_pinnedPlaylists));
+    await prefs.setStringList(_pinKey, _pinnedPlaylists.map(_encode).toList());
   }
 
-  Future<void> _pinPlaylist(String name) async {
-    if (!_pinnedPlaylists.contains(name)) {
-      _pinnedPlaylists.add(name);
+  Future<void> _pinPlaylist(PlaylistInfo p) async {
+    if (!_pinnedPlaylists.any((e) => e.id == p.id)) {
+      _pinnedPlaylists.add(p);
       await _savePinned();
       if (mounted) {
         setState(() {});
-        Toast.show(context, '已置顶「$name」');
+        Toast.show(context, '已置顶「${p.name}」');
       }
     }
   }
 
-  Future<void> _unpinPlaylist(String name) async {
-    _pinnedPlaylists.remove(name);
+  Future<void> _unpinPlaylist(PlaylistInfo p) async {
+    _pinnedPlaylists.removeWhere((e) => e.id == p.id);
     await _savePinned();
     if (mounted) setState(() {});
-  }
-
-  Future<void> _showAddDialog() async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        contentPadding: const EdgeInsets.all(20),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('添加置顶歌单',
-                style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 14),
-            TextField(
-              controller: controller,
-              style: const TextStyle(color: Colors.white, fontSize: 15),
-              decoration: InputDecoration(
-                hintText: '输入歌单名称',
-                hintStyle: const TextStyle(color: Color(0xFF666666)),
-                filled: true,
-                fillColor: const Color(0xFF0D0D0D),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFF444444)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFF333333)),
-                ),
-              ),
-              maxLines: 1,
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-                child: const Text('添加', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (result != null && result.isNotEmpty && !_pinnedPlaylists.contains(result)) {
-      _pinnedPlaylists.add(result);
-      await _savePinned();
-      if (mounted) setState(() {});
-    }
   }
 
   @override
@@ -246,32 +197,20 @@ class _ModeDrawerState extends State<ModeDrawer> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            const Text(
-              '已置顶',
-              style: TextStyle(color: Color(0xFF999999), fontSize: 14, fontWeight: FontWeight.w500),
-            ),
-            const Spacer(),
-            GestureDetector(
-              onTap: _showAddDialog,
-              child: const Text(
-                '+ 添加',
-                style: TextStyle(color: Color(0xFF999999), fontSize: 13),
-              ),
-            ),
-          ],
+        const Text(
+          '已置顶',
+          style: TextStyle(color: Color(0xFF999999), fontSize: 14, fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 10),
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: _pinnedPlaylists.map((name) => GestureDetector(
+          children: _pinnedPlaylists.map((p) => GestureDetector(
             onTap: () {
               Navigator.pop(context);
-              widget.onSelectPlaylist(name);
+              widget.onSelectPlaylist(p);
             },
-            onLongPress: () => _unpinPlaylist(name),
+            onLongPress: () => _unpinPlaylist(p),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
@@ -283,7 +222,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
                 children: [
                   const Icon(Icons.push_pin_outlined, color: Colors.white, size: 14),
                   const SizedBox(width: 4),
-                  Text(name, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                  Text(p.name, style: const TextStyle(color: Colors.white, fontSize: 13)),
                 ],
               ),
             ),
@@ -295,7 +234,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
 
   Widget _buildCategoryGrid() {
     final widgets = <Widget>[];
-    for (final entry in musicCategories.entries) {
+    for (final entry in playlistCategories.entries) {
       widgets.add(
         Padding(
           padding: const EdgeInsets.only(bottom: 12, top: 4),
@@ -313,7 +252,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
           mainAxisSpacing: 8,
           crossAxisSpacing: 8,
           childAspectRatio: 2.2,
-          children: entry.value.map((name) => _buildCategoryTile(name)).toList(),
+          children: entry.value.map((p) => _buildPlaylistTile(p)).toList(),
         ),
       );
       widgets.add(const SizedBox(height: 16));
@@ -324,14 +263,14 @@ class _ModeDrawerState extends State<ModeDrawer> {
     );
   }
 
-  Widget _buildCategoryTile(String name) {
-    final icon = categoryIcons[name] ?? Icons.music_note_outlined;
+  Widget _buildPlaylistTile(PlaylistInfo p) {
+    final icon = playlistIcons[p.name] ?? Icons.music_note_outlined;
     return GestureDetector(
       onTap: () {
         Navigator.pop(context);
-        widget.onSelectPlaylist(name);
+        widget.onSelectPlaylist(p);
       },
-      onLongPress: () => _pinPlaylist(name),
+      onLongPress: () => _pinPlaylist(p),
       child: Container(
         decoration: BoxDecoration(
           color: const Color(0xFF1A1A1A),
@@ -343,7 +282,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
             Icon(icon, color: Colors.white, size: 20),
             const SizedBox(height: 4),
             Text(
-              name,
+              p.name,
               style: const TextStyle(color: Colors.white, fontSize: 12),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

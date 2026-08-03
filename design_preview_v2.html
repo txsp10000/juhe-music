@@ -46,6 +46,9 @@ h1 { text-align: center; font-size: 28px; font-weight: 700; margin-bottom: 8px; 
 .tab-bar .tab-text { font-size: 16px; color: #999; font-weight: 500; }
 .tab-bar .play-btn { width: 52px; height: 52px; border-radius: 50%; border: 2.5px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 22px; color: #fff; }
 .tab-bar .play-btn.disabled { border-color: #666; color: #666; }
+/* 音乐指示器（三竖杠） */
+.music-indicator { width: 36px; height: 36px; background: #1A1A1A; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 4px; }
+.music-indicator .bar { width: 3.5px; background: #fff; border-radius: 2px; display: block; }
 
 /* 空状态 */
 .empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
@@ -196,36 +199,22 @@ h1 { text-align: center; font-size: 28px; font-weight: 700; margin-bottom: 8px; 
       <div class="mode-btn"><span class="m-icon">⟳</span> 随机模式</div>
       <div class="section-title">已置顶</div>
       <div class="pinned-area">
-        <div class="pinned-chip"><span class="p-icon">📌</span> 华语</div>
-        <div class="pinned-chip"><span class="p-icon">📌</span> 流行</div>
-        <div class="pinned-chip"><span class="p-icon">📌</span> 助眠</div>
+        <div class="pinned-chip"><span class="p-icon">📌</span> 热歌榜</div>
+        <div class="pinned-chip"><span class="p-icon">📌</span> 韩语榜</div>
+      </div>
+      <div class="section-title">榜单（实时网络歌单）</div>
+      <div class="cat-grid">
+        <div class="cat-tile"><div class="c-icon">📈</div><div class="c-label">热歌榜</div></div>
+        <div class="cat-tile"><div class="c-icon">🆕</div><div class="c-label">新歌榜</div></div>
+        <div class="cat-tile"><div class="c-icon">🚀</div><div class="c-label">飙升榜</div></div>
+        <div class="cat-tile"><div class="c-icon">✎</div><div class="c-label">原创榜</div></div>
+        <div class="cat-tile"><div class="c-icon">🎬</div><div class="c-label">抖音排行榜</div></div>
       </div>
       <div class="section-title">语种</div>
       <div class="cat-grid">
-        <div class="cat-tile"><div class="c-icon">♪</div><div class="c-label">华语</div></div>
-        <div class="cat-tile"><div class="c-icon">🌐</div><div class="c-label">欧美</div></div>
-        <div class="cat-tile"><div class="c-icon">⚑</div><div class="c-label">日语</div></div>
-        <div class="cat-tile"><div class="c-icon">文</div><div class="c-label">韩语</div></div>
-        <div class="cat-tile"><div class="c-icon">🎤</div><div class="c-label">粤语</div></div>
-        <div class="cat-tile"><div class="c-icon">◎</div><div class="c-label">小语种</div></div>
-      </div>
-      <div class="section-title">场景</div>
-      <div class="cat-grid">
-        <div class="cat-tile"><div class="c-icon">☀</div><div class="c-label">清晨</div></div>
-        <div class="cat-tile"><div class="c-icon">🌙</div><div class="c-label">夜晚</div></div>
-        <div class="cat-tile"><div class="c-icon">⏰</div><div class="c-label">助眠</div></div>
-        <div class="cat-tile"><div class="c-icon">📖</div><div class="c-label">学习</div></div>
-        <div class="cat-tile"><div class="c-icon">⚙</div><div class="c-label">工作</div></div>
-        <div class="cat-tile"><div class="c-icon">🏋</div><div class="c-label">运动</div></div>
-      </div>
-      <div class="section-title">心情</div>
-      <div class="cat-grid">
-        <div class="cat-tile"><div class="c-icon">😢</div><div class="c-label">伤感</div></div>
-        <div class="cat-tile"><div class="c-icon">✚</div><div class="c-label">治愈</div></div>
-        <div class="cat-tile"><div class="c-icon">😊</div><div class="c-label">快乐</div></div>
-        <div class="cat-tile"><div class="c-icon">⚑</div><div class="c-label">励志</div></div>
-        <div class="cat-tile"><div class="c-icon">~</div><div class="c-label">放松</div></div>
-        <div class="cat-tile"><div class="c-icon">☁</div><div class="c-label">慵懒</div></div>
+        <div class="cat-tile"><div class="c-icon">文</div><div class="c-label">韩语榜</div></div>
+        <div class="cat-tile"><div class="c-icon">🌐</div><div class="c-label">美国Billboard榜</div></div>
+        <div class="cat-tile"><div class="c-icon">🇬🇧</div><div class="c-label">UK排行榜周榜</div></div>
       </div>
     </div>
     <div class="drawer-bg"></div>
@@ -307,11 +296,11 @@ h1 { text-align: center; font-size: 28px; font-weight: 700; margin-bottom: 8px; 
   </div>
   <div class="tab-bar">
     <span class="tab-text" style="color:#fff">搜索</span>
-    <div class="play-btn">⏸</div>
+    <div class="music-indicator"><span class="bar" style="height:8px"></span><span class="bar" style="height:15px"></span><span class="bar" style="height:5px"></span></div>
     <span class="tab-text">收藏</span>
   </div>
 </div>
-<p class="phone-label">搜索Tab（底部栏常驻）</p>
+<p class="phone-label">搜索Tab（中间=音乐指示器，点击回播放页）</p>
 </div>
 
 <!-- 收藏页 -->
@@ -332,11 +321,11 @@ h1 { text-align: center; font-size: 28px; font-weight: 700; margin-bottom: 8px; 
   </div>
   <div class="tab-bar">
     <span class="tab-text">搜索</span>
-    <div class="play-btn">⏸</div>
+    <div class="music-indicator"><span class="bar" style="height:12px"></span><span class="bar" style="height:6px"></span><span class="bar" style="height:14px"></span></div>
     <span class="tab-text" style="color:#fff">收藏</span>
   </div>
 </div>
-<p class="phone-label">收藏Tab（底部栏常驻）</p>
+<p class="phone-label">收藏Tab（中间=音乐指示器，点击回播放页）</p>
 </div>
 
 </div>

@@ -7,6 +7,7 @@ import '../services/cover_cache_service.dart';
 import '../models/song.dart';
 import '../utils/toast.dart';
 import '../api/music_api.dart';
+import '../data/categories.dart';
 import '../widgets/mode_drawer.dart';
 import 'playlist_page.dart';
 import 'search_page.dart';
@@ -435,16 +436,10 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  Future<void> _loadAndPlay(String playlistName) async {
-    final keyword = '$playlistName歌单';
-    Toast.show(context, '正在加载「$playlistName」...');
+  Future<void> _loadAndPlay(PlaylistInfo pl) async {
+    Toast.show(context, '正在加载「${pl.name}」...');
     try {
-      final page1 = await MusicApi.searchRaw(keyword, num: 20, page: 1);
-      List<Song> songs = List.from(page1.songs);
-      if (page1.songs.length >= 20) {
-        final page2 = await MusicApi.searchRaw(keyword, num: 20, page: 2);
-        songs.addAll(page2.songs);
-      }
+      final songs = await MusicApi.getPlaylist(pl.id);
       if (!mounted) return;
       if (songs.isEmpty) {
         Toast.show(context, '未找到歌曲');
@@ -474,13 +469,19 @@ class _PlayerPageState extends State<PlayerPage> {
   void _randomPlay() async {
     final prefs = await SharedPreferences.getInstance();
     final pinned = prefs.getStringList('pinned_playlists') ?? [];
-    if (pinned.isEmpty) {
+    final playlists = <PlaylistInfo>[];
+    for (final s in pinned) {
+      final idx = s.indexOf('|');
+      if (idx > 0) {
+        playlists.add(PlaylistInfo(s.substring(idx + 1), s.substring(0, idx)));
+      }
+    }
+    if (playlists.isEmpty) {
       Toast.show(context, '请先置顶一些歌单');
       return;
     }
     final random = Random();
-    final pick = pinned[random.nextInt(pinned.length)];
-    _loadAndPlay(pick);
+    _loadAndPlay(playlists[random.nextInt(playlists.length)]);
   }
 
   // ─── Build ───

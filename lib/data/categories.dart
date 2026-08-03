@@ -1,132 +1,36 @@
 import 'package:flutter/material.dart';
 
-/// 歌单分类数据（共享常量）
-const musicCategories = <String, List<String>>{
-  '语种': ['华语', '欧美', '日语', '韩语', '粤语', '小语种', '闽南语'],
-  '风格': [
-    '流行', '嘻哈说唱', '喊麦', '电子', '轻音乐', '慢摇DJ', '民谣', '摇滚',
-    '国风', '古风', '另类/独立', '实验', '民族歌曲', '原声带', '世界音乐',
-    '二次元', '节奏布鲁斯', '戏曲', '古典', '金属', '新世纪', '儿童音乐',
-    '爵士', '蓝调', '乡村', '雷鬼', '拉丁音乐', '舞曲', '网络歌曲', '纯音乐',
-    '交响乐', '朋克', '后摇', '迷幻',
+/// 真实歌单信息（网易云歌单ID）
+class PlaylistInfo {
+  final String name;
+  final String id;
+  const PlaylistInfo(this.name, this.id);
+}
+
+/// 歌单分类（实时从网络获取的真实歌单）
+const playlistCategories = <String, List<PlaylistInfo>>{
+  '榜单': [
+    PlaylistInfo('热歌榜', '3778678'),
+    PlaylistInfo('新歌榜', '3779629'),
+    PlaylistInfo('飙升榜', '19723756'),
+    PlaylistInfo('原创榜', '2884035'),
+    PlaylistInfo('抖音排行榜', '2250011882'),
   ],
-  '榜单': ['热歌榜', '新歌榜', '飙升榜', '原创榜'],
-  '场景': [
-    '清晨', '夜晚', '起床', '助眠', '学习', '工作', '运动', '驾车',
-    '约会', '小酒馆', 'KTV', '游戏直播', '咖啡厅', '瑜伽', '冥想',
-    '下午茶', '散步', '洗澡',
-  ],
-  '心情': [
-    '伤感', '怀旧', '浪漫', '治愈', '安静', '励志', '快乐', '感动',
-    '孤独', '思念', '放松', '慵懒', '甜蜜', '清新', '热血', '空灵',
-  ],
-  '主题': [
-    '影视原声', '餐厅', '旅行', '派对', '婚礼', '童年', '青春', '毕业',
-    '圣诞', '新年', '情人节', '生日', '秋天', '冬天', '春天', '夏天',
+  '语种': [
+    PlaylistInfo('韩语榜', '745956260'),
+    PlaylistInfo('美国Billboard榜', '60198'),
+    PlaylistInfo('UK排行榜周榜', '180106'),
   ],
 };
 
-/// 分类图标映射（Material Icons，纯白无颜色线条风格）
-const categoryIcons = <String, IconData>{
-  // 语种
-  '华语': Icons.music_note_outlined,
-  '欧美': Icons.language_outlined,
-  '日语': Icons.flag_outlined,
-  '韩语': Icons.translate_outlined,
-  '粤语': Icons.mic_outlined,
-  '小语种': Icons.public_outlined,
-  '闽南语': Icons.record_voice_over_outlined,
-  // 风格
-  '流行': Icons.star_outline,
-  '嘻哈说唱': Icons.flash_on_outlined,
-  '喊麦': Icons.campaign_outlined,
-  '电子': Icons.electric_bolt_outlined,
-  '轻音乐': Icons.spa_outlined,
-  '慢摇DJ': Icons.album_outlined,
-  '民谣': Icons.grass_outlined,
-  '摇滚': Icons.whatshot_outlined,
-  '国风': Icons.temple_buddhist_outlined,
-  '古风': Icons.auto_awesome_outlined,
-  '另类/独立': Icons.change_history_outlined,
-  '实验': Icons.science_outlined,
-  '民族歌曲': Icons.people_outline,
-  '原声带': Icons.movie_outlined,
-  '世界音乐': Icons.travel_explore_outlined,
-  '二次元': Icons.animation_outlined,
-  '节奏布鲁斯': Icons.piano_outlined,
-  '戏曲': Icons.theater_comedy_outlined,
-  '古典': Icons.queue_music_outlined,
-  '金属': Icons.bolt_outlined,
-  '新世纪': Icons.auto_fix_high_outlined,
-  '儿童音乐': Icons.child_care_outlined,
-  '爵士': Icons.nightlife_outlined,
-  '蓝调': Icons.water_drop_outlined,
-  '乡村': Icons.cottage_outlined,
-  '雷鬼': Icons.wb_sunny_outlined,
-  '拉丁音乐': Icons.directions_walk_outlined,
-  '舞曲': Icons.music_video_outlined,
-  '网络歌曲': Icons.wifi_outlined,
-  '纯音乐': Icons.headphones_outlined,
-  '交响乐': Icons.library_music_outlined,
-  '朋克': Icons.highlight_outlined,
-  '后摇': Icons.waves_outlined,
-  '迷幻': Icons.blur_circular_outlined,
-  // 榜单
+/// 歌单图标映射（Material Icons，纯白无颜色线条风格）
+const playlistIcons = <String, IconData>{
   '热歌榜': Icons.trending_up_outlined,
   '新歌榜': Icons.fiber_new_outlined,
   '飙升榜': Icons.rocket_launch_outlined,
   '原创榜': Icons.edit_outlined,
-  // 场景
-  '清晨': Icons.wb_sunny_outlined,
-  '夜晚': Icons.dark_mode_outlined,
-  '起床': Icons.alarm_outlined,
-  '助眠': Icons.bedtime_outlined,
-  '学习': Icons.menu_book_outlined,
-  '工作': Icons.work_outline,
-  '运动': Icons.fitness_center_outlined,
-  '驾车': Icons.directions_car_outlined,
-  '约会': Icons.favorite_border_outlined,
-  '小酒馆': Icons.local_bar_outlined,
-  'KTV': Icons.mic_external_on_outlined,
-  '游戏直播': Icons.sports_esports_outlined,
-  '咖啡厅': Icons.coffee_outlined,
-  '瑜伽': Icons.self_improvement_outlined,
-  '冥想': Icons.psychology_outlined,
-  '下午茶': Icons.emoji_food_beverage_outlined,
-  '散步': Icons.directions_walk_outlined,
-  '洗澡': Icons.bathtub_outlined,
-  // 心情
-  '伤感': Icons.sentiment_dissatisfied_outlined,
-  '怀旧': Icons.history_outlined,
-  '浪漫': Icons.favorite_border_outlined,
-  '治愈': Icons.healing_outlined,
-  '安静': Icons.volume_off_outlined,
-  '励志': Icons.flag_outlined,
-  '快乐': Icons.sentiment_satisfied_alt_outlined,
-  '感动': Icons.volunteer_activism_outlined,
-  '孤独': Icons.person_outline,
-  '思念': Icons.nights_stay_outlined,
-  '放松': Icons.airline_seat_recline_normal_outlined,
-  '慵懒': Icons.weekend_outlined,
-  '甜蜜': Icons.cake_outlined,
-  '清新': Icons.eco_outlined,
-  '热血': Icons.local_fire_department_outlined,
-  '空灵': Icons.cloud_outlined,
-  // 主题
-  '影视原声': Icons.movie_creation_outlined,
-  '餐厅': Icons.restaurant_outlined,
-  '旅行': Icons.flight_outlined,
-  '派对': Icons.celebration_outlined,
-  '婚礼': Icons.favorite_outlined,
-  '童年': Icons.child_friendly_outlined,
-  '青春': Icons.school_outlined,
-  '毕业': Icons.school_outlined,
-  '圣诞': Icons.ac_unit_outlined,
-  '新年': Icons.celebration_outlined,
-  '情人节': Icons.favorite_border_outlined,
-  '生日': Icons.cake_outlined,
-  '秋天': Icons.park_outlined,
-  '冬天': Icons.ac_unit_outlined,
-  '春天': Icons.local_florist_outlined,
-  '夏天': Icons.wb_sunny_outlined,
+  '抖音排行榜': Icons.music_video_outlined,
+  '韩语榜': Icons.translate_outlined,
+  '美国Billboard榜': Icons.public_outlined,
+  'UK排行榜周榜': Icons.language_outlined,
 };

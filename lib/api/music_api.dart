@@ -53,6 +53,49 @@ class MusicApi {
     return SearchRawResult(songs.take(num).toList(), rawBody);
   }
 
+  /// 获取歌单（网易云歌单ID，返回真实歌单歌曲列表）
+  static Future<List<Song>> getPlaylist(String id) async {
+    for (var attempt = 1; attempt <= 30; attempt++) {
+      try {
+        final url = '$_base?types=playlist&id=${_enc(id)}';
+        final body = await _httpGet(url);
+        final json = jsonDecode(body);
+        if (json is Map && json['code'] == 200) {
+          final tracks = json['playlist']?['tracks'];
+          if (tracks is List) {
+            final songs = tracks
+                .whereType<Map<String, dynamic>>()
+                .map((t) {
+                  final ar = t['ar'] as List? ?? [];
+                  final singer = ar
+                      .map((a) => a['name']?.toString() ?? '')
+                      .where((n) => n.isNotEmpty)
+                      .join(' / ');
+                  final al = t['al'] as Map<String, dynamic>? ?? {};
+                  final dt = t['dt'];
+                  final sid = t['id']?.toString() ?? '';
+                  return Song(
+                    id: sid,
+                    name: t['name'] ?? '未知歌曲',
+                    singer: singer.isEmpty ? '未知歌手' : singer,
+                    album: al['name'] ?? '',
+                    source: 'netease',
+                    picId: al['pic_str']?.toString() ?? '',
+                    lyricId: sid,
+                    duration: dt is int ? dt ~/ 1000 : 0,
+                  );
+                })
+                .where((s) => s.id.isNotEmpty)
+                .toList();
+            if (songs.isNotEmpty) return songs;
+          }
+        }
+      } catch (_) {}
+      if (attempt < 30) await Future.delayed(const Duration(seconds: 1));
+    }
+    return [];
+  }
+
   /// 获取播放URL（999=24bit FLAC无损，最多重试30次）
   static Future<String> getPlayUrl(String trackId) async {
     return _retry(() async {
