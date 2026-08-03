@@ -832,35 +832,33 @@ class _PlayerPageState extends State<PlayerPage> {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           GestureDetector(
-            onTap: () => Navigator.push(
-                context, MaterialPageRoute(builder: (_) => const SearchPage())),
-            child: const Text('搜索',
-                style: TextStyle(color: _textSecondary, fontSize: 16, fontWeight: FontWeight.w500)),
+            onTap: null,
+            child: Text('收藏',
+                style: TextStyle(color: _accent.withOpacity(0.5), fontSize: 16, fontWeight: FontWeight.w500)),
           ),
           GestureDetector(
             onTap: hasSong ? () => _player.togglePlayPause() : null,
             child: Container(
-              width: 52,
-              height: 52,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                    color: hasSong ? Colors.white : _textTertiary, width: 2.5),
+                    color: hasSong ? _accent : _textTertiary, width: 2.5),
               ),
               child: Center(
                 child: Icon(
                   _player.isPlaying ? Icons.pause : Icons.play_arrow,
-                  color: hasSong ? Colors.white : _textTertiary,
-                  size: 26,
+                  color: hasSong ? _accent : _textTertiary,
+                  size: 22,
                 ),
               ),
             ),
           ),
           GestureDetector(
-            onTap: () => Navigator.push(
-                context, MaterialPageRoute(builder: (_) => const FavoritesPage())),
-            child: const Text('收藏',
-                style: TextStyle(color: _textSecondary, fontSize: 16, fontWeight: FontWeight.w500)),
+            onTap: null,
+            child: Text('搜索',
+                style: TextStyle(color: _accent.withOpacity(0.5), fontSize: 16, fontWeight: FontWeight.w500)),
           ),
         ],
       ),
@@ -869,7 +867,7 @@ class _PlayerPageState extends State<PlayerPage> {
 
   Widget _buildBottomActions() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -877,13 +875,13 @@ class _PlayerPageState extends State<PlayerPage> {
             onTap: _toggleFavorite,
             child: Icon(
               _isFavorite ? Icons.favorite : Icons.favorite_border,
-              color: _isFavorite ? Colors.red : _textSecondary,
+              color: _isFavorite ? Colors.red : _accent.withOpacity(0.6),
               size: 30,
             ),
           ),
           GestureDetector(
             onTap: _showSearchSameSheet,
-            child: const Icon(Icons.search, color: _textSecondary, size: 30),
+            child: Icon(Icons.search, color: _accent.withOpacity(0.6), size: 30),
           ),
           GestureDetector(
             onTap: _showQualityPicker,
@@ -891,15 +889,15 @@ class _PlayerPageState extends State<PlayerPage> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _textTertiary),
+                border: Border.all(color: _accent.withOpacity(0.4)),
               ),
               child: Text(_qualityLabel(),
-                  style: const TextStyle(color: _textSecondary, fontSize: 14)),
+                  style: TextStyle(color: _accent.withOpacity(0.7), fontSize: 14)),
             ),
           ),
           GestureDetector(
             onTap: _showPlaylistSheet,
-            child: const Icon(Icons.queue_music, color: _textSecondary, size: 30),
+            child: Icon(Icons.queue_music, color: _accent.withOpacity(0.6), size: 30),
           ),
         ],
       ),
