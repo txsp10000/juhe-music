@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/favorites_service.dart';
 import 'search_result_page.dart';
+import '../services/theme_service.dart';
 
 class SearchPage extends StatefulWidget {
   final bool embedded;
@@ -14,11 +15,9 @@ class _SearchPageState extends State<SearchPage> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
   List<String> _history = [];
+  Color _accent = Colors.white;
+  Color _bgHint = const Color(0xFF000000);
 
-  // ─── Design tokens ───
-  static const _bg = Color(0xFF000000);
-  static const _surface = Color(0xFF1A1A1A);
-  static const _accent = Color(0xFFFFFFFF);
   static const _textPrimary = Color(0xFFFFFFFF);
   static const _textSecondary = Color(0xFF999999);
 
@@ -26,12 +25,24 @@ class _SearchPageState extends State<SearchPage> {
   void initState() {
     super.initState();
     _loadHistory();
+    _onThemeChange();
+    ThemeService.accentColor.addListener(_onThemeChange);
+    ThemeService.bgHint.addListener(_onThemeChange);
+  }
+
+  void _onThemeChange() {
+    if (mounted) setState(() {
+      _accent = ThemeService.accentColor.value;
+      _bgHint = ThemeService.bgHint.value;
+    });
   }
 
   @override
   void dispose() {
     _controller.dispose();
     _focusNode.dispose();
+    ThemeService.accentColor.removeListener(_onThemeChange);
+    ThemeService.bgHint.removeListener(_onThemeChange);
     super.dispose();
   }
 
@@ -52,9 +63,9 @@ class _SearchPageState extends State<SearchPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: _bgHint,
       appBar: AppBar(
-        backgroundColor: _bg,
+        backgroundColor: _bgHint,
         automaticallyImplyLeading: false,
         leading: widget.embedded
             ? null
@@ -69,9 +80,7 @@ class _SearchPageState extends State<SearchPage> {
           style: const TextStyle(color: _textPrimary, fontSize: 17),
           cursorColor: _accent,
           textInputAction: TextInputAction.search,
-          onSubmitted: (v) {
-            if (v.trim().isNotEmpty) _doSearch(v.trim());
-          },
+          onSubmitted: (v) { if (v.trim().isNotEmpty) _doSearch(v.trim()); },
           decoration: const InputDecoration(
             hintText: '搜索歌曲、歌手...',
             hintStyle: TextStyle(color: Color(0xFF4E515E)),
@@ -80,8 +89,7 @@ class _SearchPageState extends State<SearchPage> {
         ),
       ),
       body: _history.isEmpty
-          ? const Center(
-              child: Text('暂无搜索历史', style: TextStyle(color: _textSecondary, fontSize: 15)))
+          ? const Center(child: Text('暂无搜索历史', style: TextStyle(color: _textSecondary, fontSize: 15)))
           : ListView.builder(
               itemCount: _history.length,
               itemBuilder: (_, i) {
@@ -93,22 +101,18 @@ class _SearchPageState extends State<SearchPage> {
                     decoration: const BoxDecoration(
                       border: Border(bottom: BorderSide(color: Color(0x08FFFFFF))),
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.history, size: 18, color: _textSecondary),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Text(kw, style: const TextStyle(color: _textPrimary, fontSize: 15)),
-                        ),
-                        GestureDetector(
-                          onTap: () async {
-                            await SearchHistoryService.removeOne(kw);
-                            setState(() => _history.removeAt(i));
-                          },
-                          child: const Icon(Icons.close, size: 16, color: Color(0xFF4E515E)),
-                        ),
-                      ],
-                    ),
+                    child: Row(children: [
+                      const Icon(Icons.history, size: 18, color: _textSecondary),
+                      const SizedBox(width: 14),
+                      Expanded(child: Text(kw, style: const TextStyle(color: _textPrimary, fontSize: 15))),
+                      GestureDetector(
+                        onTap: () async {
+                          await SearchHistoryService.removeOne(kw);
+                          setState(() => _history.removeAt(i));
+                        },
+                        child: const Icon(Icons.close, size: 16, color: Color(0xFF4E515E)),
+                      ),
+                    ]),
                   ),
                 );
               },

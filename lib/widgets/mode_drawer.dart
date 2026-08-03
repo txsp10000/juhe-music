@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/categories.dart';
-import '../api/music_api.dart';
 import '../utils/toast.dart';
 
 class ModeDrawer extends StatefulWidget {
@@ -23,22 +22,24 @@ class ModeDrawer extends StatefulWidget {
 class _ModeDrawerState extends State<ModeDrawer> {
   static const _pinKey = 'pinned_playlists';
   final List<PlaylistInfo> _pinnedPlaylists = [];
-  // 从 API 动态获取的歌单信息：id → PlaylistInfo
-  final Map<String, PlaylistInfo> _playlists = {};
 
   @override
   void initState() {
     super.initState();
     _loadPinned();
-    _loadAllPlaylists();
   }
 
-  static String _encode(PlaylistInfo p) => '${p.id}|${p.name}';
+  static String _encode(PlaylistInfo p) =>
+      '${p.id}|${p.name}|${p.coverUrl}';
 
   static PlaylistInfo? _decode(String s) {
-    final idx = s.indexOf('|');
-    if (idx <= 0) return null;
-    return PlaylistInfo(s.substring(idx + 1), s.substring(0, idx));
+    final parts = s.split('|');
+    if (parts.length < 2 || parts[0].isEmpty) return null;
+    return PlaylistInfo(
+      parts.sublist(1, parts.length).join('|'),
+      parts[0],
+      coverUrl: parts.length > 2 ? parts[2] : '',
+    );
   }
 
   Future<void> _loadPinned() async {
@@ -55,16 +56,6 @@ class _ModeDrawerState extends State<ModeDrawer> {
   Future<void> _savePinned() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_pinKey, _pinnedPlaylists.map(_encode).toList());
-  }
-
-  /// 从 API 获取所有分类歌单的名称和封面（失败则用 ID 兜底）
-  Future<void> _loadAllPlaylists() async {
-    for (final entry in playlistCategories.entries) {
-      for (final id in entry.value) {
-        final info = await MusicApi.getPlaylistInfo(id);
-        if (mounted && info != null) setState(() => _playlists[id] = info);
-      }
-    }
   }
 
   Future<void> _pinPlaylist(PlaylistInfo p) async {
@@ -125,11 +116,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
         children: [
           const Text(
             '听歌模式',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
           ),
           const Spacer(),
           GestureDetector(
@@ -146,63 +133,27 @@ class _ModeDrawerState extends State<ModeDrawer> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
-          _buildModeBtn(
-            icon: Icons.play_circle_outline,
-            label: '默认模式',
-            onTap: () => Navigator.pop(context),
-          ),
+          _buildModeBtn(Icons.play_circle_outline, '默认模式', () => Navigator.pop(context)),
           const SizedBox(height: 10),
-          _buildModeBtn(
-            icon: Icons.favorite_border,
-            label: '收藏模式',
-            onTap: () {
-              Navigator.pop(context);
-              widget.onOpenFavorites();
-            },
-          ),
+          _buildModeBtn(Icons.favorite_border, '收藏模式', () { Navigator.pop(context); widget.onOpenFavorites(); }),
           const SizedBox(height: 10),
-          _buildModeBtn(
-            icon: Icons.shuffle,
-            label: '随机模式',
-            onTap: () {
-              Navigator.pop(context);
-              widget.onRandomPlay();
-            },
-          ),
+          _buildModeBtn(Icons.shuffle, '随机模式', () { Navigator.pop(context); widget.onRandomPlay(); }),
         ],
       ),
     );
   }
 
-  Widget _buildModeBtn({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildModeBtn(IconData icon, String label, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
+        decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(12)),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(icon, color: Colors.white, size: 20), const SizedBox(width: 8),
+          Text(label, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500)),
+        ]),
       ),
     );
   }
@@ -211,56 +162,27 @@ class _ModeDrawerState extends State<ModeDrawer> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          '已置顶',
-          style: TextStyle(color: Color(0xFF999999), fontSize: 14, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _pinnedPlaylists.map((p) {
-            final latest = _playlists[p.id]; // 用最新拉到的封面
-            final cover = latest?.coverUrl ?? p.coverUrl;
-            final name = latest?.name ?? p.name;
-            return GestureDetector(
-            onTap: () {
-              Navigator.pop(context);
-              widget.onSelectPlaylist(latest ?? p);
-            },
+        const Text('已置顶', style: TextStyle(color: Color(0xFF999999), fontSize: 13, fontWeight: FontWeight.w500)),
+        const SizedBox(height: 8),
+        Wrap(spacing: 6, runSpacing: 6, children: _pinnedPlaylists.map((p) {
+          return GestureDetector(
+            onTap: () { Navigator.pop(context); widget.onSelectPlaylist(p); },
             onLongPress: () => _unpinPlaylist(p),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (cover.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: Image.network(
-                          cover,
-                          width: 20,
-                          height: 20,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const Icon(
-                              Icons.music_note_outlined,
-                              color: Colors.white,
-                              size: 16),
-                        ),
-                      ),
-                    ),
-                  Text(name, style: const TextStyle(color: Colors.white, fontSize: 13)),
-                ],
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(16)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                if (p.coverUrl.isNotEmpty)
+                  Padding(padding: const EdgeInsets.only(right: 5), child: ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: Image.network(p.coverUrl, width: 18, height: 18, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.music_note_outlined, color: Colors.white, size: 14)),
+                  )),
+                Text(p.name, style: const TextStyle(color: Colors.white, fontSize: 12)),
+              ]),
             ),
-          );}).toList(),
-        ),
+          );
+        }).toList()),
       ],
     );
   }
@@ -268,82 +190,39 @@ class _ModeDrawerState extends State<ModeDrawer> {
   Widget _buildCategoryGrid() {
     final widgets = <Widget>[];
     for (final entry in playlistCategories.entries) {
-      widgets.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12, top: 4),
-          child: Text(
-            entry.key,
-            style: const TextStyle(color: Color(0xFF999999), fontSize: 14, fontWeight: FontWeight.w500),
-          ),
-        ),
-      );
-      widgets.add(
-        GridView.count(
-          crossAxisCount: 3,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          childAspectRatio: 2.2,
-          children: entry.value.map((id) => _buildPlaylistTile(id)).toList(),
-        ),
-      );
-      widgets.add(const SizedBox(height: 16));
+      widgets.add(Padding(
+        padding: const EdgeInsets.only(bottom: 10, top: 4),
+        child: Text(entry.key, style: const TextStyle(color: Color(0xFF999999), fontSize: 13, fontWeight: FontWeight.w500)),
+      ));
+      widgets.add(GridView.count(
+        crossAxisCount: 3, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
+        mainAxisSpacing: 6, crossAxisSpacing: 6, childAspectRatio: 2.2,
+        children: entry.value.map((p) => _buildPlaylistTile(p)).toList(),
+      ));
+      widgets.add(const SizedBox(height: 14));
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: widgets,
-    );
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: widgets);
   }
 
-  Widget _buildPlaylistTile(String id) {
-    final info = _playlists[id]; // 从 API 获取的最新信息
-    final cover = info?.coverUrl ?? '';
-    final name = info?.name ?? id;
+  Widget _buildPlaylistTile(PlaylistInfo p) {
     return GestureDetector(
-      onTap: info != null ? () {
-        Navigator.pop(context);
-        widget.onSelectPlaylist(info);
-      } : null,
-      onLongPress: info != null ? () => _pinPlaylist(info) : null,
+      onTap: () { Navigator.pop(context); widget.onSelectPlaylist(p); },
+      onLongPress: () => _pinPlaylist(p),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            if (info != null && cover.isNotEmpty)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: Image.network(
-                  cover,
-                  width: 18,
-                  height: 18,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Icon(
-                      Icons.music_note_outlined,
-                      color: Colors.white,
-                      size: 16),
-                ),
-              )
-            else
-              const Icon(Icons.music_note_outlined,
-                  color: Colors.white, size: 16),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                name,
-                style: const TextStyle(color: Colors.white, fontSize: 13),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(8)),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.center, children: [
+          if (p.coverUrl.isNotEmpty)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: Image.network(p.coverUrl, width: 16, height: 16, fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Icon(Icons.music_note_outlined, color: Colors.white, size: 14)),
+            )
+          else
+            const Icon(Icons.music_note_outlined, color: Colors.white, size: 14),
+          const SizedBox(width: 5),
+          Flexible(child: Text(p.name, style: const TextStyle(color: Colors.white, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
+        ]),
       ),
     );
   }

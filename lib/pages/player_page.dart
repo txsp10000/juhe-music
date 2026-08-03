@@ -242,25 +242,20 @@ class _PlayerPageState extends State<PlayerPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
+        final accent = _accent;
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const SizedBox(height: 8),
-              Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: _textTertiary,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
+              Container(width: 36, height: 4, decoration: BoxDecoration(
+                color: accent.withOpacity(0.4), borderRadius: BorderRadius.circular(2))),
               const SizedBox(height: 16),
-              const Text('搜索同名歌曲或歌手',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+              Text('搜索同名歌曲或歌手',
+                  style: TextStyle(color: accent, fontSize: 16, fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               ListTile(
-                leading: const Icon(Icons.music_note, color: Colors.white),
+                leading: Icon(Icons.music_note, color: accent),
                 title: Text('歌曲名: ${song.name}',
                     style: const TextStyle(color: Colors.white)),
                 onTap: () {
@@ -270,7 +265,7 @@ class _PlayerPageState extends State<PlayerPage> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.person, color: Colors.white),
+                leading: Icon(Icons.person, color: accent),
                 title: Text('歌手: ${song.singer}',
                     style: const TextStyle(color: Colors.white)),
                 onTap: () {
