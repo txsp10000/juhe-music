@@ -1,4 +1,5 @@
 import '../services/settings_service.dart';
+import '../data/categories.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -97,32 +98,37 @@ class MusicApi {
     return [];
   }
 
-  /// 获取歌单封面URL（每次启动从网络刷新，本地缓存仅作网络失败兜底）
-  static final Map<String, String> _playlistCoverCache = {};
+  /// 获取歌单基本信息（名称 + 封面URL，每次启动从网络刷新）
+  static final Map<String, PlaylistInfo> _playlistInfoCache = {};
 
-  static Future<String> getPlaylistCover(String id) async {
-    if (_playlistCoverCache.containsKey(id)) return _playlistCoverCache[id]!;
+  static Future<PlaylistInfo?> getPlaylistInfo(String id) async {
+    if (_playlistInfoCache.containsKey(id)) return _playlistInfoCache[id];
     try {
       final url = '$_base?types=playlist&id=${_enc(id)}';
       final body = await _httpGet(url);
       final json = jsonDecode(body);
       if (json is Map && json['code'] == 200) {
-        final cover = json['playlist']?['coverImgUrl']?.toString() ?? '';
-        if (cover.isNotEmpty) {
-          _playlistCoverCache[id] = cover;
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('playlist_cover_$id', cover);
-          return cover;
-        }
+        final playlist = json['playlist'] as Map<String, dynamic>? ?? {};
+        final name = playlist['name'] ?? id;
+        final cover = playlist['coverImgUrl']?.toString() ?? '';
+        final info = PlaylistInfo(name.toString(), id, coverUrl: cover);
+        _playlistInfoCache[id] = info;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('playlist_name_$id', name.toString());
+        await prefs.setString('playlist_cover_$id', cover);
+        return info;
       }
     } catch (_) {}
+    // 网络失败时用本地缓存兜底
     final prefs = await SharedPreferences.getInstance();
-    final cached = prefs.getString('playlist_cover_$id');
-    if (cached != null && cached.isNotEmpty) {
-      _playlistCoverCache[id] = cached;
-      return cached;
+    final cachedName = prefs.getString('playlist_name_$id');
+    final cachedCover = prefs.getString('playlist_cover_$id');
+    if (cachedName != null) {
+      final info = PlaylistInfo(cachedName, id, coverUrl: cachedCover ?? '');
+      _playlistInfoCache[id] = info;
+      return info;
     }
-    return '';
+    return null;
   }
 
   /// 获取播放URL（999=24bit FLAC无损，最多重试30次）

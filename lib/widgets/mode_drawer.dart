@@ -23,13 +23,14 @@ class ModeDrawer extends StatefulWidget {
 class _ModeDrawerState extends State<ModeDrawer> {
   static const _pinKey = 'pinned_playlists';
   final List<PlaylistInfo> _pinnedPlaylists = [];
-  final Map<String, String> _covers = {}; // id → coverUrl
+  // 从 API 动态获取的歌单信息：id → PlaylistInfo
+  final Map<String, PlaylistInfo> _playlists = {};
 
   @override
   void initState() {
     super.initState();
     _loadPinned();
-    _loadCovers();
+    _loadAllPlaylists();
   }
 
   static String _encode(PlaylistInfo p) => '${p.id}|${p.name}';
@@ -56,6 +57,16 @@ class _ModeDrawerState extends State<ModeDrawer> {
     await prefs.setStringList(_pinKey, _pinnedPlaylists.map(_encode).toList());
   }
 
+  /// 从 API 获取所有分类歌单的名称和封面（失败则用 ID 兜底）
+  Future<void> _loadAllPlaylists() async {
+    for (final entry in playlistCategories.entries) {
+      for (final id in entry.value) {
+        final info = await MusicApi.getPlaylistInfo(id);
+        if (mounted && info != null) setState(() => _playlists[id] = info);
+      }
+    }
+  }
+
   Future<void> _pinPlaylist(PlaylistInfo p) async {
     if (!_pinnedPlaylists.any((e) => e.id == p.id)) {
       _pinnedPlaylists.add(p);
@@ -71,16 +82,6 @@ class _ModeDrawerState extends State<ModeDrawer> {
     _pinnedPlaylists.removeWhere((e) => e.id == p.id);
     await _savePinned();
     if (mounted) setState(() {});
-  }
-
-  Future<void> _loadCovers() async {
-    for (final entry in playlistCategories.entries) {
-      for (final p in entry.value) {
-        MusicApi.getPlaylistCover(p.id).then((url) {
-          if (url.isNotEmpty && mounted) setState(() => _covers[p.id] = url);
-        });
-      }
-    }
   }
 
   @override
@@ -219,11 +220,13 @@ class _ModeDrawerState extends State<ModeDrawer> {
           spacing: 8,
           runSpacing: 8,
           children: _pinnedPlaylists.map((p) {
-            final cover = _covers[p.id];
+            final latest = _playlists[p.id]; // 用最新拉到的封面
+            final cover = latest?.coverUrl ?? p.coverUrl;
+            final name = latest?.name ?? p.name;
             return GestureDetector(
             onTap: () {
               Navigator.pop(context);
-              widget.onSelectPlaylist(p);
+              widget.onSelectPlaylist(latest ?? p);
             },
             onLongPress: () => _unpinPlaylist(p),
             child: Container(
@@ -235,7 +238,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (cover != null)
+                  if (cover.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(right: 6),
                       child: ClipRRect(
@@ -252,7 +255,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
                         ),
                       ),
                     ),
-                  Text(p.name, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                  Text(name, style: const TextStyle(color: Colors.white, fontSize: 13)),
                 ],
               ),
             ),
@@ -282,7 +285,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
           mainAxisSpacing: 8,
           crossAxisSpacing: 8,
           childAspectRatio: 2.2,
-          children: entry.value.map((p) => _buildPlaylistTile(p)).toList(),
+          children: entry.value.map((id) => _buildPlaylistTile(id)).toList(),
         ),
       );
       widgets.add(const SizedBox(height: 16));
@@ -293,14 +296,16 @@ class _ModeDrawerState extends State<ModeDrawer> {
     );
   }
 
-  Widget _buildPlaylistTile(PlaylistInfo p) {
-    final cover = _covers[p.id];
+  Widget _buildPlaylistTile(String id) {
+    final info = _playlists[id]; // 从 API 获取的最新信息
+    final cover = info?.coverUrl ?? '';
+    final name = info?.name ?? id;
     return GestureDetector(
-      onTap: () {
+      onTap: info != null ? () {
         Navigator.pop(context);
-        widget.onSelectPlaylist(p);
-      },
-      onLongPress: () => _pinPlaylist(p),
+        widget.onSelectPlaylist(info);
+      } : null,
+      onLongPress: info != null ? () => _pinPlaylist(info) : null,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         decoration: BoxDecoration(
@@ -311,7 +316,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            if (cover != null)
+            if (info != null && cover.isNotEmpty)
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
                 child: Image.network(
@@ -331,7 +336,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
             const SizedBox(width: 6),
             Flexible(
               child: Text(
-                p.name,
+                name,
                 style: const TextStyle(color: Colors.white, fontSize: 13),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
