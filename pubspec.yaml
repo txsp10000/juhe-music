@@ -16,6 +16,7 @@ dependencies:
   audio_service: ^0.18.12
   path_provider: ^2.1.1
   connectivity_plus: ^5.0.2
+  palette_generator: ^0.3.3
 
 dev_dependencies:
   flutter_test:

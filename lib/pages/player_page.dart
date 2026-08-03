@@ -14,6 +14,7 @@ import 'search_page.dart';
 import 'search_result_page.dart';
 import 'favorites_page.dart';
 import '../services/settings_service.dart';
+import '../services/theme_service.dart';
 import 'dart:typed_data';
 
 /// LRC 歌词行
@@ -50,15 +51,29 @@ class _PlayerPageState extends State<PlayerPage> {
   static const _textSecondary = Color(0xFF999999);
   static const _textTertiary = Color(0xFF666666);
 
+  // ─── 动态主题色（跟随封面图取色）───
+  Color _accent = Colors.white;
+  Color _bgHint = const Color(0xFF000000);
+
   @override
   void initState() {
     super.initState();
+    ThemeService.accentColor.addListener(_onThemeChange);
+    ThemeService.bgHint.addListener(_onThemeChange);
     _player.addProgressListener(_onProgressUpdate);
     _player.addSongChangeListener(_onSongChange);
     _player.addDownloadProgressListener(_onDownloadProgress);
     _player.addPlayStateListener(_onPlayStateChange);
     _syncState();
     _checkFavorite();
+    _onThemeChange();
+  }
+
+  void _onThemeChange() {
+    if (mounted) setState(() {
+      _accent = ThemeService.accentColor.value;
+      _bgHint = ThemeService.bgHint.value;
+    });
   }
 
   void _onProgressUpdate(Duration pos, Duration? dur) {
@@ -101,6 +116,8 @@ class _PlayerPageState extends State<PlayerPage> {
     _player.removeSongChangeListener(_onSongChange);
     _player.removeDownloadProgressListener(_onDownloadProgress);
     _player.removePlayStateListener(_onPlayStateChange);
+    ThemeService.accentColor.removeListener(_onThemeChange);
+    ThemeService.bgHint.removeListener(_onThemeChange);
     super.dispose();
   }
 
@@ -125,12 +142,14 @@ class _PlayerPageState extends State<PlayerPage> {
     final cached = await coverCache.load(picId);
     if (cached != null && mounted && _coverUrl == url) {
       setState(() => _coverBytes = cached);
+      ThemeService.updateFromCover(cached);
       return;
     }
     if (url.startsWith('file://')) return;
     final downloaded = await coverCache.download(picId, url);
     if (downloaded != null && mounted && _coverUrl == url) {
       setState(() => _coverBytes = downloaded);
+      ThemeService.updateFromCover(downloaded);
     } else {
       if (_coverUrl == url) _coverUrl = '';
     }
@@ -495,7 +514,7 @@ class _PlayerPageState extends State<PlayerPage> {
 
     return Scaffold(
       key: widget.isRoot ? _scaffoldKey : null,
-      backgroundColor: _bgColor,
+      backgroundColor: _bgHint,
       drawer: widget.isRoot
           ? ModeDrawer(
               onSelectPlaylist: _loadAndPlay,
@@ -763,10 +782,10 @@ class _PlayerPageState extends State<PlayerPage> {
               trackHeight: 2.5,
               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
               overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-              activeTrackColor: Colors.white,
+              activeTrackColor: _accent,
               inactiveTrackColor: const Color(0xFF333333),
-              thumbColor: Colors.white,
-              overlayColor: Colors.white.withOpacity(0.1),
+              thumbColor: _accent,
+              overlayColor: _accent.withOpacity(0.1),
             ),
             child: Slider(
               min: 0,

@@ -309,6 +309,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             if (cover != null)
               ClipRRect(
