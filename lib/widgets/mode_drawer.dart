@@ -8,14 +8,12 @@ class ModeDrawer extends StatefulWidget {
   final void Function(String playlistName) onSelectPlaylist;
   final VoidCallback onOpenFavorites;
   final VoidCallback onRandomPlay;
-  final VoidCallback onViewFavorites;
 
   const ModeDrawer({
     super.key,
     required this.onSelectPlaylist,
     required this.onOpenFavorites,
     required this.onRandomPlay,
-    required this.onViewFavorites,
   });
 
   @override
@@ -184,13 +182,13 @@ class _ModeDrawerState extends State<ModeDrawer> {
       child: Column(
         children: [
           _buildModeBtn(
-            icon: '▶',
+            icon: Icons.play_circle_outline,
             label: '默认模式',
             onTap: () => Navigator.pop(context),
           ),
           const SizedBox(height: 10),
           _buildModeBtn(
-            icon: '♡',
+            icon: Icons.favorite_border,
             label: '收藏模式',
             onTap: () {
               Navigator.pop(context);
@@ -199,20 +197,11 @@ class _ModeDrawerState extends State<ModeDrawer> {
           ),
           const SizedBox(height: 10),
           _buildModeBtn(
-            icon: '⟳',
+            icon: Icons.shuffle,
             label: '随机模式',
             onTap: () {
               Navigator.pop(context);
               widget.onRandomPlay();
-            },
-          ),
-          const SizedBox(height: 10),
-          _buildModeBtn(
-            icon: '♥',
-            label: '我的收藏',
-            onTap: () {
-              Navigator.pop(context);
-              widget.onViewFavorites();
             },
           ),
         ],
@@ -221,7 +210,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
   }
 
   Widget _buildModeBtn({
-    required String icon,
+    required IconData icon,
     required String label,
     required VoidCallback onTap,
   }) {
@@ -234,15 +223,20 @@ class _ModeDrawerState extends State<ModeDrawer> {
           color: const Color(0xFF1A1A1A),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Center(
-          child: Text(
-            '$icon  $label',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -284,9 +278,13 @@ class _ModeDrawerState extends State<ModeDrawer> {
                 color: const Color(0xFF1A1A1A),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Text(
-                '📌 $name',
-                style: const TextStyle(color: Colors.white, fontSize: 13),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.push_pin_outlined, color: Colors.white, size: 14),
+                  const SizedBox(width: 4),
+                  Text(name, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                ],
               ),
             ),
           )).toList(),
@@ -327,7 +325,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
   }
 
   Widget _buildCategoryTile(String name) {
-    final icon = categoryIcons[name] ?? '♪';
+    final icon = categoryIcons[name] ?? Icons.music_note_outlined;
     return GestureDetector(
       onTap: () {
         Navigator.pop(context);
@@ -342,10 +340,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              icon,
-              style: const TextStyle(fontSize: 20, color: Colors.white),
-            ),
+            Icon(icon, color: Colors.white, size: 20),
             const SizedBox(height: 4),
             Text(
               name,
