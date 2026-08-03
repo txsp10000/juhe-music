@@ -302,36 +302,39 @@ class _ModeDrawerState extends State<ModeDrawer> {
       },
       onLongPress: () => _pinPlaylist(p),
       child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         decoration: BoxDecoration(
           color: const Color(0xFF1A1A1A),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Column(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (cover != null)
               ClipRRect(
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(4),
                 child: Image.network(
                   cover,
-                  width: 28,
-                  height: 28,
+                  width: 18,
+                  height: 18,
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => const Icon(
                       Icons.music_note_outlined,
                       color: Colors.white,
-                      size: 20),
+                      size: 16),
                 ),
               )
             else
               const Icon(Icons.music_note_outlined,
-                  color: Colors.white, size: 20),
-            const SizedBox(height: 4),
-            Text(
-              p.name,
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+                  color: Colors.white, size: 16),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                p.name,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
