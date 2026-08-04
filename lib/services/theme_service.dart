@@ -15,18 +15,24 @@ class ThemeService {
         size: const Size(50, 50),
         maximumColorCount: 8,
       );
-      final raw = palette.dominantColor?.color ?? Colors.white;
+      final candidates = [
+        palette.vibrantColor?.color,
+        palette.mutedColor?.color,
+        palette.dominantColor?.color,
+        Colors.white,
+      ];
+      final raw = candidates.firstWhere((c) => c != null, orElse: () => Colors.white)!;
       final hsl = HSLColor.fromColor(raw);
-      // 保证在暗色背景上清晰可见
+
       final accent = hsl
-          .withLightness(hsl.lightness.clamp(0.35, 0.7))
-          .withSaturation(hsl.saturation.clamp(0.0, 0.75))
+          .withLightness(hsl.lightness.clamp(0.45, 0.68).toDouble())
+          .withSaturation(hsl.saturation.clamp(0.35, 0.80).toDouble())
           .toColor();
       accentColor.value = accent;
-      // 背景微调
+
       bgHint.value = hsl
-          .withLightness(hsl.lightness.clamp(0.03, 0.08))
-          .withSaturation(hsl.saturation * 0.3)
+          .withLightness(hsl.lightness.clamp(0.16, 0.28).toDouble())
+          .withSaturation(hsl.saturation.clamp(0.25, 0.55).toDouble())
           .toColor();
     } catch (_) {}
   }

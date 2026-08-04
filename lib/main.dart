@@ -4,6 +4,7 @@ import 'services/player_service.dart';
 import 'services/settings_service.dart';
 import 'services/audio_cache_service.dart';
 import 'services/wifi_cache_service.dart';
+import 'theme/app_design_tokens.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,14 +25,35 @@ class MusicApp extends StatelessWidget {
       title: '苗苗music',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
+        useMaterial3: true,
         brightness: Brightness.dark,
-        primaryColor: Colors.white,
-        scaffoldBackgroundColor: const Color(0xFF000000),
+        scaffoldBackgroundColor: AppDesignTokens.inkBlack,
         colorScheme: const ColorScheme.dark(
-          primary: Colors.white,
-          surface: Color(0xFF1A1A1A),
+          primary: AppDesignTokens.lyricWhite,
+          surface: AppDesignTokens.stageBlack,
+          secondary: AppDesignTokens.quietGrey,
         ),
         fontFamily: 'sans-serif',
+        textTheme: const TextTheme(
+          titleLarge: TextStyle(color: AppDesignTokens.lyricWhite, fontWeight: FontWeight.w800),
+          titleMedium: TextStyle(color: AppDesignTokens.lyricWhite, fontWeight: FontWeight.w700),
+          bodyMedium: TextStyle(color: AppDesignTokens.lyricWhite),
+          bodySmall: TextStyle(color: AppDesignTokens.quietGrey),
+        ),
+        iconTheme: const IconThemeData(color: AppDesignTokens.lyricWhite),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
+          foregroundColor: AppDesignTokens.lyricWhite,
+        ),
+        bottomSheetTheme: const BottomSheetThemeData(
+          backgroundColor: AppDesignTokens.stageBlack,
+          modalBackgroundColor: AppDesignTokens.stageBlack,
+          surfaceTintColor: Colors.transparent,
+        ),
+        splashColor: Colors.white10,
+        highlightColor: Colors.white10,
       ),
       home: const MainPage(),
     );

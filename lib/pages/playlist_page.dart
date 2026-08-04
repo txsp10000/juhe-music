@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
-import '../services/player_service.dart';
 import '../models/song.dart';
+import '../services/player_service.dart';
+import '../services/theme_service.dart';
+import '../theme/app_design_tokens.dart';
+import '../widgets/glass_panel.dart';
+import '../widgets/music_list_tile.dart';
 import '../widgets/swipe_action_cell.dart';
 import 'player_page.dart';
 
@@ -15,27 +19,33 @@ class PlaylistPage extends StatefulWidget {
 class _PlaylistPageState extends State<PlaylistPage> {
   final _player = PlayerService();
   final ScrollController _scrollController = ScrollController();
-
-  // ─── Design tokens ───
-  static const _bg = Color(0xFF000000);
-  static const _accent = Color(0xFFFFFFFF);
-  static const _textPrimary = Color(0xFFFFFFFF);
-  static const _textSecondary = Color(0xFF999999);
-  static const _textTertiary = Color(0xFF666666);
+  Color _accent = AppDesignTokens.lyricWhite;
+  Color _bgHint = AppDesignTokens.inkBlack;
 
   @override
   void initState() {
     super.initState();
     _player.addSongChangeListener(_onSongChange);
+    _onThemeChange();
+    ThemeService.accentColor.addListener(_onThemeChange);
+    ThemeService.bgHint.addListener(_onThemeChange);
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToPlaying());
+  }
+
+  void _onThemeChange() {
+    if (mounted) {
+      setState(() {
+        _accent = AppDesignTokens.readableAccent(ThemeService.accentColor.value);
+        _bgHint = ThemeService.bgHint.value;
+      });
+    }
   }
 
   void _scrollToPlaying() {
     final idx = _player.currentIndex;
     if (idx > 0 && _scrollController.hasClients) {
-      final offset = (idx * 62.0).clamp(0.0, _scrollController.position.maxScrollExtent);
-      _scrollController.animateTo(offset,
-          duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+      final offset = (idx * 76.0).clamp(0.0, _scrollController.position.maxScrollExtent);
+      _scrollController.animateTo(offset, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
     }
   }
 
@@ -47,6 +57,8 @@ class _PlaylistPageState extends State<PlaylistPage> {
   void dispose() {
     _scrollController.dispose();
     _player.removeSongChangeListener(_onSongChange);
+    ThemeService.accentColor.removeListener(_onThemeChange);
+    ThemeService.bgHint.removeListener(_onThemeChange);
     super.dispose();
   }
 
@@ -72,72 +84,63 @@ class _PlaylistPageState extends State<PlaylistPage> {
     final songs = _player.playlist;
     final currentIdx = _player.currentIndex;
     return Scaffold(
-      backgroundColor: _bg,
-      appBar: AppBar(
-        backgroundColor: _bg,
-        title: Text('播放列表 (${songs.length})',
-            style: const TextStyle(color: _textPrimary, fontSize: 17, fontWeight: FontWeight.w600)),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: _textSecondary),
-          onPressed: () => Navigator.pop(context),
+      backgroundColor: Colors.transparent,
+      body: MusicScaffoldBackground(
+        bgHint: _bgHint,
+        accent: _accent,
+        child: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(songs.length, currentIdx),
+              Expanded(
+                child: songs.isEmpty
+                    ? MusicEmptyState(accent: _accent, icon: Icons.queue_music_rounded, title: '队列是空的', message: '去搜索或播放收藏里的歌曲。')
+                    : ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.only(top: 4, bottom: 24),
+                        itemCount: songs.length,
+                        itemBuilder: (_, i) {
+                          final s = songs[i];
+                          final isCurrent = i == currentIdx;
+                          return SwipeActionCell(
+                            actionLabel: '删除',
+                            actionColor: AppDesignTokens.danger,
+                            onAction: () {
+                              _player.removeAt(i).then((_) {
+                                if (mounted) setState(() {});
+                              });
+                            },
+                            child: MusicListTile(song: s, index: i, isCurrent: isCurrent, accent: _accent, onTap: () => _playAt(i), margin: EdgeInsets.zero),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
-      body: songs.isEmpty
-          ? const Center(
-              child: Text('暂无歌曲', style: TextStyle(color: _textSecondary, fontSize: 15)))
-          : ListView.builder(
-              controller: _scrollController,
-              itemCount: songs.length,
-              itemBuilder: (_, i) {
-                final s = songs[i];
-                final isCurrent = i == currentIdx;
-                return SwipeActionCell(
-                  actionLabel: '删除',
-                  actionColor: const Color(0xFFFF5E5E),
-                  onAction: () {
-                    _player.removeAt(i).then((_) {
-                      if (mounted) setState(() {});
-                    });
-                  },
-                  child: InkWell(
-                    onTap: () => _playAt(i),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: isCurrent ? _accent.withOpacity(0.08) : Colors.transparent,
-                        border: const Border(bottom: BorderSide(color: Color(0x08FFFFFF))),
-                      ),
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: 26,
-                            child: isCurrent
-                                ? const Icon(Icons.volume_up, color: _accent, size: 18)
-                                : Text('${i + 1}',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(color: _textTertiary, fontSize: 13)),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(s.name,
-                                    style: TextStyle(
-                                        color: isCurrent ? _accent : _textPrimary, fontSize: 15)),
-                                const SizedBox(height: 3),
-                                Text(s.singer,
-                                    style: const TextStyle(color: _textSecondary, fontSize: 12)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
+    );
+  }
+
+  Widget _buildHeader(int count, int currentIdx) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
+      child: Row(
+        children: [
+          IconOrbButton(icon: Icons.arrow_back_rounded, accent: _accent, size: 42, onTap: () => Navigator.pop(context)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('播放队列', style: AppDesignTokens.title(size: 24)),
+                const SizedBox(height: 4),
+                Text(count == 0 ? '没有歌曲' : '${currentIdx + 1}/$count · 跟着当前歌曲继续播放', style: AppDesignTokens.caption(color: _accent)),
+              ],
             ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import '../models/song.dart';
 import '../services/favorites_service.dart';
 import '../services/player_service.dart';
-import '../models/song.dart';
 import '../services/theme_service.dart';
-import '../widgets/swipe_action_cell.dart';
+import '../theme/app_design_tokens.dart';
 import '../utils/toast.dart';
+import '../widgets/glass_panel.dart';
+import '../widgets/music_list_tile.dart';
+import '../widgets/swipe_action_cell.dart';
 import 'player_page.dart';
 
 class FavoritesPage extends StatefulWidget {
@@ -22,12 +25,8 @@ class _FavoritesPageState extends State<FavoritesPage> {
   bool _editMode = false;
   final Set<int> _selected = {};
   final ScrollController _scrollController = ScrollController();
-  Color _accent = Colors.white;
-  Color _bgHint = const Color(0xFF000000);
-
-  static const _textPrimary = Color(0xFFFFFFFF);
-  static const _textSecondary = Color(0xFF999999);
-  static const _textTertiary = Color(0xFF666666);
+  Color _accent = AppDesignTokens.lyricWhite;
+  Color _bgHint = AppDesignTokens.inkBlack;
 
   @override
   void initState() {
@@ -41,14 +40,18 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   void _onThemeChange() {
-    if (mounted) setState(() {
-      _accent = ThemeService.accentColor.value;
-      _bgHint = ThemeService.bgHint.value;
-    });
+    if (mounted) {
+      setState(() {
+        _accent = AppDesignTokens.readableAccent(ThemeService.accentColor.value);
+        _bgHint = ThemeService.bgHint.value;
+      });
+    }
   }
 
-  void _onFavoritesChanged() { _load(); }
-  void _onSongChange(Song _) { if (mounted) setState(() {}); }
+  void _onFavoritesChanged() => _load();
+  void _onSongChange(Song _) {
+    if (mounted) setState(() {});
+  }
 
   @override
   void dispose() {
@@ -62,7 +65,10 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
   Future<void> _load() async {
     final songs = await FavoritesService.load();
-    if (mounted) { setState(() => _songs = songs); _scrollToPlaying(); }
+    if (mounted) {
+      setState(() => _songs = songs);
+      _scrollToPlaying();
+    }
   }
 
   void _scrollToPlaying() {
@@ -72,7 +78,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
     if (idx > 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
-          final offset = (idx * 62.0).clamp(0.0, _scrollController.position.maxScrollExtent);
+          final offset = (idx * 76.0).clamp(0.0, _scrollController.position.maxScrollExtent);
           _scrollController.animateTo(offset, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
         }
       });
@@ -81,13 +87,21 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
   void _playAt(int index) {
     if (_player.currentSong?.id == _songs[index].id) {
-      if (widget.fromPlayer) { Navigator.pop(context); } else { Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage())); }
+      if (widget.fromPlayer) {
+        Navigator.pop(context);
+      } else {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+      }
       return;
     }
     _player.playlist.clear();
     _player.playlist.addAll(_songs);
     _player.playAt(index);
-    if (widget.fromPlayer) { Navigator.pop(context); } else { Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage())); }
+    if (widget.fromPlayer) {
+      Navigator.pop(context);
+    } else {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+    }
   }
 
   Future<void> _removeSong(int index) async {
@@ -97,106 +111,153 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   void _toggleSelectAll() {
-    if (_selected.length == _songs.length) { _selected.clear(); } else { _selected.clear(); for (var i = 0; i < _songs.length; i++) _selected.add(i); }
+    if (_selected.length == _songs.length) {
+      _selected.clear();
+    } else {
+      _selected
+        ..clear()
+        ..addAll(List.generate(_songs.length, (i) => i));
+    }
     setState(() {});
   }
 
   Future<void> _deleteSelected() async {
     final toDelete = _selected.toList()..sort((a, b) => b.compareTo(a));
-    for (final i in toDelete) await FavoritesService.remove(_songs[i]);
+    for (final i in toDelete) {
+      await FavoritesService.remove(_songs[i]);
+    }
     final remaining = <Song>[];
-    for (var i = 0; i < _songs.length; i++) { if (!_selected.contains(i)) remaining.add(_songs[i]); }
-    setState(() { _songs = remaining; _selected.clear(); _editMode = false; });
+    for (var i = 0; i < _songs.length; i++) {
+      if (!_selected.contains(i)) remaining.add(_songs[i]);
+    }
+    setState(() {
+      _songs = remaining;
+      _selected.clear();
+      _editMode = false;
+    });
     Toast.show(context, '已删除 ${toDelete.length} 首');
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _bgHint,
-      appBar: AppBar(
-        backgroundColor: _bgHint,
-        title: Text(
-          _editMode ? '已选 ${_selected.length} 首' : '我的收藏 (${_songs.length})',
-          style: const TextStyle(color: _textPrimary, fontSize: 17, fontWeight: FontWeight.w600),
+      backgroundColor: Colors.transparent,
+      body: MusicScaffoldBackground(
+        bgHint: _bgHint,
+        accent: _accent,
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              _buildHeader(),
+              Expanded(child: _buildBody()),
+              if (_editMode) _buildEditTray(),
+              if (widget.embedded) const SizedBox(height: 96),
+            ],
+          ),
         ),
-        automaticallyImplyLeading: false,
-        leading: widget.embedded && !_editMode
-            ? null
-            : IconButton(
-                icon: const Icon(Icons.arrow_back, color: _textSecondary),
-                onPressed: () {
-                  if (_editMode) { setState(() { _editMode = false; _selected.clear(); }); } else { Navigator.pop(context); }
-                },
-              ),
-        actions: [
-          if (!_editMode && _songs.isNotEmpty)
-            IconButton(icon: const Icon(Icons.delete_outline, color: _textSecondary, size: 22), onPressed: () => setState(() => _editMode = true)),
-          if (_editMode) ...[
-            TextButton(
-              onPressed: _toggleSelectAll,
-              child: Text(_selected.length == _songs.length ? '取消全选' : '全选', style: TextStyle(color: _accent, fontSize: 14)),
-            ),
-            TextButton(
-              onPressed: _selected.isEmpty ? null : _deleteSelected,
-              child: Text('删除', style: TextStyle(color: _selected.isEmpty ? _textTertiary : const Color(0xFFFF5E5E), fontSize: 14)),
-            ),
-          ],
-        ],
       ),
-      body: _songs.isEmpty
-          ? const Center(child: Text('还没有收藏歌曲', style: TextStyle(color: _textSecondary, fontSize: 15)))
-          : ListView.builder(
-              controller: _scrollController,
-              itemCount: _songs.length,
-              itemBuilder: (_, i) {
-                final s = _songs[i];
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+      child: Row(
+        children: [
+          if (!widget.embedded || _editMode)
+            IconOrbButton(
+              icon: Icons.arrow_back_rounded,
+              accent: _accent,
+              size: 42,
+              onTap: () {
                 if (_editMode) {
-                  return InkWell(
-                    onTap: () => setState(() { _selected.contains(i) ? _selected.remove(i) : _selected.add(i); }),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0x08FFFFFF)))),
-                      child: Row(children: [
-                        Icon(_selected.contains(i) ? Icons.check_circle : Icons.radio_button_unchecked,
-                            color: _selected.contains(i) ? _accent : _textTertiary, size: 20),
-                        const SizedBox(width: 14),
-                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(s.name, style: const TextStyle(color: _textPrimary, fontSize: 15)),
-                          const SizedBox(height: 3),
-                          Text(s.singer, style: const TextStyle(color: _textSecondary, fontSize: 12)),
-                        ])),
-                      ]),
-                    ),
-                  );
+                  setState(() {
+                    _editMode = false;
+                    _selected.clear();
+                  });
+                } else {
+                  Navigator.pop(context);
                 }
-                final isCurrent = _player.currentSong?.id == s.id;
-                return SwipeActionCell(
-                  actionLabel: '删除', actionColor: const Color(0xFFFF5E5E), onAction: () => _removeSong(i),
-                  child: InkWell(
-                    onTap: () => _playAt(i),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: isCurrent ? _accent.withOpacity(0.08) : Colors.transparent,
-                        border: const Border(bottom: BorderSide(color: Color(0x08FFFFFF))),
-                      ),
-                      child: Row(children: [
-                        SizedBox(width: 26, child: isCurrent
-                            ? Icon(Icons.volume_up, color: _accent, size: 18)
-                            : Text('${i + 1}', textAlign: TextAlign.center, style: const TextStyle(color: _textTertiary, fontSize: 13))),
-                        const SizedBox(width: 14),
-                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(s.name, style: TextStyle(color: isCurrent ? _accent : _textPrimary, fontSize: 15)),
-                          const SizedBox(height: 3),
-                          Text(s.singer, style: const TextStyle(color: _textSecondary, fontSize: 12)),
-                        ])),
-                      ]),
-                    ),
-                  ),
-                );
               },
             ),
+          if (!widget.embedded || _editMode) const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_editMode ? '已选 ${_selected.length} 首' : '收藏', style: AppDesignTokens.display(size: 28)),
+                const SizedBox(height: 4),
+                Text(_editMode ? '选择要移出的歌曲' : '${_songs.length} 首被点亮的歌', style: AppDesignTokens.caption(color: _accent)),
+              ],
+            ),
+          ),
+          if (!_editMode && _songs.isNotEmpty)
+            MusicChip(label: '整理', icon: Icons.edit_rounded, accent: _accent, onTap: () => setState(() => _editMode = true)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_songs.isEmpty) {
+      return MusicEmptyState(
+        accent: _accent,
+        icon: Icons.favorite_rounded,
+        title: '还没有收藏的歌',
+        message: '在播放页点亮爱心，歌曲会出现在这里。',
+      );
+    }
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.only(top: 4, bottom: 16),
+      itemCount: _songs.length,
+      itemBuilder: (_, i) {
+        final s = _songs[i];
+        final isCurrent = _player.currentSong?.id == s.id;
+        if (_editMode) {
+          return MusicListTile(
+            song: s,
+            index: i,
+            selected: _selected.contains(i),
+            isCurrent: isCurrent,
+            accent: _accent,
+            onTap: () => setState(() => _selected.contains(i) ? _selected.remove(i) : _selected.add(i)),
+            leadingOverride: Icon(
+              _selected.contains(i) ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+              color: _selected.contains(i) ? _accent : AppDesignTokens.dimGrey,
+              size: 26,
+            ),
+          );
+        }
+        return SwipeActionCell(
+          actionLabel: '删除',
+          actionColor: AppDesignTokens.danger,
+          onAction: () => _removeSong(i),
+          child: MusicListTile(song: s, index: i, isCurrent: isCurrent, accent: _accent, onTap: () => _playAt(i), margin: EdgeInsets.zero),
+        );
+      },
+    );
+  }
+
+  Widget _buildEditTray() {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 14),
+        child: GlassPanel(
+          accent: _accent,
+          radius: 26,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Expanded(child: MusicChip(label: _selected.length == _songs.length ? '取消全选' : '全选', icon: Icons.select_all_rounded, accent: _accent, onTap: _toggleSelectAll)),
+              const SizedBox(width: 10),
+              Expanded(child: MusicChip(label: '删除', icon: Icons.delete_rounded, accent: _selected.isEmpty ? AppDesignTokens.dimGrey : AppDesignTokens.danger, active: _selected.isNotEmpty, onTap: _selected.isEmpty ? null : _deleteSelected)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

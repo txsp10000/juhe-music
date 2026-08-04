@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import '../api/music_api.dart';
 import '../models/song.dart';
-import '../services/player_service.dart';
 import '../services/favorites_service.dart';
+import '../services/player_service.dart';
+import '../services/theme_service.dart';
+import '../theme/app_design_tokens.dart';
+import '../widgets/glass_panel.dart';
+import '../widgets/music_list_tile.dart';
 import 'player_page.dart';
 
 class SearchResultPage extends StatefulWidget {
@@ -23,20 +27,33 @@ class _SearchResultPageState extends State<SearchResultPage> {
   List<Song> _songs = [];
   final Set<String> _favoriteIds = {};
   String _errorMsg = '';
-
-  // ─── Design tokens ───
-  static const _bg = Color(0xFF000000);
-  static const _surface = Color(0xFF1A1A1A);
-  static const _accent = Color(0xFFFFFFFF);
-  static const _textPrimary = Color(0xFFFFFFFF);
-  static const _textSecondary = Color(0xFF999999);
-  static const _textTertiary = Color(0xFF666666);
+  Color _accent = AppDesignTokens.lyricWhite;
+  Color _bgHint = AppDesignTokens.inkBlack;
 
   @override
   void initState() {
     super.initState();
     _initialLoad();
     _loadFavorites();
+    _onThemeChange();
+    ThemeService.accentColor.addListener(_onThemeChange);
+    ThemeService.bgHint.addListener(_onThemeChange);
+  }
+
+  void _onThemeChange() {
+    if (mounted) {
+      setState(() {
+        _accent = AppDesignTokens.readableAccent(ThemeService.accentColor.value);
+        _bgHint = ThemeService.bgHint.value;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    ThemeService.accentColor.removeListener(_onThemeChange);
+    ThemeService.bgHint.removeListener(_onThemeChange);
+    super.dispose();
   }
 
   Future<void> _initialLoad() async {
@@ -50,10 +67,9 @@ class _SearchResultPageState extends State<SearchResultPage> {
 
   Future<void> _loadFavorites() async {
     final favorites = await FavoritesService.load();
-    _favoriteIds.clear();
-    for (final s in favorites) {
-      _favoriteIds.add(s.id);
-    }
+    _favoriteIds
+      ..clear()
+      ..addAll(favorites.map((s) => s.id));
     if (mounted) setState(() {});
   }
 
@@ -88,7 +104,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
           _isLoadingMore = false;
         });
       }
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -141,136 +157,122 @@ class _SearchResultPageState extends State<SearchResultPage> {
     return PopScope(
       canPop: !_isLoadingMore,
       child: Scaffold(
-        backgroundColor: _bg,
-        appBar: AppBar(
-          backgroundColor: _bg,
-          title: Text(
-            _loading ? '搜索中...' : widget.keyword,
-            style: const TextStyle(color: _textPrimary, fontSize: 17, fontWeight: FontWeight.w600),
-          ),
-          leading: _isLoadingMore
-              ? const SizedBox()
-              : IconButton(
-                  icon: const Icon(Icons.arrow_back, color: _textSecondary),
-                  onPressed: () => Navigator.pop(context),
-                ),
-        ),
-        body: GestureDetector(
-          onTap: () => FocusScope.of(context).unfocus(),
-          child: Stack(
-            children: [
-              if (_loading)
-                const Center(child: CircularProgressIndicator(color: _accent))
-              else if (_songs.isEmpty && !_isLoadingMore)
-                Center(
-                    child: Text(_errorMsg.isNotEmpty ? _errorMsg : '无搜索结果',
-                        style: const TextStyle(color: _textSecondary, fontSize: 15)))
-              else
-                NotificationListener<ScrollNotification>(
-                  onNotification: (notification) {
-                    if (notification is ScrollEndNotification &&
-                        notification.metrics.pixels >= notification.metrics.maxScrollExtent - 100 &&
-                        !_isLoadingMore && _hasMore) {
-                      _loadNextPage();
-                    }
-                    return false;
-                  },
-                  child: Column(
-                    children: [
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        color: _accent.withOpacity(0.08),
-                        child: Text(
-                          '共 ${_songs.length} 首歌',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: _accent, fontSize: 13),
-                        ),
-                      ),
-                      Expanded(
-                        child: ListView.builder(
-                          itemCount: _songs.length,
-                          itemBuilder: (_, i) {
-                      final s = _songs[i];
-                      final isCurrent = _player.currentSong?.id == s.id;
-                      return InkWell(
-                        onTap: () => _playAt(i),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: isCurrent ? _accent.withOpacity(0.08) : Colors.transparent,
-                            border: const Border(bottom: BorderSide(color: Color(0x08FFFFFF))),
-                          ),
-                          child: Row(
-                            children: [
-                              SizedBox(
-                                width: 26,
-                                child: isCurrent
-                                    ? const Icon(Icons.volume_up, color: _accent, size: 18)
-                                    : Text('${i + 1}',
-                                        textAlign: TextAlign.center,
-                                        style: const TextStyle(color: _textTertiary, fontSize: 13)),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(s.name,
-                                        style: TextStyle(
-                                            color: isCurrent ? _accent : _textPrimary,
-                                            fontSize: 15),
-                                        maxLines: 1, overflow: TextOverflow.ellipsis),
-                                    const SizedBox(height: 3),
-                                    Text(s.singer,
-                                        style: const TextStyle(color: _textSecondary, fontSize: 12)),
-                                  ],
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: () => _toggleFavorite(s),
-                                behavior: HitTestBehavior.opaque,
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                  child: Icon(
-                                    _favoriteIds.contains(s.id)
-                                        ? Icons.favorite
-                                        : Icons.favorite_border,
-                                    size: 22,
-                                    color: _favoriteIds.contains(s.id)
-                                        ? Colors.red
-                                        : Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                  ],
-                ),
-              ),
-              if (_isLoadingMore)
-                Container(
-                  color: Colors.black54,
-                  child: const Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CircularProgressIndicator(color: _accent),
-                        SizedBox(height: 16),
-                        Text('加载中...', style: TextStyle(color: Colors.white, fontSize: 15)),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
+        backgroundColor: Colors.transparent,
+        body: MusicScaffoldBackground(
+          bgHint: _bgHint,
+          accent: _accent,
+          child: SafeArea(
+            child: Column(
+              children: [
+                _buildHeader(),
+                Expanded(child: _buildBody()),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 10),
+      child: Row(
+        children: [
+          IconOrbButton(icon: Icons.arrow_back_rounded, accent: _accent, size: 42, onTap: _isLoadingMore ? null : () => Navigator.pop(context)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_loading ? '搜索中' : widget.keyword, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.title(size: 22)),
+                const SizedBox(height: 4),
+                Text(_loading ? '正在翻找音乐房间' : '共 ${_songs.length} 首歌', style: AppDesignTokens.caption(color: _accent)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return MusicEmptyState(accent: _accent, icon: Icons.graphic_eq_rounded, title: '正在搜索', message: '把相关歌曲从云端唱片箱里找出来。');
+    }
+    if (_songs.isEmpty && !_isLoadingMore) {
+      return MusicEmptyState(
+        accent: _accent,
+        icon: _errorMsg == '搜索失败' ? Icons.wifi_off_rounded : Icons.search_off_rounded,
+        title: _errorMsg.isNotEmpty ? _errorMsg : '没有找到相关歌曲',
+        message: _errorMsg == '搜索失败' ? '网络或接口暂时没有回应，稍后再试。' : '换个歌名或歌手试试。',
+      );
+    }
+    return Stack(
+      children: [
+        NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            if (notification is ScrollEndNotification &&
+                notification.metrics.pixels >= notification.metrics.maxScrollExtent - 100 &&
+                !_isLoadingMore &&
+                _hasMore) {
+              _loadNextPage();
+            }
+            return false;
+          },
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(0, 4, 0, 24),
+            itemCount: _songs.length + (_hasMore ? 1 : 0),
+            itemBuilder: (_, i) {
+              if (i >= _songs.length) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  child: Center(child: CircularProgressIndicator(color: _accent, strokeWidth: 2.4)),
+                );
+              }
+              final s = _songs[i];
+              final isCurrent = _player.currentSong?.id == s.id;
+              final favored = _favoriteIds.contains(s.id);
+              return MusicListTile(
+                song: s,
+                index: i,
+                isCurrent: isCurrent,
+                accent: _accent,
+                onTap: () => _playAt(i),
+                trailing: GestureDetector(
+                  onTap: () => _toggleFavorite(s),
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Icon(favored ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: favored ? AppDesignTokens.danger : AppDesignTokens.quietGrey, size: 23),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        if (_isLoadingMore)
+          Positioned.fill(
+            child: Container(
+              color: AppDesignTokens.inkBlack.withOpacity(0.42),
+              child: Center(
+                child: GlassPanel(
+                  accent: _accent,
+                  radius: 22,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: _accent, strokeWidth: 2)),
+                      const SizedBox(width: 12),
+                      Text('加载更多', style: AppDesignTokens.body(size: 14, color: AppDesignTokens.quietGrey)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
