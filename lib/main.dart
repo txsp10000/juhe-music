@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'pages/main_page.dart';
 import 'services/player_service.dart';
@@ -6,14 +7,24 @@ import 'services/audio_cache_service.dart';
 import 'services/wifi_cache_service.dart';
 import 'theme/app_design_tokens.dart';
 
+Future<void> _bootstrapBackgroundServices() async {
+  try {
+    await AudioCacheService().cleanupIncomplete();
+    await AudioCacheService().migrateOldFiles();
+    await PlayerService.init();
+    WifiCacheService().init();
+  } catch (e, st) {
+    debugPrint('Background init failed: $e');
+    debugPrintStack(stackTrace: st);
+  }
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SettingsService().load();
-  await AudioCacheService().cleanupIncomplete();
-  await AudioCacheService().migrateOldFiles();
-  await PlayerService.init();
-  WifiCacheService().init();
   runApp(const MusicApp());
+
+  unawaited(_bootstrapBackgroundServices());
 }
 
 class MusicApp extends StatelessWidget {

@@ -15,7 +15,8 @@ class PlayerService {
   factory PlayerService() => _instance;
   PlayerService._();
 
-  late final Player _player;
+  Player? _player;
+  bool _initialized = false;
   final List<Song> playlist = [];
   int _currentIndex = -1;
   String? _currentUrl;
@@ -113,8 +114,9 @@ class PlayerService {
   StreamSubscription? _completedSub;
 
   static Future<void> init() async {
-    MediaKit.ensureInitialized();
     final instance = PlayerService();
+    if (instance._initialized) return;
+    MediaKit.ensureInitialized();
     instance._player = Player();
 
     await AudioService.init(
@@ -127,13 +129,15 @@ class PlayerService {
         androidShowNotificationBadge: false,
       ),
     );
+    final player = instance._player!;
+    instance._initialized = true;
 
-    instance._positionSub = instance._player.stream.position.listen((pos) {
+    instance._positionSub = player.stream.position.listen((pos) {
       instance._position = pos;
       instance._notifyProgress(pos, instance._duration);
     });
 
-    instance._durationSub = instance._player.stream.duration.listen((dur) {
+    instance._durationSub = player.stream.duration.listen((dur) {
       instance._duration = dur;
       if (instance._currentMediaItem != null) {
         try {
@@ -143,12 +147,12 @@ class PlayerService {
       }
     });
 
-    instance._playingSub = instance._player.stream.playing.listen((playing) {
+    instance._playingSub = player.stream.playing.listen((playing) {
       instance._isPlaying = playing;
       instance._notifyPlayStateChanged(playing);
     });
 
-    instance._completedSub = instance._player.stream.completed.listen((completed) {
+    instance._completedSub = player.stream.completed.listen((completed) {
       if (completed) instance._onComplete();
     });
   }
@@ -186,7 +190,7 @@ class PlayerService {
       _currentUrl = null;
       _position = Duration.zero;
       _duration = Duration.zero;
-      await _player.stop();
+      await _player?.stop();
       _notifyPlayStateChanged(false);
       _notifyDownloadProgress(null);
       return;
@@ -201,14 +205,16 @@ class PlayerService {
   }
 
   void togglePlayPause() {
-    _player.playOrPause();
+    _player?.playOrPause();
   }
 
   bool _isSeeking = false;
 
   Future<void> seek(Duration position) async {
+    final player = _player;
+    if (player == null) return;
     _isSeeking = true;
-    _player.seek(position);
+    player.seek(position);
     // Delay to let media_kit settle after seek, ignore spurious completed events
     Future.delayed(const Duration(milliseconds: 500), () {
       _isSeeking = false;
@@ -217,8 +223,18 @@ class PlayerService {
 
   Future<void> playAt(int index) async {
     if (index < 0 || index >= playlist.length) return;
+    if (_player == null) {
+      try {
+        await PlayerService.init();
+      } catch (_) {}
+    }
+    final player = _player;
     _currentIndex = index;
     final song = playlist[index];
+    if (player == null) {
+      _notifySongChange(song);
+      return;
+    }
     final currentGen = ++_playGeneration;
     // Clear any lingering download progress from previous song
     _notifyDownloadProgress(null);
@@ -270,13 +286,13 @@ class PlayerService {
     }
 
     // Stop current playback immediately and show new song info
-    await _player.stop();
+    await player.stop();
     _notifySongChange(song);
 
     // If audio is already cached locally at sufficient quality, play directly
     if (hasCachedAudio) {
       _currentPlayingBr = _extractBrFromPath(cachedPath!);
-      await _player.open(Media('file://$cachedPath'), play: true);
+      await player.open(Media('file://$cachedPath'), play: true);
       if (currentGen != _playGeneration) return;
       // 本地播放后仍需获取封面（如果还没有的话）
       if (song.cover.isEmpty || localCover == null) {
@@ -354,7 +370,7 @@ class PlayerService {
     }
     // Download complete, start playback
     _currentPlayingBr = SettingsService().quality.br;
-    await _player.open(Media('file://$localPath'), play: true);
+    await player.open(Media('file://$localPath'), play: true);
     if (currentGen != _playGeneration) return;
   }
 
@@ -401,12 +417,13 @@ class PlayerService {
       if (currentGen != _playGeneration) return;
     }
 
-    if (localPath == null || localPath.isEmpty) return;
+    final player = _player;
+    if (player == null || localPath == null || localPath.isEmpty) return;
     _currentPlayingBr = _extractBrFromPath(localPath);
-    await _player.open(Media('file://$localPath'), play: wasPlaying);
+    await player.open(Media('file://$localPath'), play: wasPlaying);
     if (currentGen != _playGeneration) return;
     if (resumePosition > Duration.zero) {
-      await _player.seek(resumePosition);
+      await player.seek(resumePosition);
     }
   }
 
@@ -438,7 +455,7 @@ class PlayerService {
     _durationSub?.cancel();
     _playingSub?.cancel();
     _completedSub?.cancel();
-    _player.dispose();
+    _player?.dispose();
   }
 }
 
@@ -461,12 +478,12 @@ class _AudioPlayerTask extends BaseAudioHandler {
             final wasPlaying = args['wasPlaying'] as bool? ?? ps._isPlaying;
             _resumeAfterInterruption = reason == 'interruption' && wasPlaying;
             _pauseReason = reason;
-            await ps._player.pause();
+            await ps._player?.pause();
           } else if (event == 'resume') {
             if (reason == 'interruption' && _resumeAfterInterruption) {
               _resumeAfterInterruption = false;
               _pauseReason = null;
-              await ps._player.play();
+              await ps._player?.play();
             }
           }
           break;
@@ -475,7 +492,7 @@ class _AudioPlayerTask extends BaseAudioHandler {
       }
     });
 
-    ps._player.stream.playing.listen((playing) {
+    ps._player?.stream.playing.listen((playing) {
       if (playing && _pauseReason != null) {
         _pauseReason = null;
         _resumeAfterInterruption = false;
@@ -484,12 +501,12 @@ class _AudioPlayerTask extends BaseAudioHandler {
       _syncNowPlaying();
     });
 
-    ps._player.stream.position.listen((_) {
+    ps._player?.stream.position.listen((_) {
       _updatePlaybackState();
       _syncNowPlaying();
     });
 
-    ps._player.stream.duration.listen((dur) {
+    ps._player?.stream.duration.listen((dur) {
       final item = ps._currentMediaItem;
       if (item != null && dur > Duration.zero) {
         final updated = item.copyWith(duration: dur);
@@ -538,13 +555,13 @@ class _AudioPlayerTask extends BaseAudioHandler {
   }
 
   @override
-  Future<void> play() async => PlayerService()._player.play();
+  Future<void> play() async => PlayerService()._player?.play();
 
   @override
-  Future<void> pause() async => PlayerService()._player.pause();
+  Future<void> pause() async => PlayerService()._player?.pause();
 
   @override
-  Future<void> stop() async => PlayerService()._player.stop();
+  Future<void> stop() async => PlayerService()._player?.stop();
 
   @override
   Future<void> seek(Duration position) async => PlayerService().seek(position);

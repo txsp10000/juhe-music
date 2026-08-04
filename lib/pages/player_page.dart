@@ -556,46 +556,59 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   Widget _buildPlayerContent(Song song) {
-    final size = MediaQuery.of(context).size;
-    final coverSize = min(size.width * 0.76, size.height * 0.35);
     final currentLyric = _currentLyricText(song);
     final nextLyric = _nextLyricText(song);
-    return Padding(
+    return LayoutBuilder(
       key: ValueKey(song.id),
-      padding: const EdgeInsets.fromLTRB(26, 8, 26, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Spacer(flex: 2),
-          Center(
-            child: Container(
-              width: coverSize,
-              height: coverSize,
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(28), color: Colors.white.withOpacity(0.08), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.28), blurRadius: 28, offset: const Offset(0, 16))]),
-              clipBehavior: Clip.antiAlias,
-              child: _coverBytes != null ? Image.memory(_coverBytes!, fit: BoxFit.cover) : Icon(Icons.music_note_rounded, color: AppDesignTokens.lyricWhite.withOpacity(0.72), size: 90),
-            ),
-          ),
-          const Spacer(flex: 2),
-          Row(
+      builder: (context, constraints) {
+        final availableHeight = constraints.maxHeight;
+        final width = constraints.maxWidth;
+        final coverSize = min(width * 0.56, availableHeight * 0.28).clamp(160.0, 240.0);
+        final compact = availableHeight < 640;
+        final titleSize = compact ? 22.0 : 24.0;
+        final singerSize = compact ? 17.0 : 19.0;
+        final lyricSize = compact ? 22.0 : 24.0;
+        final nextLyricSize = compact ? 17.0 : 19.0;
+        final topGap = compact ? 2.0 : 8.0;
+        final coverToInfoGap = compact ? 12.0 : 18.0;
+        final infoToLyricGap = compact ? 14.0 : 18.0;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(26, 0, 26, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: Text(song.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.display(size: 27))),
-              const SizedBox(width: 8),
-              MusicChip(label: _qualityLabel(), accent: _accent, active: true, onTap: _showQualityPicker),
+              SizedBox(height: topGap),
+              Center(
+                child: Container(
+                  width: coverSize,
+                  height: coverSize,
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(28), color: Colors.white.withOpacity(0.08), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.28), blurRadius: 28, offset: const Offset(0, 16))]),
+                  clipBehavior: Clip.antiAlias,
+                  child: _coverBytes != null ? Image.memory(_coverBytes!, fit: BoxFit.cover) : Icon(Icons.music_note_rounded, color: AppDesignTokens.lyricWhite.withOpacity(0.72), size: coverSize * 0.26),
+                ),
+              ),
+              SizedBox(height: coverToInfoGap),
+              Row(
+                children: [
+                  Expanded(child: Text(song.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.display(size: titleSize))),
+                  const SizedBox(width: 8),
+                  MusicChip(label: _qualityLabel(), accent: _accent, active: true, onTap: _showQualityPicker),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(song.singer, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.title(size: singerSize, color: AppDesignTokens.warmWhite.withOpacity(0.76))),
+              SizedBox(height: infoToLyricGap),
+              Text(currentLyric, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppDesignTokens.display(size: lyricSize)),
+              const SizedBox(height: 8),
+              Text(nextLyric, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.title(size: nextLyricSize, color: AppDesignTokens.warmWhite.withOpacity(0.58))),
+              const Spacer(),
+              _buildSocialActions(),
+              if (_downloadProgress != null) ...[const SizedBox(height: 8), _buildDownloadProgress()],
+              SizedBox(height: compact ? 4 : 10),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(song.singer, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.title(size: 22, color: AppDesignTokens.warmWhite.withOpacity(0.76))),
-          const SizedBox(height: 28),
-          Text(currentLyric, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppDesignTokens.display(size: 27)),
-          const SizedBox(height: 12),
-          Text(nextLyric, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.title(size: 21, color: AppDesignTokens.warmWhite.withOpacity(0.58))),
-          const Spacer(flex: 2),
-          _buildSocialActions(),
-          if (_downloadProgress != null) ...[const SizedBox(height: 12), _buildDownloadProgress()],
-          const Spacer(flex: 1),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -669,7 +682,7 @@ class _PlayerPageState extends State<PlayerPage> {
     final max = _duration.inMilliseconds.toDouble();
     final current = _isDragging ? _dragValue : _position.inMilliseconds.toDouble().clamp(0.0, max);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(30, 0, 30, 84),
+      padding: const EdgeInsets.fromLTRB(30, 0, 30, 92),
       child: SliderTheme(
         data: SliderThemeData(
           trackHeight: 2,
