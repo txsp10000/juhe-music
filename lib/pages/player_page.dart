@@ -819,45 +819,30 @@ class _PlayerPageState extends State<PlayerPage> {
   Widget _buildBottomTab() {
     final hasSong = _player.currentSong != null;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0xFF1A1A1A), width: 0.5)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          GestureDetector(
-            onTap: null,
-            child: Text('收藏',
-                style: TextStyle(color: _accent.withOpacity(0.5), fontSize: 16, fontWeight: FontWeight.w500)),
-          ),
-          GestureDetector(
-            onTap: hasSong ? () => _player.togglePlayPause() : null,
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                    color: hasSong ? _accent : _textTertiary, width: 2.5),
-              ),
-              child: Center(
-                child: Icon(
-                  _player.isPlaying ? Icons.pause : Icons.play_arrow,
-                  color: hasSong ? _accent : _textTertiary,
-                  size: 22,
-                ),
-              ),
-            ),
-          ),
-          GestureDetector(
-            onTap: null,
-            child: Text('搜索',
-                style: TextStyle(color: _accent.withOpacity(0.5), fontSize: 16, fontWeight: FontWeight.w500)),
-          ),
-        ],
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      color: _bgHint,
+      child: Row(children: [
+        Expanded(child: _buildTabLabel('收藏')),
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: hasSong ? () => _player.togglePlayPause() : null,
+          child: SizedBox(width: 60, height: 44, child: Center(
+            child: Container(width: 40, height: 40, decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: hasSong ? Colors.white : const Color(0xFF555555), width: 2.5),
+            ), child: Center(child: Icon(
+              _player.isPlaying ? Icons.pause : Icons.play_arrow,
+              color: hasSong ? Colors.white : const Color(0xFF555555), size: 20))),
+          )),
+        ),
+        Expanded(child: _buildTabLabel('搜索')),
+      ]),
     );
+  }
+
+  Widget _buildTabLabel(String text) {
+    return Container(height: 44, alignment: Alignment.center,
+      child: Text(text, style: TextStyle(color: _accent.withOpacity(0.5), fontSize: 14, fontWeight: FontWeight.w500)));
   }
 
   Widget _buildBottomActions() {
