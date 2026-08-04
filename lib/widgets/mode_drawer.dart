@@ -21,18 +21,6 @@ class _ModeDrawerState extends State<ModeDrawer> {
   Color _accent = AppDesignTokens.lyricWhite;
   Color _bgHint = AppDesignTokens.inkBlack;
 
-  final _modes = const [
-    (Icons.favorite_rounded, '收藏模式'),
-    (Icons.shuffle_rounded, '随机模式'),
-    (Icons.nightlight_round, '助眠模式'),
-    (Icons.bathtub_rounded, '洗澡'),
-    (Icons.directions_run_rounded, '动感健身'),
-    (Icons.eco_rounded, 'Chill 放松'),
-    (Icons.mood_rounded, '快乐时光'),
-    (Icons.equalizer_rounded, '电音'),
-    (Icons.filter_vintage_rounded, '国风'),
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -106,9 +94,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
             children: [
               _buildHeader(),
               const SizedBox(height: 34),
-              _selectedDefault(),
-              const SizedBox(height: 26),
-              _buildModeGrid(),
+              _buildQuickModes(),
               const SizedBox(height: 28),
               _buildPlaylistAccess(),
             ],
@@ -129,44 +115,44 @@ class _ModeDrawerState extends State<ModeDrawer> {
     );
   }
 
-  Widget _selectedDefault() {
-    return GestureDetector(
-      onTap: () => Navigator.pop(context),
-      child: Container(
-        height: 76,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(color: AppDesignTokens.selectedPill, borderRadius: BorderRadius.circular(18)),
-        child: Text('||| 默认模式', style: AppDesignTokens.title(size: 23, color: const Color(0xFF3B2418))),
-      ),
+  Widget _buildQuickModes() {
+    return Column(
+      children: [
+        _modeButton(Icons.album_rounded, '默认模式', '返回当前播放页面', () => Navigator.pop(context), selected: true),
+        const SizedBox(height: 12),
+        _modeButton(Icons.favorite_rounded, '收藏模式', '播放收藏列表里的歌曲', () { Navigator.pop(context); widget.onOpenFavorites(); }),
+        const SizedBox(height: 12),
+        _modeButton(Icons.shuffle_rounded, '随机模式', '从置顶歌单中随机播放', () { Navigator.pop(context); widget.onRandomPlay(); }),
+      ],
     );
   }
 
-  Widget _buildModeGrid() {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 3,
-      mainAxisSpacing: 26,
-      crossAxisSpacing: 8,
-      childAspectRatio: 0.86,
-      children: _modes.map((m) => _modeTile(m.$1, m.$2, () {
-        if (m.$2 == '收藏模式') { Navigator.pop(context); widget.onOpenFavorites(); return; }
-        if (m.$2 == '随机模式') { Navigator.pop(context); widget.onRandomPlay(); return; }
-        Toast.show(context, '已切换到「${m.$2}」');
-      })).toList(),
-    );
-  }
-
-  Widget _modeTile(IconData icon, String label, VoidCallback onTap) {
+  Widget _modeButton(IconData icon, String title, String subtitle, VoidCallback onTap, {bool selected = false}) {
     return GestureDetector(
       onTap: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: AppDesignTokens.lyricWhite.withOpacity(0.90), size: 30),
-          const SizedBox(height: 12),
-          Text(label, textAlign: TextAlign.center, maxLines: 2, style: AppDesignTokens.body(size: 14, color: AppDesignTokens.warmWhite.withOpacity(0.86), weight: FontWeight.w800)),
-        ],
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        decoration: BoxDecoration(
+          color: selected ? AppDesignTokens.selectedPill : Colors.white.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: selected ? const Color(0xFF3B2418) : AppDesignTokens.lyricWhite.withOpacity(0.90), size: 28),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: AppDesignTokens.title(size: 20, color: selected ? const Color(0xFF3B2418) : AppDesignTokens.lyricWhite)),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: AppDesignTokens.caption(color: selected ? const Color(0xFF3B2418).withOpacity(0.72) : AppDesignTokens.warmWhite.withOpacity(0.62))),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

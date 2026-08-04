@@ -41,6 +41,7 @@ class _MainPageState extends State<MainPage> {
 
   void _onPlayState(bool _) { if (mounted) setState(() {}); }
   void _onSongChange(Song _) { if (mounted) setState(() {}); }
+  void _showPlayer() { if (mounted) setState(() => _tab = 0); }
 
   @override
   void dispose() {
@@ -61,10 +62,10 @@ class _MainPageState extends State<MainPage> {
         accent: _accent,
         child: IndexedStack(
           index: _tab,
-          children: const [
-            PlayerPage(isRoot: true),
-            SearchPage(embedded: true),
-            FavoritesPage(embedded: true),
+          children: [
+            const PlayerPage(),
+            SearchPage(embedded: true, onShowPlayer: _showPlayer),
+            FavoritesPage(embedded: true, onShowPlayer: _showPlayer),
           ],
         ),
       ),
@@ -88,7 +89,7 @@ class _MainPageState extends State<MainPage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _navLabel('发现', 0),
+                  _navLabel('发现', 1),
                   const SizedBox(width: 70),
                   _navLabel('收藏', 2),
                 ],

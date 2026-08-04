@@ -7,7 +7,8 @@ import 'search_result_page.dart';
 
 class SearchPage extends StatefulWidget {
   final bool embedded;
-  const SearchPage({super.key, this.embedded = false});
+  final VoidCallback? onShowPlayer;
+  const SearchPage({super.key, this.embedded = false, this.onShowPlayer});
 
   @override
   State<SearchPage> createState() => _SearchPageState();
@@ -64,7 +65,7 @@ class _SearchPageState extends State<SearchPage> {
     _focusNode.unfocus();
     await SearchHistoryService.save(trimmed);
     if (!mounted) return;
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => SearchResultPage(keyword: trimmed)));
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => SearchResultPage(keyword: trimmed, onShowPlayer: widget.onShowPlayer)));
     if (mounted) _loadHistory();
   }
 
@@ -112,7 +113,7 @@ class _SearchPageState extends State<SearchPage> {
           GestureDetector(onTap: () => Navigator.pop(context), child: const Icon(Icons.arrow_back_rounded, color: AppDesignTokens.lyricWhite, size: 30)),
           const SizedBox(width: 10),
         ],
-        Text('发现', style: AppDesignTokens.display(size: 30)),
+        Text('搜索', style: AppDesignTokens.display(size: 30)),
       ],
     );
   }

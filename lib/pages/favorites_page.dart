@@ -8,12 +8,12 @@ import '../utils/toast.dart';
 import '../widgets/glass_panel.dart';
 import '../widgets/music_list_tile.dart';
 import '../widgets/swipe_action_cell.dart';
-import 'player_page.dart';
 
 class FavoritesPage extends StatefulWidget {
   final bool fromPlayer;
   final bool embedded;
-  const FavoritesPage({super.key, this.fromPlayer = false, this.embedded = false});
+  final VoidCallback? onShowPlayer;
+  const FavoritesPage({super.key, this.fromPlayer = false, this.embedded = false, this.onShowPlayer});
 
   @override
   State<FavoritesPage> createState() => _FavoritesPageState();
@@ -86,21 +86,15 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   void _playAt(int index) {
-    if (_player.currentSong?.id == _songs[index].id) {
-      if (widget.fromPlayer) {
-        Navigator.pop(context);
-      } else {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
-      }
-      return;
+    if (_player.currentSong?.id != _songs[index].id) {
+      _player.playlist.clear();
+      _player.playlist.addAll(_songs);
+      _player.playAt(index);
     }
-    _player.playlist.clear();
-    _player.playlist.addAll(_songs);
-    _player.playAt(index);
     if (widget.fromPlayer) {
       Navigator.pop(context);
-    } else {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+    } else if (widget.embedded && widget.onShowPlayer != null) {
+      widget.onShowPlayer!();
     }
   }
 

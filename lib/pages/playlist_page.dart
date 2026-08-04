@@ -6,7 +6,6 @@ import '../theme/app_design_tokens.dart';
 import '../widgets/glass_panel.dart';
 import '../widgets/music_list_tile.dart';
 import '../widgets/swipe_action_cell.dart';
-import 'player_page.dart';
 
 class PlaylistPage extends StatefulWidget {
   final bool fromPlayer;
@@ -63,20 +62,10 @@ class _PlaylistPageState extends State<PlaylistPage> {
   }
 
   void _playAt(int index) {
-    if (_player.currentSong?.id == _player.playlist[index].id) {
-      if (widget.fromPlayer) {
-        Navigator.pop(context);
-      } else {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
-      }
-      return;
+    if (_player.currentSong?.id != _player.playlist[index].id) {
+      _player.playAt(index);
     }
-    _player.playAt(index);
-    if (widget.fromPlayer) {
-      Navigator.pop(context);
-    } else {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
-    }
+    Navigator.pop(context);
   }
 
   @override

@@ -7,12 +7,12 @@ import '../services/theme_service.dart';
 import '../theme/app_design_tokens.dart';
 import '../widgets/glass_panel.dart';
 import '../widgets/music_list_tile.dart';
-import 'player_page.dart';
 
 class SearchResultPage extends StatefulWidget {
   final String keyword;
   final bool fromPlayer;
-  const SearchResultPage({super.key, required this.keyword, this.fromPlayer = false});
+  final VoidCallback? onShowPlayer;
+  const SearchResultPage({super.key, required this.keyword, this.fromPlayer = false, this.onShowPlayer});
 
   @override
   State<SearchResultPage> createState() => _SearchResultPageState();
@@ -120,21 +120,16 @@ class _SearchResultPageState extends State<SearchResultPage> {
   }
 
   void _playAt(int index) {
-    if (_player.currentSong?.id == _songs[index].id) {
-      if (widget.fromPlayer) {
-        Navigator.pop(context);
-      } else {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
-      }
-      return;
+    if (_player.currentSong?.id != _songs[index].id) {
+      _player.playlist.clear();
+      _player.playlist.addAll(_songs);
+      _player.playAt(index);
     }
-    _player.playlist.clear();
-    _player.playlist.addAll(_songs);
-    _player.playAt(index);
     if (widget.fromPlayer) {
       Navigator.pop(context);
-    } else {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerPage()));
+    } else if (widget.onShowPlayer != null) {
+      widget.onShowPlayer!();
+      Navigator.pop(context);
     }
   }
 

@@ -15,9 +15,6 @@ import '../utils/toast.dart';
 import '../widgets/glass_panel.dart';
 import '../widgets/mode_drawer.dart';
 import '../widgets/music_list_tile.dart';
-import 'favorites_page.dart';
-import 'playlist_page.dart';
-import 'search_page.dart';
 import 'search_result_page.dart';
 
 class _LrcLine {
@@ -27,8 +24,7 @@ class _LrcLine {
 }
 
 class PlayerPage extends StatefulWidget {
-  final bool isRoot;
-  const PlayerPage({super.key, this.isRoot = false});
+  const PlayerPage({super.key});
 
   @override
   State<PlayerPage> createState() => _PlayerPageState();
@@ -47,6 +43,8 @@ class _PlayerPageState extends State<PlayerPage> {
   String _coverUrl = '';
   Uint8List? _coverBytes;
   int _swipeDirection = 0;
+  double _dragOffset = 0.0;
+  bool _isSwitchingSong = false;
 
   Color _accent = AppDesignTokens.lyricWhite;
   Color _bgHint = AppDesignTokens.inkBlack;
@@ -93,7 +91,10 @@ class _PlayerPageState extends State<PlayerPage> {
       _coverBytes = null;
       _coverUrl = '';
     }
-    setState(() {});
+    setState(() {
+      _dragOffset = 0.0;
+      _isSwitchingSong = false;
+    });
     _checkFavorite();
     _loadCover(s);
   }
@@ -308,18 +309,6 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  String _currentBrLabel() {
-    final br = _player.currentPlayingBr;
-    switch (br) {
-      case 128: return '128kbps';
-      case 192: return '192kbps';
-      case 320: return '320kbps';
-      case 740: return '16bit 无损';
-      case 999: return '24bit 无损';
-      default: return '${br}kbps';
-    }
-  }
-
   String _qualityLabel() {
     switch (SettingsService().quality) {
       case AudioQuality.low128: return '标准';
@@ -416,27 +405,23 @@ class _PlayerPageState extends State<PlayerPage> {
   @override
   Widget build(BuildContext context) {
     final song = _player.currentSong;
-    if (song == null && !widget.isRoot) {
-      return const Scaffold(backgroundColor: AppDesignTokens.inkBlack, body: SizedBox());
-    }
     return Scaffold(
-      key: widget.isRoot ? _scaffoldKey : null,
+      key: _scaffoldKey,
       backgroundColor: Colors.transparent,
-      drawer: widget.isRoot ? ModeDrawer(onSelectPlaylist: _loadAndPlay, onOpenFavorites: _openFavorites, onRandomPlay: _randomPlay) : null,
+      drawer: ModeDrawer(onSelectPlaylist: _loadAndPlay, onOpenFavorites: _openFavorites, onRandomPlay: _randomPlay),
       body: MusicScaffoldBackground(
         bgHint: _bgHint,
         accent: _accent,
         coverBytes: _coverBytes,
         useCoverBlur: true,
         child: SafeArea(
-          bottom: !widget.isRoot,
+          bottom: false,
           child: Column(
             children: [
               _buildHeader(song),
               Expanded(child: song != null ? _buildSwipeableContent(song) : _buildEmptyState()),
               if (song != null) _buildProgressBar(),
-              if (!widget.isRoot && song != null) _buildNonRootControls(),
-              if (widget.isRoot) const SizedBox(height: 92),
+              const SizedBox(height: 92),
             ],
           ),
         ),
@@ -450,18 +435,15 @@ class _PlayerPageState extends State<PlayerPage> {
       child: Row(
         children: [
           GestureDetector(
-            onTap: widget.isRoot ? () => _scaffoldKey.currentState?.openDrawer() : () => Navigator.pop(context),
+            onTap: () => _scaffoldKey.currentState?.openDrawer(),
             child: Row(
               children: [
-                Icon(widget.isRoot ? Icons.menu_rounded : Icons.keyboard_arrow_down_rounded, color: AppDesignTokens.lyricWhite, size: 34),
+                const Icon(Icons.menu_rounded, color: AppDesignTokens.lyricWhite, size: 34),
                 const SizedBox(width: 10),
-                Text(widget.isRoot ? '模式选择' : '正在播放', style: AppDesignTokens.title(size: 26)),
+                Text('模式选择', style: AppDesignTokens.title(size: 26)),
               ],
             ),
           ),
-          const Spacer(),
-          if (!widget.isRoot)
-            GestureDetector(onTap: _showPlaylistSheet, child: const Icon(Icons.queue_music_rounded, color: AppDesignTokens.lyricWhite, size: 32)),
         ],
       ),
     );
@@ -495,33 +477,75 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   Widget _buildSwipeableContent(Song song) {
-    return GestureDetector(
-      onVerticalDragEnd: (details) {
-        final dy = details.primaryVelocity ?? 0;
-        if (dy < -300) { setState(() => _swipeDirection = -1); _player.next(); }
-        if (dy > 300) { setState(() => _swipeDirection = 1); _player.prev(); }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final height = constraints.maxHeight == double.infinity ? MediaQuery.of(context).size.height : constraints.maxHeight;
+        final dragProgress = (_dragOffset.abs() / max(height * 0.46, 1.0)).clamp(0.0, 1.0);
+        final slideOffset = _isSwitchingSong ? Offset(0, _swipeDirection < 0 ? -1.05 : 1.05) : Offset(0, _dragOffset / max(height, 1.0));
+        final opacity = _isSwitchingSong ? 0.0 : (1.0 - dragProgress * 0.72).clamp(0.28, 1.0);
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onVerticalDragUpdate: (details) {
+            if (_isSwitchingSong) return;
+            setState(() => _dragOffset = (_dragOffset + details.delta.dy).clamp(-height * 0.58, height * 0.58));
+          },
+          onVerticalDragEnd: (details) => _finishSongDrag(details.primaryVelocity ?? 0, height),
+          onVerticalDragCancel: () {
+            if (!_isSwitchingSong) setState(() => _dragOffset = 0.0);
+          },
+          child: ClipRect(
+            child: AnimatedSlide(
+              offset: slideOffset,
+              duration: Duration(milliseconds: _isSwitchingSong ? 260 : 80),
+              curve: Curves.easeOutCubic,
+              child: AnimatedOpacity(
+                opacity: opacity,
+                duration: Duration(milliseconds: _isSwitchingSong ? 240 : 80),
+                child: _buildPlayerContent(song),
+              ),
+            ),
+          ),
+        );
       },
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 320),
-        transitionBuilder: (child, animation) {
-          final offset = _swipeDirection <= 0 ? Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero) : Tween<Offset>(begin: const Offset(0, -0.12), end: Offset.zero);
-          return FadeTransition(opacity: animation, child: SlideTransition(position: offset.animate(animation), child: child));
-        },
-        child: _buildPlayerContent(song),
-      ),
     );
   }
 
+  void _finishSongDrag(double velocity, double height) {
+    if (_isSwitchingSong) return;
+    final threshold = height * 0.18;
+    final shouldNext = _dragOffset < -threshold || velocity < -650;
+    final shouldPrev = _dragOffset > threshold || velocity > 650;
+    if (!shouldNext && !shouldPrev) {
+      setState(() => _dragOffset = 0.0);
+      return;
+    }
+    setState(() {
+      _swipeDirection = shouldNext ? -1 : 1;
+      _isSwitchingSong = true;
+      _dragOffset = shouldNext ? -height : height;
+    });
+    Future.delayed(const Duration(milliseconds: 180), () {
+      if (!mounted) return;
+      if (shouldNext) {
+        _player.next();
+      } else {
+        _player.prev();
+      }
+    });
+  }
+
   Widget _buildPlayerContent(Song song) {
-    final coverSize = min(MediaQuery.of(context).size.width * 0.82, 360.0);
+    final size = MediaQuery.of(context).size;
+    final coverSize = min(size.width * 0.76, size.height * 0.35);
     final currentLyric = _currentLyricText(song);
     final nextLyric = _nextLyricText(song);
-    return SingleChildScrollView(
+    return Padding(
       key: ValueKey(song.id),
-      padding: const EdgeInsets.fromLTRB(26, 80, 26, 18),
+      padding: const EdgeInsets.fromLTRB(26, 8, 26, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const Spacer(flex: 2),
           Center(
             child: Container(
               width: coverSize,
@@ -531,11 +555,11 @@ class _PlayerPageState extends State<PlayerPage> {
               child: _coverBytes != null ? Image.memory(_coverBytes!, fit: BoxFit.cover) : Icon(Icons.music_note_rounded, color: AppDesignTokens.lyricWhite.withOpacity(0.72), size: 90),
             ),
           ),
-          const SizedBox(height: 48),
+          const Spacer(flex: 2),
           Text(currentLyric, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppDesignTokens.display(size: 27)),
           const SizedBox(height: 12),
           Text(nextLyric, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.title(size: 21, color: AppDesignTokens.warmWhite.withOpacity(0.58))),
-          const SizedBox(height: 78),
+          const Spacer(flex: 3),
           Row(
             children: [
               Expanded(child: Text(song.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.display(size: 27))),
@@ -545,9 +569,10 @@ class _PlayerPageState extends State<PlayerPage> {
           ),
           const SizedBox(height: 12),
           Text(song.singer, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.title(size: 22, color: AppDesignTokens.warmWhite.withOpacity(0.76))),
-          const SizedBox(height: 30),
+          const SizedBox(height: 22),
           _buildSocialActions(),
-          if (_downloadProgress != null) ...[const SizedBox(height: 14), _buildDownloadProgress()],
+          if (_downloadProgress != null) ...[const SizedBox(height: 12), _buildDownloadProgress()],
+          const Spacer(flex: 1),
         ],
       ),
     );
@@ -608,19 +633,6 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  Widget _socialAction(IconData icon, String count, VoidCallback onTap, [Color? color]) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Row(
-        children: [
-          Icon(icon, color: color ?? AppDesignTokens.lyricWhite, size: 42),
-          const SizedBox(width: 5),
-          Text(count, style: AppDesignTokens.body(size: 16, weight: FontWeight.w900)),
-        ],
-      ),
-    );
-  }
-
   Widget _buildDownloadProgress() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -636,7 +648,7 @@ class _PlayerPageState extends State<PlayerPage> {
     final max = _duration.inMilliseconds.toDouble();
     final current = _isDragging ? _dragValue : _position.inMilliseconds.toDouble().clamp(0.0, max);
     return Padding(
-      padding: EdgeInsets.fromLTRB(30, 0, 30, widget.isRoot ? 84 : 14),
+      padding: const EdgeInsets.fromLTRB(30, 0, 30, 84),
       child: SliderTheme(
         data: SliderThemeData(
           trackHeight: 2,
@@ -655,21 +667,6 @@ class _PlayerPageState extends State<PlayerPage> {
           onChanged: (v) => setState(() => _dragValue = v),
           onChangeEnd: (v) { _isDragging = false; _player.seek(Duration(milliseconds: v.toInt())); },
         ),
-      ),
-    );
-  }
-
-  Widget _buildNonRootControls() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(26, 0, 26, 18),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          IconOrbButton(icon: _isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded, accent: _accent, active: _isFavorite, onTap: _toggleFavorite),
-          IconOrbButton(icon: Icons.search_rounded, accent: _accent, onTap: _showSearchSameSheet),
-          MusicChip(label: _qualityLabel(), accent: _accent, active: true, onTap: _showQualityPicker),
-          IconOrbButton(icon: Icons.queue_music_rounded, accent: _accent, onTap: _showPlaylistSheet),
-        ],
       ),
     );
   }
