@@ -410,34 +410,33 @@ class _PlayerPageState extends State<PlayerPage> {
             onRandomPlay: _randomPlay,
             onClose: _closeModePanel,
           ),
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeOutCubic,
-            left: _modePanelOpen ? panelWidth : 0,
-            right: _modePanelOpen ? -panelWidth : 0,
-            top: 0,
-            bottom: 0,
-            child: GestureDetector(
-              behavior: _modePanelOpen ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
-              onTap: _modePanelOpen ? _closeModePanel : null,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(_modePanelOpen ? 28 : 0),
-                child: AbsorbPointer(
-                  absorbing: _modePanelOpen,
-                  child: MusicScaffoldBackground(
-                    bgHint: _bgHint,
-                    accent: _accent,
-                    coverBytes: _coverBytes,
-                    useCoverBlur: true,
-                    child: SafeArea(
-                      bottom: false,
-                      child: Column(
-                        children: [
-                          _buildHeader(song),
-                          Expanded(child: song != null ? _buildSwipeableContent(song) : _buildEmptyState()),
-                          if (song != null) _buildProgressBar(),
-                          const SizedBox(height: 92),
-                        ],
+          Positioned.fill(
+            child: AnimatedSlide(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+              offset: Offset(_modePanelOpen ? panelWidth / MediaQuery.of(context).size.width : 0, 0),
+              child: GestureDetector(
+                behavior: _modePanelOpen ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
+                onTap: _modePanelOpen ? _closeModePanel : null,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(_modePanelOpen ? 28 : 0),
+                  child: AbsorbPointer(
+                    absorbing: _modePanelOpen,
+                    child: MusicScaffoldBackground(
+                      bgHint: _bgHint,
+                      accent: _accent,
+                      coverBytes: _coverBytes,
+                      useCoverBlur: true,
+                      child: SafeArea(
+                        bottom: false,
+                        child: Column(
+                          children: [
+                            _buildHeader(song),
+                            Expanded(child: song != null ? _buildSwipeableContent(song) : _buildEmptyState()),
+                            if (song != null) _buildProgressBar(),
+                            const SizedBox(height: 92),
+                          ],
+                        ),
                       ),
                     ),
                   ),
