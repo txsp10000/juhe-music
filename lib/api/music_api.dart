@@ -7,6 +7,7 @@ import '../models/song.dart';
 
 class MusicApi {
   static const _base = 'https://music-api.gdstudio.xyz/api.php';
+  static const _emptyRetryAttempts = 80;
   static final _client = http.Client();
   static String _enc(String s) => Uri.encodeComponent(s);
 
@@ -17,8 +18,8 @@ class MusicApi {
     return resp.body;
   }
 
-  /// 通用重试：用于播放地址/歌词等关键请求
-  static Future<T> _retry<T>(Future<T> Function() block, {int maxAttempts = 6}) async {
+  /// 通用立即重试：接口偶发返回空时会马上再次请求，但保留上限避免卡死。
+  static Future<T> _retry<T>(Future<T> Function() block, {int maxAttempts = _emptyRetryAttempts}) async {
     Exception? lastError;
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
@@ -26,99 +27,96 @@ class MusicApi {
       } on Exception catch (e) {
         lastError = e;
       }
-      if (attempt < maxAttempts) await Future.delayed(const Duration(milliseconds: 450));
     }
     throw lastError ?? Exception('重试后仍失败');
   }
 
-  /// 搜索歌曲（返回原始响应体，用于错误展示）
+  /// 搜索歌曲（返回原始响应体，用于错误展示；[] 会立即重试）
   static Future<SearchRawResult> searchRaw(String keyword, {int num = 20, int page = 1}) async {
     final encoded = _enc(keyword);
-    var songs = <Song>[];
-    var rawBody = '';
-    for (var attempt = 1; attempt <= 2; attempt++) {
-      try {
+    try {
+      return await _retry(() async {
         final url = '$_base?types=search&source=netease&name=$encoded&count=$num&pages=$page';
-        rawBody = await _httpGet(url);
+        final rawBody = await _httpGet(url);
         final list = jsonDecode(rawBody);
-        if (list is List) {
-          songs = list
-              .whereType<Map<String, dynamic>>()
-              .map((item) => Song.fromApiJson(item))
-              .where((s) => s.id.isNotEmpty)
-              .toList();
-        }
-        break;
-      } catch (_) {
-        if (attempt < 2) await Future.delayed(const Duration(milliseconds: 350));
-      }
+        if (list is! List || list.isEmpty) throw Exception('搜索结果为空');
+        final songs = list
+            .whereType<Map<String, dynamic>>()
+            .map((item) => Song.fromApiJson(item))
+            .where((s) => s.id.isNotEmpty)
+            .toList();
+        if (songs.isEmpty) throw Exception('搜索结果无有效歌曲');
+        return SearchRawResult(songs.take(num).toList(), rawBody);
+      });
+    } catch (_) {
+      return SearchRawResult(const [], '');
     }
-    return SearchRawResult(songs.take(num).toList(), rawBody);
   }
 
-  /// 获取歌单（网易云歌单ID，返回真实歌单歌曲列表）
+  /// 获取歌单（网易云歌单ID，返回真实歌单歌曲列表；空歌单会立即重试）
   static Future<List<Song>> getPlaylist(String id) async {
-    for (var attempt = 1; attempt <= 3; attempt++) {
-      try {
+    try {
+      return await _retry(() async {
         final url = '$_base?types=playlist&id=${_enc(id)}';
         final body = await _httpGet(url);
         final json = jsonDecode(body);
-        if (json is Map && json['code'] == 200) {
-          final tracks = json['playlist']?['tracks'];
-          if (tracks is List) {
-            final songs = tracks
-                .whereType<Map<String, dynamic>>()
-                .map((t) {
-                  final ar = t['ar'] as List? ?? [];
-                  final singer = ar
-                      .map((a) => a['name']?.toString() ?? '')
-                      .where((n) => n.isNotEmpty)
-                      .join(' / ');
-                  final al = t['al'] as Map<String, dynamic>? ?? {};
-                  final dt = t['dt'];
-                  final sid = t['id']?.toString() ?? '';
-                  return Song(
-                    id: sid,
-                    name: t['name'] ?? '未知歌曲',
-                    singer: singer.isEmpty ? '未知歌手' : singer,
-                    album: al['name'] ?? '',
-                    source: 'netease',
-                    picId: al['pic_str']?.toString() ?? '',
-                    lyricId: sid,
-                    duration: dt is int ? dt ~/ 1000 : 0,
-                  );
-                })
-                .where((s) => s.id.isNotEmpty)
-                .toList();
-            if (songs.isNotEmpty) return songs;
-          }
-        }
-      } catch (_) {}
-      if (attempt < 3) await Future.delayed(const Duration(milliseconds: 450));
+        if (json is! Map || json['code'] != 200) throw Exception('歌单响应无效');
+        final tracks = json['playlist']?['tracks'];
+        if (tracks is! List || tracks.isEmpty) throw Exception('歌单为空');
+        final songs = tracks
+            .whereType<Map<String, dynamic>>()
+            .map((t) {
+              final ar = t['ar'] as List? ?? [];
+              final singer = ar
+                  .map((a) => a['name']?.toString() ?? '')
+                  .where((n) => n.isNotEmpty)
+                  .join(' / ');
+              final al = t['al'] as Map<String, dynamic>? ?? {};
+              final dt = t['dt'];
+              final sid = t['id']?.toString() ?? '';
+              return Song(
+                id: sid,
+                name: t['name'] ?? '未知歌曲',
+                singer: singer.isEmpty ? '未知歌手' : singer,
+                album: al['name'] ?? '',
+                source: 'netease',
+                picId: al['pic_str']?.toString() ?? '',
+                lyricId: sid,
+                duration: dt is int ? dt ~/ 1000 : 0,
+              );
+            })
+            .where((s) => s.id.isNotEmpty)
+            .toList();
+        if (songs.isEmpty) throw Exception('歌单无有效歌曲');
+        return songs;
+      });
+    } catch (_) {
+      return [];
     }
-    return [];
   }
 
-  /// 获取歌单基本信息（名称 + 封面URL，每次启动从网络刷新）
+  /// 获取歌单基本信息（名称 + 封面URL，每次启动从网络刷新；空信息会立即重试）
   static final Map<String, PlaylistInfo> _playlistInfoCache = {};
 
   static Future<PlaylistInfo?> getPlaylistInfo(String id) async {
     if (_playlistInfoCache.containsKey(id)) return _playlistInfoCache[id];
     try {
-      final url = '$_base?types=playlist&id=${_enc(id)}';
-      final body = await _httpGet(url);
-      final json = jsonDecode(body);
-      if (json is Map && json['code'] == 200) {
+      return await _retry(() async {
+        final url = '$_base?types=playlist&id=${_enc(id)}';
+        final body = await _httpGet(url);
+        final json = jsonDecode(body);
+        if (json is! Map || json['code'] != 200) throw Exception('歌单信息响应无效');
         final playlist = json['playlist'] as Map<String, dynamic>? ?? {};
-        final name = playlist['name'] ?? id;
+        final name = playlist['name']?.toString() ?? '';
         final cover = playlist['coverImgUrl']?.toString() ?? '';
-        final info = PlaylistInfo(name.toString(), id, coverUrl: cover);
+        if (name.isEmpty) throw Exception('歌单名称为空');
+        final info = PlaylistInfo(name, id, coverUrl: cover);
         _playlistInfoCache[id] = info;
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('playlist_name_$id', name.toString());
+        await prefs.setString('playlist_name_$id', name);
         await prefs.setString('playlist_cover_$id', cover);
         return info;
-      }
+      });
     } catch (_) {}
     // 网络失败时用本地缓存兜底
     final prefs = await SharedPreferences.getInstance();
@@ -132,7 +130,7 @@ class MusicApi {
     return null;
   }
 
-  /// 获取播放URL（999=24bit FLAC无损，最多重试30次）
+  /// 获取播放URL（空结果会立即重试）
   static Future<String> getPlayUrl(String trackId) async {
     return _retry(() async {
       final br = SettingsService().quality.br;
@@ -145,7 +143,7 @@ class MusicApi {
     });
   }
 
-  /// 获取歌词（最多重试30次，空结果也重试）
+  /// 获取歌词（空结果会立即重试）
   static Future<String> getLyric(String lyricId) async {
     try {
       return await _retry(() async {
@@ -161,7 +159,7 @@ class MusicApi {
     }
   }
 
-  /// 获取专辑封面URL（最多重试30次，空结果也重试）
+  /// 获取专辑封面URL（空结果会立即重试）
   static Future<String> getCover(String picId) async {
     try {
       return await _retry(() async {
@@ -171,7 +169,7 @@ class MusicApi {
         final u = json['url'] as String?;
         if (u == null || u.isEmpty) throw Exception('封面为空');
         return u;
-      }, maxAttempts: 2);
+      });
     } catch (_) {
       return '';
     }
