@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
+import '../utils/retry_helper.dart';
 
 class CoverCacheService {
   static final CoverCacheService _instance = CoverCacheService._();
@@ -33,17 +34,22 @@ class CoverCacheService {
     if (url.isEmpty) return null;
     final cached = await load(id);
     if (cached != null) return cached;
+
     try {
-      final resp = await http.get(Uri.parse(url),
-          headers: {'User-Agent': 'Mozilla/5.0'});
-      if (resp.statusCode == 200 && resp.bodyBytes.isNotEmpty) {
-        final dir = await _getDir();
-        final file = File('${dir.path}/$id.jpg');
-        await file.writeAsBytes(resp.bodyBytes);
-        return resp.bodyBytes;
-      }
-    } catch (_) {}
-    return null;
+      return await RetryHelper.run(() async {
+        final resp = await http
+            .get(Uri.parse(url), headers: {'User-Agent': 'Mozilla/5.0'});
+        if (resp.statusCode == 200 && resp.bodyBytes.isNotEmpty) {
+          final dir = await _getDir();
+          final file = File('${dir.path}/$id.jpg');
+          await file.writeAsBytes(resp.bodyBytes);
+          return resp.bodyBytes;
+        }
+        throw Exception('HTTP ${resp.statusCode}');
+      });
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<String?> getLocalPath(String id) async {

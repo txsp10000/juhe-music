@@ -4,39 +4,32 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/song.dart';
+import '../utils/retry_helper.dart';
 
 class MusicApi {
   static const _base = 'https://music-api.gdstudio.xyz/api.php';
-  static const _emptyRetryAttempts = 80;
   static final _client = http.Client();
   static String _enc(String s) => Uri.encodeComponent(s);
 
   static Future<String> _httpGet(String url) async {
-    final resp = await _client.get(Uri.parse(url),
-        headers: {'User-Agent': 'Mozilla/5.0'});
+    final resp = await _client
+        .get(Uri.parse(url), headers: {'User-Agent': 'Mozilla/5.0'});
     if (resp.statusCode >= 400) throw Exception('HTTP ${resp.statusCode}');
     return resp.body;
   }
 
-  /// 通用立即重试：接口偶发返回空时会马上再次请求，但保留上限避免卡死。
-  static Future<T> _retry<T>(Future<T> Function() block, {int maxAttempts = _emptyRetryAttempts}) async {
-    Exception? lastError;
-    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        return await block();
-      } on Exception catch (e) {
-        lastError = e;
-      }
-    }
-    throw lastError ?? Exception('重试后仍失败');
+  static Future<T> _retry<T>(Future<T> Function() block) {
+    return RetryHelper.run(block);
   }
 
-  /// 搜索歌曲（返回原始响应体，用于错误展示；[] 会立即重试）
-  static Future<SearchRawResult> searchRaw(String keyword, {int num = 20, int page = 1}) async {
+  /// 搜索歌曲（返回原始响应体，用于错误展示；[] 会失败等待后重试）
+  static Future<SearchRawResult> searchRaw(String keyword,
+      {int num = 20, int page = 1}) async {
     final encoded = _enc(keyword);
     try {
       return await _retry(() async {
-        final url = '$_base?types=search&source=netease&name=$encoded&count=$num&pages=$page';
+        final url =
+            '$_base?types=search&source=netease&name=$encoded&count=$num&pages=$page';
         final rawBody = await _httpGet(url);
         final list = jsonDecode(rawBody);
         if (list is! List || list.isEmpty) throw Exception('搜索结果为空');
@@ -53,7 +46,7 @@ class MusicApi {
     }
   }
 
-  /// 获取歌单（网易云歌单ID，返回真实歌单歌曲列表；空歌单会立即重试）
+  /// 获取歌单（网易云歌单ID，返回真实歌单歌曲列表；空歌单会失败等待后重试）
   static Future<List<Song>> getPlaylist(String id) async {
     try {
       return await _retry(() async {
@@ -95,7 +88,7 @@ class MusicApi {
     }
   }
 
-  /// 获取歌单基本信息（名称 + 封面URL，每次启动从网络刷新；空信息会立即重试）
+  /// 获取歌单基本信息（名称 + 封面URL，每次启动从网络刷新；空信息会失败等待后重试）
   static final Map<String, PlaylistInfo> _playlistInfoCache = {};
 
   static Future<PlaylistInfo?> getPlaylistInfo(String id) async {
@@ -130,7 +123,7 @@ class MusicApi {
     return null;
   }
 
-  /// 获取播放URL（空结果会立即重试）
+  /// 获取播放URL（空结果会失败等待后重试）
   static Future<String> getPlayUrl(String trackId) async {
     return _retry(() async {
       final br = SettingsService().quality.br;
@@ -143,7 +136,7 @@ class MusicApi {
     });
   }
 
-  /// 获取歌词（空结果会立即重试）
+  /// 获取歌词（空结果会失败等待后重试）
   static Future<String> getLyric(String lyricId) async {
     try {
       return await _retry(() async {
@@ -159,11 +152,12 @@ class MusicApi {
     }
   }
 
-  /// 获取专辑封面URL（空结果会立即重试）
+  /// 获取专辑封面URL（空结果会失败等待后重试）
   static Future<String> getCover(String picId) async {
     try {
       return await _retry(() async {
-        final url = '$_base?types=pic&source=netease&id=${_enc(picId)}&size=500';
+        final url =
+            '$_base?types=pic&source=netease&id=${_enc(picId)}&size=500';
         final body = await _httpGet(url);
         final json = jsonDecode(body);
         final u = json['url'] as String?;

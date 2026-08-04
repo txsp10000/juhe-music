@@ -1,6 +1,7 @@
 ﻿import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
+import '../utils/retry_helper.dart';
 import 'settings_service.dart';
 
 /// Quality tiers ordered from lowest to highest
@@ -162,8 +163,11 @@ class AudioCacheService {
     int? br,
   }) async {
     final quality = br ?? SettingsService().quality.br;
+    String path;
+    File tmpFile;
+
     try {
-      final path = await getFilePath(songId, url, quality);
+      path = await getFilePath(songId, url, quality);
       final file = File(path);
 
       // Already fully cached at this quality
@@ -172,19 +176,25 @@ class AudioCacheService {
         return path;
       }
 
-      // Download to a temporary file first
-      final tmpPath = '$path.tmp';
-      final tmpFile = File(tmpPath);
+      tmpFile = File('$path.tmp');
+    } catch (_) {
+      return null;
+    }
 
-      if (await tmpFile.exists()) {
-        await tmpFile.delete();
-      }
+    try {
+      return await RetryHelper.run(() async {
+        if (await tmpFile.exists()) {
+          await tmpFile.delete();
+        }
 
-      final request = http.Request('GET', Uri.parse(url));
-      request.headers['User-Agent'] = 'Mozilla/5.0';
-      final response = await _client.send(request);
+        final request = http.Request('GET', Uri.parse(url));
+        request.headers['User-Agent'] = 'Mozilla/5.0';
+        final response = await _client.send(request);
 
-      if (response.statusCode == 200) {
+        if (response.statusCode != 200) {
+          throw Exception('HTTP ${response.statusCode}');
+        }
+
         final totalBytes = response.contentLength ?? 0;
         int receivedBytes = 0;
 
@@ -203,27 +213,25 @@ class AudioCacheService {
         }
         await sink.close();
 
-        if (await tmpFile.length() > 0) {
-          if (totalBytes > 0 && receivedBytes < totalBytes) {
-            await tmpFile.delete();
-            return null;
-          }
-          await tmpFile.rename(path);
-          await _deleteAllForSong(songId, exceptPath: path);
-          onProgress?.call(1.0);
-          return path;
+        if (await tmpFile.length() <= 0) {
+          throw Exception('下载文件为空');
         }
-        await tmpFile.delete();
-      }
+        if (totalBytes > 0 && receivedBytes < totalBytes) {
+          throw Exception('下载未完成');
+        }
+
+        await tmpFile.rename(path);
+        await _deleteAllForSong(songId, exceptPath: path);
+        onProgress?.call(1.0);
+        return path;
+      });
     } catch (_) {
       try {
-        final path = await getFilePath(songId, url, quality);
-        final tmpFile = File('$path.tmp');
         if (await tmpFile.exists()) {
           await tmpFile.delete();
         }
       } catch (_) {}
+      return null;
     }
-    return null;
   }
 }
