@@ -17,18 +17,18 @@ class MusicApi {
     return resp.body;
   }
 
-  /// 通用重试：最多30次，间隔1秒
-  static Future<T> _retry<T>(Future<T> Function() block) async {
+  /// 通用重试：用于播放地址/歌词等关键请求
+  static Future<T> _retry<T>(Future<T> Function() block, {int maxAttempts = 6}) async {
     Exception? lastError;
-    for (var attempt = 1; attempt <= 30; attempt++) {
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         return await block();
       } on Exception catch (e) {
         lastError = e;
       }
-      if (attempt < 30) await Future.delayed(const Duration(seconds: 1));
+      if (attempt < maxAttempts) await Future.delayed(const Duration(milliseconds: 450));
     }
-    throw lastError ?? Exception('重试30次后仍失败');
+    throw lastError ?? Exception('重试后仍失败');
   }
 
   /// 搜索歌曲（返回原始响应体，用于错误展示）
@@ -36,7 +36,7 @@ class MusicApi {
     final encoded = _enc(keyword);
     var songs = <Song>[];
     var rawBody = '';
-    for (var attempt = 1; attempt <= 30; attempt++) {
+    for (var attempt = 1; attempt <= 2; attempt++) {
       try {
         final url = '$_base?types=search&source=netease&name=$encoded&count=$num&pages=$page';
         rawBody = await _httpGet(url);
@@ -47,17 +47,18 @@ class MusicApi {
               .map((item) => Song.fromApiJson(item))
               .where((s) => s.id.isNotEmpty)
               .toList();
-          if (songs.isNotEmpty) break;
         }
-      } catch (_) {}
-      if (attempt < 30) await Future.delayed(const Duration(seconds: 1));
+        break;
+      } catch (_) {
+        if (attempt < 2) await Future.delayed(const Duration(milliseconds: 350));
+      }
     }
     return SearchRawResult(songs.take(num).toList(), rawBody);
   }
 
   /// 获取歌单（网易云歌单ID，返回真实歌单歌曲列表）
   static Future<List<Song>> getPlaylist(String id) async {
-    for (var attempt = 1; attempt <= 30; attempt++) {
+    for (var attempt = 1; attempt <= 3; attempt++) {
       try {
         final url = '$_base?types=playlist&id=${_enc(id)}';
         final body = await _httpGet(url);
@@ -93,7 +94,7 @@ class MusicApi {
           }
         }
       } catch (_) {}
-      if (attempt < 30) await Future.delayed(const Duration(seconds: 1));
+      if (attempt < 3) await Future.delayed(const Duration(milliseconds: 450));
     }
     return [];
   }
@@ -170,7 +171,7 @@ class MusicApi {
         final u = json['url'] as String?;
         if (u == null || u.isEmpty) throw Exception('封面为空');
         return u;
-      });
+      }, maxAttempts: 2);
     } catch (_) {
       return '';
     }

@@ -22,23 +22,14 @@ class _ModeDrawerState extends State<ModeDrawer> {
   Color _bgHint = AppDesignTokens.inkBlack;
 
   final _modes = const [
-    (Icons.waves_rounded, '沉浸0.8x'),
-    (Icons.music_note_rounded, '抖音漫游'),
-    (Icons.surround_sound_rounded, '超清全景声'),
-    (Icons.spatial_audio_off_rounded, 'DJ模式'),
-    (Icons.mic_external_on_rounded, '躺平'),
-    (Icons.sentiment_dissatisfied_rounded, '深夜 EMO'),
+    (Icons.favorite_rounded, '收藏模式'),
+    (Icons.shuffle_rounded, '随机模式'),
     (Icons.nightlight_round, '助眠模式'),
     (Icons.bathtub_rounded, '洗澡'),
     (Icons.directions_run_rounded, '动感健身'),
     (Icons.eco_rounded, 'Chill 放松'),
     (Icons.mood_rounded, '快乐时光'),
     (Icons.equalizer_rounded, '电音'),
-    (Icons.smart_display_rounded, '音乐视频'),
-    (Icons.auto_awesome_rounded, '好运'),
-    (Icons.account_balance_rounded, '图书馆'),
-    (Icons.text_fields_rounded, '欧美'),
-    (Icons.cleaning_services_rounded, '打扫'),
     (Icons.filter_vintage_rounded, '国风'),
   ];
 
@@ -116,10 +107,6 @@ class _ModeDrawerState extends State<ModeDrawer> {
               _buildHeader(),
               const SizedBox(height: 34),
               _selectedDefault(),
-              const SizedBox(height: 18),
-              _wideMode('熟悉模式', Icons.favorite_rounded, widget.onOpenFavorites),
-              const SizedBox(height: 14),
-              _wideMode('新鲜模式', Icons.shuffle_rounded, widget.onRandomPlay),
               const SizedBox(height: 26),
               _buildModeGrid(),
               const SizedBox(height: 28),
@@ -132,42 +119,14 @@ class _ModeDrawerState extends State<ModeDrawer> {
   }
 
   Widget _buildHeader() {
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('听歌模式', style: AppDesignTokens.display(size: 28)),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5), decoration: BoxDecoration(color: const Color(0xFFEBC7AD), borderRadius: BorderRadius.circular(10)), child: Text('SVIP', style: AppDesignTokens.body(size: 14, color: const Color(0xFF4C2A18), weight: FontWeight.w900))),
-                  const SizedBox(width: 8),
-                  Text('正在享受精准推荐', style: AppDesignTokens.body(size: 17, color: AppDesignTokens.warmWhite.withOpacity(0.62), weight: FontWeight.w800)),
-                ],
-              ),
-            ],
-          ),
-        ),
-        Column(
-          children: [
-            Row(children: [
-              _smallCircle(Icons.play_circle_fill_rounded, const Color(0xFFFFFFFF)),
-              const SizedBox(width: 8),
-              _smallCircle(Icons.add_rounded, Colors.white.withOpacity(0.12)),
-            ]),
-            const SizedBox(height: 8),
-            Text('双人一起听', style: AppDesignTokens.body(size: 14, color: AppDesignTokens.warmWhite.withOpacity(0.62), weight: FontWeight.w800)),
-          ],
-        ),
+        Text('听歌模式', style: AppDesignTokens.display(size: 28)),
+        const SizedBox(height: 12),
+        Text('选择一种方式开始播放', style: AppDesignTokens.body(size: 17, color: AppDesignTokens.warmWhite.withOpacity(0.62), weight: FontWeight.w800)),
       ],
     );
-  }
-
-  Widget _smallCircle(IconData icon, Color bg) {
-    return Container(width: 42, height: 42, decoration: BoxDecoration(shape: BoxShape.circle, color: bg), child: Icon(icon, color: bg == Colors.white ? _accent : AppDesignTokens.lyricWhite, size: 25));
   }
 
   Widget _selectedDefault() {
@@ -182,18 +141,6 @@ class _ModeDrawerState extends State<ModeDrawer> {
     );
   }
 
-  Widget _wideMode(String label, IconData icon, VoidCallback action) {
-    return GestureDetector(
-      onTap: () { Navigator.pop(context); action(); },
-      child: Container(
-        height: 72,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(color: AppDesignTokens.surfaceFor(_bgHint, opacity: 0.64).withOpacity(0.76), borderRadius: BorderRadius.circular(18)),
-        child: Text(label, style: AppDesignTokens.title(size: 22)),
-      ),
-    );
-  }
-
   Widget _buildModeGrid() {
     return GridView.count(
       shrinkWrap: true,
@@ -202,52 +149,66 @@ class _ModeDrawerState extends State<ModeDrawer> {
       mainAxisSpacing: 26,
       crossAxisSpacing: 8,
       childAspectRatio: 0.86,
-      children: _modes.map((m) {
-        return GestureDetector(
-          onTap: () => Toast.show(context, '已切换到「${m.$2}」'),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(m.$1, color: AppDesignTokens.lyricWhite.withOpacity(0.90), size: 30),
-              const SizedBox(height: 12),
-              Text(m.$2, textAlign: TextAlign.center, maxLines: 2, style: AppDesignTokens.body(size: 14, color: AppDesignTokens.warmWhite.withOpacity(0.86), weight: FontWeight.w800)),
-            ],
-          ),
-        );
-      }).toList(),
+      children: _modes.map((m) => _modeTile(m.$1, m.$2, () {
+        if (m.$2 == '收藏模式') { Navigator.pop(context); widget.onOpenFavorites(); return; }
+        if (m.$2 == '随机模式') { Navigator.pop(context); widget.onRandomPlay(); return; }
+        Toast.show(context, '已切换到「${m.$2}」');
+      })).toList(),
+    );
+  }
+
+  Widget _modeTile(IconData icon, String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: AppDesignTokens.lyricWhite.withOpacity(0.90), size: 30),
+          const SizedBox(height: 12),
+          Text(label, textAlign: TextAlign.center, maxLines: 2, style: AppDesignTokens.body(size: 14, color: AppDesignTokens.warmWhite.withOpacity(0.86), weight: FontWeight.w800)),
+        ],
+      ),
     );
   }
 
   Widget _buildPlaylistAccess() {
+    final tiles = <Widget>[];
+    for (final p in _pinnedPlaylists) {
+      tiles.add(_playlistTile(Icons.push_pin_rounded, p.name, () { Navigator.pop(context); widget.onSelectPlaylist(p); }, onLongPress: () => _unpinPlaylist(p)));
+    }
+    for (final entry in playlistCategories.entries) {
+      for (final p in entry.value) {
+        tiles.add(_playlistTile(_iconForCategory(entry.key), p.name, () { Navigator.pop(context); widget.onSelectPlaylist(p); }, onLongPress: () => _pinPlaylist(p)));
+      }
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('歌单分类', style: AppDesignTokens.title(size: 20)),
-        const SizedBox(height: 12),
-        if (_pinnedPlaylists.isNotEmpty) Wrap(spacing: 8, runSpacing: 8, children: _pinnedPlaylists.map((p) => GestureDetector(onTap: () { Navigator.pop(context); widget.onSelectPlaylist(p); }, onLongPress: () => _unpinPlaylist(p), child: MusicChip(label: p.name, accent: _accent, active: true))).toList()),
-        if (_pinnedPlaylists.isNotEmpty) const SizedBox(height: 14),
-        ...playlistCategories.entries.map((entry) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(entry.key, style: AppDesignTokens.caption(color: AppDesignTokens.warmWhite.withOpacity(0.62))),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: entry.value.map((p) => GestureDetector(
-                    onTap: () { Navigator.pop(context); widget.onSelectPlaylist(p); },
-                    onLongPress: () => _pinPlaylist(p),
-                    child: MusicChip(label: p.name, accent: _accent, background: Colors.white.withOpacity(0.08)),
-                  )).toList(),
-                ),
-              ],
-            ),
-          );
-        }),
+        Text('歌单', style: AppDesignTokens.title(size: 20)),
+        const SizedBox(height: 14),
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 3,
+          mainAxisSpacing: 22,
+          crossAxisSpacing: 8,
+          childAspectRatio: 0.86,
+          children: tiles,
+        ),
       ],
     );
+  }
+
+  IconData _iconForCategory(String key) {
+    switch (key) {
+      case '榜单': return Icons.leaderboard_rounded;
+      case '语种': return Icons.language_rounded;
+      case '风格': return Icons.style_rounded;
+      default: return Icons.queue_music_rounded;
+    }
+  }
+
+  Widget _playlistTile(IconData icon, String label, VoidCallback onTap, {VoidCallback? onLongPress}) {
+    return GestureDetector(onTap: onTap, onLongPress: onLongPress, child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(icon, color: AppDesignTokens.lyricWhite.withOpacity(0.90), size: 30), const SizedBox(height: 12), Text(label, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppDesignTokens.body(size: 14, color: AppDesignTokens.warmWhite.withOpacity(0.86), weight: FontWeight.w800))]));
   }
 }

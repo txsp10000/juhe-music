@@ -3,6 +3,7 @@ import '../models/song.dart';
 import '../services/player_service.dart';
 import '../services/theme_service.dart';
 import '../theme/app_design_tokens.dart';
+import '../widgets/sound_halo.dart';
 import 'favorites_page.dart';
 import 'player_page.dart';
 import 'search_page.dart';
@@ -72,6 +73,7 @@ class _MainPageState extends State<MainPage> {
   }
 
   Widget _buildBottomNav() {
+    final hasSong = _player.currentSong != null;
     return Padding(
       padding: const EdgeInsets.fromLTRB(26, 0, 26, 12),
       child: SizedBox(
@@ -87,31 +89,41 @@ class _MainPageState extends State<MainPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _navLabel('发现', 0),
-                  _navLabel('听抖音', 1),
                   const SizedBox(width: 70),
-                  _navLabel('福利', 2),
-                  _navLabel('我的', 2),
+                  _navLabel('收藏', 2),
                 ],
               ),
             ),
             Positioned(
               bottom: 0,
               child: GestureDetector(
-                onTap: _tab == 0 && _player.currentSong != null
-                    ? () => _player.togglePlayPause()
-                    : () => setState(() => _tab = 0),
+                onTap: () {
+                  if (_tab == 0 && hasSong) {
+                    _player.togglePlayPause();
+                  } else {
+                    setState(() => _tab = 0);
+                  }
+                },
                 child: Container(
                   width: 66,
                   height: 66,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 3),
-                    color: Colors.white.withOpacity(0.05),
+                    border: Border.all(color: hasSong ? Colors.white : Colors.white38, width: 3),
+                    color: Colors.white.withOpacity(hasSong ? 0.05 : 0.02),
                   ),
-                  child: Icon(
-                    _player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                    color: Colors.white,
-                    size: 34,
+                  child: Center(
+                    child: _tab == 0
+                        ? Icon(
+                            hasSong
+                                ? (_player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded)
+                                : Icons.play_arrow_rounded,
+                            color: hasSong ? Colors.white : Colors.white38,
+                            size: 34,
+                          )
+                        : hasSong
+                            ? Opacity(opacity: _player.isPlaying ? 1.0 : 0.8, child: MiniWave(playing: _player.isPlaying, color: Colors.white, size: 24))
+                            : Icon(Icons.play_arrow_rounded, color: Colors.white24, size: 34),
                   ),
                 ),
               ),
@@ -123,7 +135,7 @@ class _MainPageState extends State<MainPage> {
   }
 
   Widget _navLabel(String label, int tabIndex) {
-    final active = _tab == tabIndex && (label == '发现' || label == '听抖音' || label == '我的');
+    final active = _tab == tabIndex;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => setState(() => _tab = tabIndex),

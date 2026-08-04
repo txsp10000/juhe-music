@@ -446,39 +446,22 @@ class _PlayerPageState extends State<PlayerPage> {
 
   Widget _buildHeader(Song? song) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(26, 10, 26, 12),
-      child: Column(
+      padding: const EdgeInsets.fromLTRB(26, 18, 26, 12),
+      child: Row(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(width: 24, height: 24, decoration: BoxDecoration(color: Colors.black.withOpacity(0.78), borderRadius: BorderRadius.circular(7)), child: Icon(Icons.music_note_rounded, color: _accent, size: 17)),
-              const SizedBox(width: 7),
-              Text('苗苗music', style: AppDesignTokens.title(size: 17)),
-            ],
+          GestureDetector(
+            onTap: widget.isRoot ? () => _scaffoldKey.currentState?.openDrawer() : () => Navigator.pop(context),
+            child: Row(
+              children: [
+                Icon(widget.isRoot ? Icons.menu_rounded : Icons.keyboard_arrow_down_rounded, color: AppDesignTokens.lyricWhite, size: 34),
+                const SizedBox(width: 10),
+                Text(widget.isRoot ? '模式选择' : '正在播放', style: AppDesignTokens.title(size: 26)),
+              ],
+            ),
           ),
-          const SizedBox(height: 30),
-          Row(
-            children: [
-              GestureDetector(
-                onTap: widget.isRoot ? () => _scaffoldKey.currentState?.openDrawer() : () => Navigator.pop(context),
-                child: Row(
-                  children: [
-                    Icon(widget.isRoot ? Icons.menu_rounded : Icons.keyboard_arrow_down_rounded, color: AppDesignTokens.lyricWhite, size: 34),
-                    const SizedBox(width: 10),
-                    Text(widget.isRoot ? '模式选择' : '正在播放', style: AppDesignTokens.title(size: 26)),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              if (widget.isRoot) ...[
-                Container(width: 34, height: 34, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFFFD879)), child: const Icon(Icons.monetization_on_rounded, color: Color(0xFFAD6825), size: 22)),
-                const SizedBox(width: 18),
-                GestureDetector(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SearchPage())), child: const Icon(Icons.search_rounded, color: AppDesignTokens.lyricWhite, size: 36)),
-              ] else
-                GestureDetector(onTap: _showPlaylistSheet, child: const Icon(Icons.queue_music_rounded, color: AppDesignTokens.lyricWhite, size: 32)),
-            ],
-          ),
+          const Spacer(),
+          if (!widget.isRoot)
+            GestureDetector(onTap: _showPlaylistSheet, child: const Icon(Icons.queue_music_rounded, color: AppDesignTokens.lyricWhite, size: 32)),
         ],
       ),
     );
@@ -557,9 +540,7 @@ class _PlayerPageState extends State<PlayerPage> {
             children: [
               Expanded(child: Text(song.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.display(size: 27))),
               const SizedBox(width: 8),
-              MusicChip(label: _qualityLabel(), accent: _accent, active: true),
-              const SizedBox(width: 8),
-              MusicChip(label: '音效', accent: _accent),
+              MusicChip(label: _qualityLabel(), accent: _accent, active: true, onTap: _showQualityPicker),
             ],
           ),
           const SizedBox(height: 12),
@@ -573,16 +554,57 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   Widget _buildSocialActions() {
-    return Row(
-      children: [
-        _socialAction(_isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded, '1818', _toggleFavorite, _isFavorite ? AppDesignTokens.lyricWhite : AppDesignTokens.lyricWhite),
-        const SizedBox(width: 34),
-        _socialAction(Icons.more_horiz_rounded, '3', () => Toast.show(context, '评论功能暂未开放')),
-        const SizedBox(width: 34),
-        _socialAction(Icons.near_me_rounded, '6', () => Toast.show(context, '分享功能暂未开放')),
-        const Spacer(),
-        GestureDetector(onTap: _showPlaylistSheet, child: Icon(Icons.more_vert_rounded, color: AppDesignTokens.warmWhite.withOpacity(0.76), size: 34)),
-      ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: _toggleFavorite,
+                child: Icon(_isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: _isFavorite ? AppDesignTokens.lyricWhite : AppDesignTokens.warmWhite.withOpacity(0.85), size: 38),
+              ),
+              const SizedBox(height: 5),
+              Text('收藏', style: AppDesignTokens.caption(size: 10, color: AppDesignTokens.warmWhite.withOpacity(0.65))),
+            ],
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: _showPlaylistSheet,
+                child: Icon(Icons.queue_music_rounded, color: AppDesignTokens.warmWhite.withOpacity(0.85), size: 38),
+              ),
+              const SizedBox(height: 5),
+              Text('列表', style: AppDesignTokens.caption(size: 10, color: AppDesignTokens.warmWhite.withOpacity(0.65))),
+            ],
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: _showQualityPicker,
+                child: Icon(Icons.high_quality_rounded, color: AppDesignTokens.warmWhite.withOpacity(0.85), size: 38),
+              ),
+              const SizedBox(height: 5),
+              Text('音质', style: AppDesignTokens.caption(size: 10, color: AppDesignTokens.warmWhite.withOpacity(0.65))),
+            ],
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: _showSearchSameSheet,
+                child: Icon(Icons.search_rounded, color: AppDesignTokens.warmWhite.withOpacity(0.85), size: 38),
+              ),
+              const SizedBox(height: 5),
+              Text('搜索', style: AppDesignTokens.caption(size: 10, color: AppDesignTokens.warmWhite.withOpacity(0.65))),
+            ],
+          ),
+        ],
+      ),
     );
   }
 

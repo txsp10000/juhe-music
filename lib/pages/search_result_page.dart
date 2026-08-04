@@ -58,10 +58,6 @@ class _SearchResultPageState extends State<SearchResultPage> {
 
   Future<void> _initialLoad() async {
     await _search();
-    if (_hasMore && mounted) {
-      _currentPage++;
-      await _search(append: true);
-    }
     if (mounted) setState(() => _loading = false);
   }
 
@@ -78,10 +74,11 @@ class _SearchResultPageState extends State<SearchResultPage> {
       final result = await MusicApi.searchRaw(widget.keyword, num: 20, page: _currentPage);
       if (!mounted) return;
       if (result.songs.isNotEmpty) {
-        final picIds = result.songs.map((s) => s.picId.isNotEmpty ? s.picId : s.id).toList();
+        final coverTargets = result.songs.take(8).toList();
+        final picIds = coverTargets.map((s) => s.picId.isNotEmpty ? s.picId : s.id).toList();
         MusicApi.getCovers(picIds).then((covers) {
           if (!mounted) return;
-          for (final s in result.songs) {
+          for (final s in coverTargets) {
             final key = s.picId.isNotEmpty ? s.picId : s.id;
             final cover = covers[key];
             if (cover != null && cover.isNotEmpty) s.cover = cover;
