@@ -76,21 +76,21 @@ class _MainPageState extends State<MainPage> {
   Widget _buildBottomNav() {
     final hasSong = _player.currentSong != null;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(26, 0, 26, 12),
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
       child: SizedBox(
-        height: 74,
+        height: 92,
         child: Stack(
           alignment: Alignment.center,
           children: [
             Positioned(
               left: 0,
               right: 0,
-              bottom: 8,
+              bottom: 12,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _navLabel('发现', 1),
-                  const SizedBox(width: 70),
+                  _navLabel('搜索', 1),
+                  const SizedBox(width: 92),
                   _navLabel('收藏', 2),
                 ],
               ),
@@ -98,6 +98,7 @@ class _MainPageState extends State<MainPage> {
             Positioned(
               bottom: 0,
               child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () {
                   if (_tab == 0 && hasSong) {
                     _player.togglePlayPause();
@@ -105,26 +106,32 @@ class _MainPageState extends State<MainPage> {
                     setState(() => _tab = 0);
                   }
                 },
-                child: Container(
-                  width: 66,
-                  height: 66,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: hasSong ? Colors.white : Colors.white38, width: 3),
-                    color: Colors.white.withOpacity(hasSong ? 0.05 : 0.02),
-                  ),
+                child: SizedBox(
+                  width: 96,
+                  height: 88,
                   child: Center(
-                    child: _tab == 0
-                        ? Icon(
-                            hasSong
-                                ? (_player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded)
-                                : Icons.play_arrow_rounded,
-                            color: hasSong ? Colors.white : Colors.white38,
-                            size: 34,
-                          )
-                        : hasSong
-                            ? Opacity(opacity: _player.isPlaying ? 1.0 : 0.8, child: MiniWave(playing: _player.isPlaying, color: Colors.white, size: 24))
-                            : Icon(Icons.play_arrow_rounded, color: Colors.white24, size: 34),
+                    child: Container(
+                      width: 66,
+                      height: 66,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: hasSong ? Colors.white : Colors.white38, width: 3),
+                        color: Colors.white.withOpacity(hasSong ? 0.05 : 0.02),
+                      ),
+                      child: Center(
+                        child: _tab == 0
+                            ? Icon(
+                                hasSong
+                                    ? (_player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded)
+                                    : Icons.play_arrow_rounded,
+                                color: hasSong ? Colors.white : Colors.white38,
+                                size: 34,
+                              )
+                            : hasSong
+                                ? Opacity(opacity: _player.isPlaying ? 1.0 : 0.8, child: MiniWave(playing: _player.isPlaying, color: Colors.white, size: 24))
+                                : Icon(Icons.play_arrow_rounded, color: Colors.white24, size: 34),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -141,8 +148,8 @@ class _MainPageState extends State<MainPage> {
       behavior: HitTestBehavior.opaque,
       onTap: () => setState(() => _tab = tabIndex),
       child: SizedBox(
-        width: 64,
-        height: 40,
+        width: 112,
+        height: 64,
         child: Center(
           child: Text(
             label,

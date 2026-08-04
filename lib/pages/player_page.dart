@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../api/music_api.dart';
 import '../data/categories.dart';
 import '../models/song.dart';
@@ -32,7 +31,6 @@ class PlayerPage extends StatefulWidget {
 
 class _PlayerPageState extends State<PlayerPage> {
   final _player = PlayerService();
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _isFavorite = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
@@ -45,6 +43,7 @@ class _PlayerPageState extends State<PlayerPage> {
   int _swipeDirection = 0;
   double _dragOffset = 0.0;
   bool _isSwitchingSong = false;
+  bool _modePanelOpen = false;
 
   Color _accent = AppDesignTokens.lyricWhite;
   Color _bgHint = AppDesignTokens.inkBlack;
@@ -105,6 +104,14 @@ class _PlayerPageState extends State<PlayerPage> {
 
   void _onPlayStateChange(bool _) {
     if (mounted) setState(() {});
+  }
+
+  void _openModePanel() {
+    if (mounted) setState(() => _modePanelOpen = true);
+  }
+
+  void _closeModePanel() {
+    if (mounted) setState(() => _modePanelOpen = false);
   }
 
   @override
@@ -380,17 +387,9 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   Future<void> _randomPlay() async {
-    final prefs = await SharedPreferences.getInstance();
-    final pinned = prefs.getStringList('pinned_playlists') ?? [];
-    final playlists = <PlaylistInfo>[];
-    for (final s in pinned) {
-      final parts = s.split('|');
-      if (parts.length >= 2 && parts[0].isNotEmpty) {
-        playlists.add(PlaylistInfo(parts[1], parts[0], coverUrl: parts.length > 2 ? parts[2] : ''));
-      }
-    }
+    final playlists = playlistCategories.values.expand((items) => items).toList();
     if (playlists.isEmpty) {
-      Toast.show(context, '请先置顶一些歌单');
+      Toast.show(context, '暂无可随机播放的歌单');
       return;
     }
     final random = Random();
@@ -400,26 +399,53 @@ class _PlayerPageState extends State<PlayerPage> {
   @override
   Widget build(BuildContext context) {
     final song = _player.currentSong;
+    final panelWidth = min(MediaQuery.of(context).size.width * 0.78, 330.0);
     return Scaffold(
-      key: _scaffoldKey,
       backgroundColor: Colors.transparent,
-      drawer: ModeDrawer(onSelectPlaylist: _loadAndPlay, onOpenFavorites: _openFavorites, onRandomPlay: _randomPlay),
-      body: MusicScaffoldBackground(
-        bgHint: _bgHint,
-        accent: _accent,
-        coverBytes: _coverBytes,
-        useCoverBlur: true,
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              _buildHeader(song),
-              Expanded(child: song != null ? _buildSwipeableContent(song) : _buildEmptyState()),
-              if (song != null) _buildProgressBar(),
-              const SizedBox(height: 92),
-            ],
+      body: Stack(
+        children: [
+          ModeDrawer(
+            onSelectPlaylist: _loadAndPlay,
+            onOpenFavorites: _openFavorites,
+            onRandomPlay: _randomPlay,
+            onClose: _closeModePanel,
           ),
-        ),
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            left: _modePanelOpen ? panelWidth : 0,
+            right: _modePanelOpen ? -panelWidth : 0,
+            top: 0,
+            bottom: 0,
+            child: GestureDetector(
+              behavior: _modePanelOpen ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
+              onTap: _modePanelOpen ? _closeModePanel : null,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(_modePanelOpen ? 28 : 0),
+                child: AbsorbPointer(
+                  absorbing: _modePanelOpen,
+                  child: MusicScaffoldBackground(
+                    bgHint: _bgHint,
+                    accent: _accent,
+                    coverBytes: _coverBytes,
+                    useCoverBlur: true,
+                    child: SafeArea(
+                      bottom: false,
+                      child: Column(
+                        children: [
+                          _buildHeader(song),
+                          Expanded(child: song != null ? _buildSwipeableContent(song) : _buildEmptyState()),
+                          if (song != null) _buildProgressBar(),
+                          const SizedBox(height: 92),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -430,7 +456,7 @@ class _PlayerPageState extends State<PlayerPage> {
       child: Row(
         children: [
           GestureDetector(
-            onTap: () => _scaffoldKey.currentState?.openDrawer(),
+            onTap: _openModePanel,
             child: Row(
               children: [
                 const Icon(Icons.menu_rounded, color: AppDesignTokens.lyricWhite, size: 34),
@@ -458,7 +484,7 @@ class _PlayerPageState extends State<PlayerPage> {
             Text('让当前专辑的颜色铺满整个房间。', textAlign: TextAlign.center, style: AppDesignTokens.body(color: AppDesignTokens.warmWhite.withOpacity(0.72))),
             const SizedBox(height: 22),
             GestureDetector(
-              onTap: () => _scaffoldKey.currentState?.openDrawer(),
+              onTap: _openModePanel,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
                 decoration: BoxDecoration(color: AppDesignTokens.selectedPill, borderRadius: BorderRadius.circular(999)),
@@ -551,10 +577,6 @@ class _PlayerPageState extends State<PlayerPage> {
             ),
           ),
           const Spacer(flex: 2),
-          Text(currentLyric, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppDesignTokens.display(size: 27)),
-          const SizedBox(height: 12),
-          Text(nextLyric, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.title(size: 21, color: AppDesignTokens.warmWhite.withOpacity(0.58))),
-          const Spacer(flex: 3),
           Row(
             children: [
               Expanded(child: Text(song.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.display(size: 27))),
@@ -564,7 +586,11 @@ class _PlayerPageState extends State<PlayerPage> {
           ),
           const SizedBox(height: 12),
           Text(song.singer, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.title(size: 22, color: AppDesignTokens.warmWhite.withOpacity(0.76))),
-          const SizedBox(height: 22),
+          const SizedBox(height: 28),
+          Text(currentLyric, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppDesignTokens.display(size: 27)),
+          const SizedBox(height: 12),
+          Text(nextLyric, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.title(size: 21, color: AppDesignTokens.warmWhite.withOpacity(0.58))),
+          const Spacer(flex: 2),
           _buildSocialActions(),
           if (_downloadProgress != null) ...[const SizedBox(height: 12), _buildDownloadProgress()],
           const Spacer(flex: 1),

@@ -1,29 +1,26 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../data/categories.dart';
 import '../services/theme_service.dart';
 import '../theme/app_design_tokens.dart';
-import '../utils/toast.dart';
 
 class ModeDrawer extends StatefulWidget {
   final void Function(PlaylistInfo playlist) onSelectPlaylist;
   final VoidCallback onOpenFavorites;
   final VoidCallback onRandomPlay;
-  const ModeDrawer({super.key, required this.onSelectPlaylist, required this.onOpenFavorites, required this.onRandomPlay});
+  final VoidCallback onClose;
+  const ModeDrawer({super.key, required this.onSelectPlaylist, required this.onOpenFavorites, required this.onRandomPlay, required this.onClose});
   @override
   State<ModeDrawer> createState() => _ModeDrawerState();
 }
 
 class _ModeDrawerState extends State<ModeDrawer> {
-  static const _pinKey = 'pinned_playlists';
-  final List<PlaylistInfo> _pinnedPlaylists = [];
   Color _accent = AppDesignTokens.lyricWhite;
   Color _bgHint = AppDesignTokens.inkBlack;
 
   @override
   void initState() {
     super.initState();
-    _loadPinned();
     _onThemeChange();
     ThemeService.accentColor.addListener(_onThemeChange);
     ThemeService.bgHint.addListener(_onThemeChange);
@@ -45,45 +42,10 @@ class _ModeDrawerState extends State<ModeDrawer> {
     super.dispose();
   }
 
-  static String _encode(PlaylistInfo p) => '${p.id}|${p.name}|${p.coverUrl}';
-  static PlaylistInfo? _decode(String s) {
-    final parts = s.split('|');
-    if (parts.length < 2 || parts[0].isEmpty) return null;
-    return PlaylistInfo(parts[1], parts[0], coverUrl: parts.length > 2 ? parts[2] : '');
-  }
-
-  Future<void> _loadPinned() async {
-    final prefs = await SharedPreferences.getInstance();
-    final list = prefs.getStringList(_pinKey) ?? [];
-    _pinnedPlaylists
-      ..clear()
-      ..addAll(list.map(_decode).whereType<PlaylistInfo>());
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _savePinned() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_pinKey, _pinnedPlaylists.map(_encode).toList());
-  }
-
-  Future<void> _pinPlaylist(PlaylistInfo p) async {
-    if (_pinnedPlaylists.any((e) => e.id == p.id)) return;
-    _pinnedPlaylists.add(p);
-    await _savePinned();
-    if (mounted) { setState(() {}); Toast.show(context, '已置顶「${p.name}」'); }
-  }
-
-  Future<void> _unpinPlaylist(PlaylistInfo p) async {
-    _pinnedPlaylists.removeWhere((e) => e.id == p.id);
-    await _savePinned();
-    if (mounted) setState(() {});
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Drawer(
-      width: MediaQuery.of(context).size.width * 0.80,
-      backgroundColor: Colors.transparent,
+    return SizedBox(
+      width: min(MediaQuery.of(context).size.width * 0.78, 330.0),
       child: MusicScaffoldBackground(
         bgHint: _bgHint,
         accent: _accent,
@@ -104,12 +66,27 @@ class _ModeDrawerState extends State<ModeDrawer> {
   }
 
   Widget _buildHeader() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
       children: [
-        Text('听歌模式', style: AppDesignTokens.display(size: 28)),
-        const SizedBox(height: 12),
-        Text('选择一种方式开始播放', style: AppDesignTokens.body(size: 17, color: AppDesignTokens.warmWhite.withOpacity(0.62), weight: FontWeight.w800)),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('听歌模式', style: AppDesignTokens.display(size: 28)),
+              const SizedBox(height: 12),
+              Text('选择一种方式开始播放', style: AppDesignTokens.body(size: 17, color: AppDesignTokens.warmWhite.withOpacity(0.62), weight: FontWeight.w800)),
+            ],
+          ),
+        ),
+        GestureDetector(
+          onTap: widget.onClose,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(14)),
+            child: const Icon(Icons.close_rounded, color: AppDesignTokens.lyricWhite, size: 24),
+          ),
+        ),
       ],
     );
   }
@@ -117,11 +94,11 @@ class _ModeDrawerState extends State<ModeDrawer> {
   Widget _buildQuickModes() {
     return Column(
       children: [
-        _modeButton(Icons.album_rounded, '默认模式', '返回当前播放页面', () => Navigator.pop(context), selected: true),
+        _modeButton(Icons.album_rounded, '默认模式', '返回当前播放页面', widget.onClose, selected: true),
         const SizedBox(height: 12),
-        _modeButton(Icons.favorite_rounded, '收藏模式', '播放收藏列表里的歌曲', () { Navigator.pop(context); widget.onOpenFavorites(); }),
+        _modeButton(Icons.favorite_rounded, '收藏模式', '播放收藏列表里的歌曲', () { widget.onClose(); widget.onOpenFavorites(); }),
         const SizedBox(height: 12),
-        _modeButton(Icons.shuffle_rounded, '随机模式', '从置顶歌单中随机播放', () { Navigator.pop(context); widget.onRandomPlay(); }),
+        _modeButton(Icons.shuffle_rounded, '随机模式', '从所有歌单中随机播放', () { widget.onClose(); widget.onRandomPlay(); }),
       ],
     );
   }
@@ -158,12 +135,9 @@ class _ModeDrawerState extends State<ModeDrawer> {
 
   Widget _buildPlaylistAccess() {
     final tiles = <Widget>[];
-    for (final p in _pinnedPlaylists) {
-      tiles.add(_playlistTile(Icons.push_pin_rounded, p.name, () { Navigator.pop(context); widget.onSelectPlaylist(p); }, onLongPress: () => _unpinPlaylist(p)));
-    }
     for (final entry in playlistCategories.entries) {
       for (final p in entry.value) {
-        tiles.add(_playlistTile(_iconForCategory(entry.key), p.name, () { Navigator.pop(context); widget.onSelectPlaylist(p); }, onLongPress: () => _pinPlaylist(p)));
+        tiles.add(_playlistTile(_iconForCategory(entry.key), p.name, () { widget.onClose(); widget.onSelectPlaylist(p); }));
       }
     }
     return Column(
@@ -193,7 +167,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
     }
   }
 
-  Widget _playlistTile(IconData icon, String label, VoidCallback onTap, {VoidCallback? onLongPress}) {
-    return GestureDetector(onTap: onTap, onLongPress: onLongPress, child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(icon, color: AppDesignTokens.lyricWhite.withOpacity(0.90), size: 30), const SizedBox(height: 12), Text(label, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppDesignTokens.body(size: 14, color: AppDesignTokens.warmWhite.withOpacity(0.86), weight: FontWeight.w800))]));
+  Widget _playlistTile(IconData icon, String label, VoidCallback onTap) {
+    return GestureDetector(onTap: onTap, child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(icon, color: AppDesignTokens.lyricWhite.withOpacity(0.90), size: 30), const SizedBox(height: 12), Text(label, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppDesignTokens.body(size: 14, color: AppDesignTokens.warmWhite.withOpacity(0.86), weight: FontWeight.w800))]));
   }
 }
