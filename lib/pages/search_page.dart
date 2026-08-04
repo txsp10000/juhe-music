@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../services/favorites_service.dart';
 import '../services/theme_service.dart';
 import '../theme/app_design_tokens.dart';
-import '../widgets/glass_panel.dart';
 import 'search_result_page.dart';
 
 class SearchPage extends StatefulWidget {

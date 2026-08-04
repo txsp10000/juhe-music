@@ -4,7 +4,6 @@ import '../data/categories.dart';
 import '../services/theme_service.dart';
 import '../theme/app_design_tokens.dart';
 import '../utils/toast.dart';
-import 'glass_panel.dart';
 
 class ModeDrawer extends StatefulWidget {
   final void Function(PlaylistInfo playlist) onSelectPlaylist;

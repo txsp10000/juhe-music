@@ -172,11 +172,6 @@ class _PlayerPageState extends State<PlayerPage> {
     if (mounted) setState(() {});
   }
 
-  String _fmt(Duration d) {
-    final s = d.inSeconds;
-    return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
-  }
-
   List<_LrcLine> _parseLrc(String? lyric) {
     if (lyric == null || lyric.isEmpty) return [];
     final lines = <_LrcLine>[];
