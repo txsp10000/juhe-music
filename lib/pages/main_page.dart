@@ -41,8 +41,9 @@ class _MainPageState extends State<MainPage> {
   void _onThemeChange() {
     if (mounted) {
       setState(() {
-        _accent =
-            AppDesignTokens.readableAccent(ThemeService.accentColor.value);
+        _accent = AppDesignTokens.readableAccent(
+          ThemeService.accentColor.value,
+        );
         _bgHint = ThemeService.bgHint.value;
       });
     }
@@ -87,15 +88,15 @@ class _MainPageState extends State<MainPage> {
               children: [
                 PlayerPage(onOpenDrawer: () => _openDrawer(0)),
                 SearchPage(
-                    embedded: true,
-                    onShowPlayer: _showPlayer,
-                    onOpenDrawer: () => _openDrawer(1)),
+                  embedded: true,
+                  onShowPlayer: _showPlayer,
+                  onOpenDrawer: () => _openDrawer(1),
+                ),
                 FavoritesPage(embedded: true, onShowPlayer: _showPlayer),
               ],
             ),
           ),
-          bottomNavigationBar:
-              SafeArea(top: false, child: _buildBottomNav()),
+          bottomNavigationBar: SafeArea(top: false, child: _buildBottomNav()),
         ),
         if (_drawerOpen)
           Positioned.fill(
@@ -215,31 +216,38 @@ class _MainPageState extends State<MainPage> {
                       height: 56,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(
-                            color: Colors.white,
-                            width: 2.6),
+                        border: Border.all(color: Colors.white, width: 2.6),
                         color: Colors.white.withOpacity(0.05),
                       ),
                       child: Center(
                         child: _tab == 0
-                            ? Icon(
-                                hasSong
-                                    ? (_player.isPlaying
+                            ? hasSong
+                                ? Icon(
+                                    _player.isPlaying
                                         ? Icons.pause_rounded
-                                        : Icons.play_arrow_rounded)
-                                    : Icons.play_arrow_rounded,
-                                color: Colors.white,
-                                size: 28,
-                              )
+                                        : Icons.play_arrow_rounded,
+                                    color: Colors.white,
+                                    size: 28,
+                                  )
+                                : MiniWave(
+                                    playing: false,
+                                    color: Colors.white,
+                                    size: 20,
+                                  )
                             : hasSong
                                 ? Opacity(
                                     opacity: _player.isPlaying ? 1.0 : 0.8,
                                     child: MiniWave(
-                                        playing: _player.isPlaying,
-                                        color: Colors.white,
-                                        size: 20))
-                                : Icon(Icons.play_arrow_rounded,
-                                    color: Colors.white24, size: 34),
+                                      playing: _player.isPlaying,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                  )
+                                : const MiniWave(
+                                    playing: false,
+                                    color: Color(0x61FFFFFF),
+                                    size: 20,
+                                  ),
                       ),
                     ),
                   ),

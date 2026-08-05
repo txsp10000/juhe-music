@@ -9,7 +9,6 @@ import '../services/settings_service.dart';
 import '../services/theme_service.dart';
 import '../theme/app_design_tokens.dart';
 import '../utils/toast.dart';
-import '../widgets/glass_panel.dart';
 import '../widgets/music_list_tile.dart';
 import 'search_result_page.dart';
 
@@ -601,21 +600,10 @@ class _PlayerPageState extends State<PlayerPage> {
                 ),
               ),
               SizedBox(height: coverToInfoGap),
-              Row(
-                children: [
-                  Expanded(
-                      child: Text(song.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppDesignTokens.display(size: titleSize))),
-                  const SizedBox(width: 8),
-                  MusicChip(
-                      label: _qualityLabel(),
-                      accent: _accent,
-                      active: true,
-                      onTap: _showQualityPicker),
-                ],
-              ),
+              Text(song.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppDesignTokens.display(size: titleSize)),
               const SizedBox(height: 8),
               Text(song.singer,
                   maxLines: 1,
@@ -625,8 +613,14 @@ class _PlayerPageState extends State<PlayerPage> {
                       color: AppDesignTokens.warmWhite.withOpacity(0.76))),
               SizedBox(height: infoToLyricGap),
               Flexible(
-                  child:
-                      _buildLyricPreview(lyricLines, lyricSize, nextLyricSize)),
+                child: Center(
+                  child: SizedBox(
+                    width: coverSize,
+                    child: _buildLyricPreview(
+                        lyricLines, lyricSize, nextLyricSize),
+                  ),
+                ),
+              ),
               SizedBox(height: lyricToActionsGap),
               _buildSocialActions(),
               if (_downloadProgress != null) ...[
@@ -672,61 +666,56 @@ class _PlayerPageState extends State<PlayerPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              GestureDetector(
-                onTap: _toggleFavorite,
-                child: Icon(
-                    _isFavorite
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
-                    color: _isFavorite
-                        ? AppDesignTokens.lyricWhite
-                        : AppDesignTokens.warmWhite.withOpacity(0.85),
-                    size: 38),
-              ),
-              const SizedBox(height: 5),
-              Text('收藏',
-                  style: AppDesignTokens.caption(
-                      size: 10,
-                      color: AppDesignTokens.warmWhite.withOpacity(0.65))),
-            ],
+          _buildActionItem(
+            icon: _isFavorite
+                ? Icons.favorite_rounded
+                : Icons.favorite_border_rounded,
+            label: '收藏',
+            onTap: _toggleFavorite,
+            active: _isFavorite,
           ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              GestureDetector(
-                onTap: _showPlaylistSheet,
-                child: Icon(Icons.queue_music_rounded,
-                    color: AppDesignTokens.warmWhite.withOpacity(0.85),
-                    size: 38),
-              ),
-              const SizedBox(height: 5),
-              Text('列表',
-                  style: AppDesignTokens.caption(
-                      size: 10,
-                      color: AppDesignTokens.warmWhite.withOpacity(0.65))),
-            ],
+          _buildActionItem(
+            icon: Icons.queue_music_rounded,
+            label: '列表',
+            onTap: _showPlaylistSheet,
           ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              GestureDetector(
-                onTap: _showSearchSameSheet,
-                child: Icon(Icons.search_rounded,
-                    color: AppDesignTokens.warmWhite.withOpacity(0.85),
-                    size: 38),
-              ),
-              const SizedBox(height: 5),
-              Text('搜索',
-                  style: AppDesignTokens.caption(
-                      size: 10,
-                      color: AppDesignTokens.warmWhite.withOpacity(0.65))),
-            ],
+          _buildActionItem(
+            icon: Icons.high_quality_rounded,
+            label: _qualityLabel(),
+            onTap: _showQualityPicker,
+            active: true,
+          ),
+          _buildActionItem(
+            icon: Icons.search_rounded,
+            label: '搜索',
+            onTap: _showSearchSameSheet,
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildActionItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool active = false,
+  }) {
+    final color = active
+        ? AppDesignTokens.lyricWhite
+        : AppDesignTokens.warmWhite.withOpacity(0.85);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: Icon(icon, color: color, size: 36),
+        ),
+        const SizedBox(height: 5),
+        Text(label,
+            style: AppDesignTokens.caption(
+                size: 10, color: AppDesignTokens.warmWhite.withOpacity(0.65))),
+      ],
     );
   }
 
