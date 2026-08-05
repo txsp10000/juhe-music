@@ -65,7 +65,8 @@ class _PlayerPageState extends State<PlayerPage> {
   void _onThemeChange() {
     if (mounted) {
       setState(() {
-        _accent = AppDesignTokens.readableAccent(ThemeService.accentColor.value);
+        _accent =
+            AppDesignTokens.readableAccent(ThemeService.accentColor.value);
         _bgHint = ThemeService.bgHint.value;
       });
     }
@@ -78,7 +79,10 @@ class _PlayerPageState extends State<PlayerPage> {
       _duration = dur ?? Duration.zero;
     });
     final song = _player.currentSong;
-    if (song != null && _coverBytes == null && song.cover.isNotEmpty && song.cover != _coverUrl) {
+    if (song != null &&
+        _coverBytes == null &&
+        song.cover.isNotEmpty &&
+        song.cover != _coverUrl) {
       _loadCover(song);
     }
   }
@@ -196,7 +200,8 @@ class _PlayerPageState extends State<PlayerPage> {
         if (msStr.length == 2) ms *= 10;
       }
       final text = match.group(4)?.trim() ?? '';
-      if (text.isNotEmpty) lines.add(_LrcLine((min * 60 + sec) * 1000 + ms, text));
+      if (text.isNotEmpty)
+        lines.add(_LrcLine((min * 60 + sec) * 1000 + ms, text));
     }
     lines.sort((a, b) => a.timeMs.compareTo(b.timeMs));
     return lines;
@@ -234,12 +239,20 @@ class _PlayerPageState extends State<PlayerPage> {
           children: [
             _sheetAction(Icons.music_note_rounded, '歌曲名', song.name, () {
               Navigator.pop(ctx);
-              Navigator.push(context, MaterialPageRoute(builder: (_) => SearchResultPage(keyword: song.name, fromPlayer: true)));
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => SearchResultPage(
+                          keyword: song.name, fromPlayer: true)));
             }),
             const SizedBox(height: 10),
             _sheetAction(Icons.person_rounded, '歌手', song.singer, () {
               Navigator.pop(ctx);
-              Navigator.push(context, MaterialPageRoute(builder: (_) => SearchResultPage(keyword: song.singer, fromPlayer: true)));
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => SearchResultPage(
+                          keyword: song.singer, fromPlayer: true)));
             }),
           ],
         ),
@@ -267,20 +280,37 @@ class _PlayerPageState extends State<PlayerPage> {
                   if (!mounted) return;
                   Navigator.pop(ctx);
                   setState(() {});
-                  if (q.br > oldBr) PlayerService().redownloadCurrentAtNewQuality();
+                  if (q.br > oldBr)
+                    PlayerService().redownloadCurrentAtNewQuality();
                 },
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
-                    color: selected ? AppDesignTokens.selectedPill : Colors.white.withOpacity(0.08),
+                    color: selected
+                        ? AppDesignTokens.selectedPill
+                        : Colors.white.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: Row(
                     children: [
-                      Icon(selected ? Icons.check_circle_rounded : Icons.circle_outlined, color: selected ? Colors.black87 : AppDesignTokens.warmWhite, size: 20),
+                      Icon(
+                          selected
+                              ? Icons.check_circle_rounded
+                              : Icons.circle_outlined,
+                          color: selected
+                              ? Colors.black87
+                              : AppDesignTokens.warmWhite,
+                          size: 20),
                       const SizedBox(width: 12),
-                      Expanded(child: Text(q.label, style: AppDesignTokens.body(color: selected ? Colors.black87 : AppDesignTokens.lyricWhite, weight: FontWeight.w800))),
+                      Expanded(
+                          child: Text(q.label,
+                              style: AppDesignTokens.body(
+                                  color: selected
+                                      ? Colors.black87
+                                      : AppDesignTokens.lyricWhite,
+                                  weight: FontWeight.w800))),
                     ],
                   ),
                 ),
@@ -292,19 +322,28 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  Widget _sheetAction(IconData icon, String label, String value, VoidCallback onTap) {
+  Widget _sheetAction(
+      IconData icon, String label, String value, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(18)),
+        decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(18)),
         child: Row(
           children: [
             Icon(icon, color: AppDesignTokens.lyricWhite, size: 22),
             const SizedBox(width: 12),
-            Text('$label：', style: AppDesignTokens.caption(color: AppDesignTokens.quietGrey)),
-            Expanded(child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.body(weight: FontWeight.w800))),
+            Text('$label：',
+                style:
+                    AppDesignTokens.caption(color: AppDesignTokens.quietGrey)),
+            Expanded(
+                child: Text(value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppDesignTokens.body(weight: FontWeight.w800))),
           ],
         ),
       ),
@@ -313,11 +352,16 @@ class _PlayerPageState extends State<PlayerPage> {
 
   String _qualityLabel() {
     switch (SettingsService().quality) {
-      case AudioQuality.low128: return '标准';
-      case AudioQuality.medium192: return '较高';
-      case AudioQuality.high320: return '极高';
-      case AudioQuality.lossless740: return '无损';
-      case AudioQuality.lossless999: return '极高';
+      case AudioQuality.low128:
+        return '标准';
+      case AudioQuality.medium192:
+        return '较高';
+      case AudioQuality.high320:
+        return '极高';
+      case AudioQuality.lossless740:
+        return '无损';
+      case AudioQuality.lossless999:
+        return '极高';
     }
   }
 
@@ -326,7 +370,8 @@ class _PlayerPageState extends State<PlayerPage> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.62),
+      constraints:
+          BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.62),
       builder: (ctx) {
         final songs = _player.playlist;
         final currentIdx = _player.currentIndex;
@@ -336,7 +381,11 @@ class _PlayerPageState extends State<PlayerPage> {
           child: SizedBox(
             height: MediaQuery.of(context).size.height * 0.46,
             child: songs.isEmpty
-                ? MusicEmptyState(accent: _accent, icon: Icons.queue_music_rounded, title: '队列是空的', message: '去搜索或播放收藏里的歌曲。')
+                ? MusicEmptyState(
+                    accent: _accent,
+                    icon: Icons.queue_music_rounded,
+                    title: '队列是空的',
+                    message: '去搜索或播放收藏里的歌曲。')
                 : ListView.builder(
                     itemCount: songs.length,
                     itemBuilder: (_, i) => MusicListTile(
@@ -387,7 +436,8 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   Future<void> _randomPlay() async {
-    final playlists = playlistCategories.values.expand((items) => items).toList();
+    final playlists =
+        playlistCategories.values.expand((items) => items).toList();
     if (playlists.isEmpty) {
       Toast.show(context, '暂无可随机播放的歌单');
       return;
@@ -415,7 +465,10 @@ class _PlayerPageState extends State<PlayerPage> {
                 child: Column(
                   children: [
                     _buildHeader(song),
-                    Expanded(child: song != null ? _buildSwipeableContent(song) : _buildEmptyState()),
+                    Expanded(
+                        child: song != null
+                            ? _buildSwipeableContent(song)
+                            : _buildEmptyState()),
                     const SizedBox(height: 92),
                   ],
                 ),
@@ -458,7 +511,8 @@ class _PlayerPageState extends State<PlayerPage> {
             onTap: _openModePanel,
             child: Row(
               children: [
-                const Icon(Icons.menu_rounded, color: AppDesignTokens.lyricWhite, size: 34),
+                const Icon(Icons.menu_rounded,
+                    color: AppDesignTokens.lyricWhite, size: 34),
                 const SizedBox(width: 10),
                 Text('模式选择', style: AppDesignTokens.title(size: 26)),
               ],
@@ -476,18 +530,27 @@ class _PlayerPageState extends State<PlayerPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.music_note_rounded, color: AppDesignTokens.lyricWhite.withOpacity(0.86), size: 78),
+            Icon(Icons.music_note_rounded,
+                color: AppDesignTokens.lyricWhite.withOpacity(0.86), size: 78),
             const SizedBox(height: 22),
             Text('选择一个听歌模式', style: AppDesignTokens.title(size: 26)),
             const SizedBox(height: 10),
-            Text('让当前专辑的颜色铺满整个房间。', textAlign: TextAlign.center, style: AppDesignTokens.body(color: AppDesignTokens.warmWhite.withOpacity(0.72))),
+            Text('让当前专辑的颜色铺满整个房间。',
+                textAlign: TextAlign.center,
+                style: AppDesignTokens.body(
+                    color: AppDesignTokens.warmWhite.withOpacity(0.72))),
             const SizedBox(height: 22),
             GestureDetector(
               onTap: _openModePanel,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                decoration: BoxDecoration(color: AppDesignTokens.selectedPill, borderRadius: BorderRadius.circular(999)),
-                child: Text('打开模式选择', style: AppDesignTokens.body(color: Colors.black87, weight: FontWeight.w900)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                decoration: BoxDecoration(
+                    color: AppDesignTokens.selectedPill,
+                    borderRadius: BorderRadius.circular(999)),
+                child: Text('打开模式选择',
+                    style: AppDesignTokens.body(
+                        color: Colors.black87, weight: FontWeight.w900)),
               ),
             ),
           ],
@@ -499,17 +562,26 @@ class _PlayerPageState extends State<PlayerPage> {
   Widget _buildSwipeableContent(Song song) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final height = constraints.maxHeight == double.infinity ? MediaQuery.of(context).size.height : constraints.maxHeight;
-        final dragProgress = (_dragOffset.abs() / max(height * 0.46, 1.0)).clamp(0.0, 1.0);
-        final slideOffset = _isSwitchingSong ? Offset(0, _swipeDirection < 0 ? -1.05 : 1.05) : Offset(0, _dragOffset / max(height, 1.0));
-        final opacity = _isSwitchingSong ? 0.0 : (1.0 - dragProgress * 0.72).clamp(0.28, 1.0);
+        final height = constraints.maxHeight == double.infinity
+            ? MediaQuery.of(context).size.height
+            : constraints.maxHeight;
+        final dragProgress =
+            (_dragOffset.abs() / max(height * 0.46, 1.0)).clamp(0.0, 1.0);
+        final slideOffset = _isSwitchingSong
+            ? Offset(0, _swipeDirection < 0 ? -1.05 : 1.05)
+            : Offset(0, _dragOffset / max(height, 1.0));
+        final opacity = _isSwitchingSong
+            ? 0.0
+            : (1.0 - dragProgress * 0.72).clamp(0.28, 1.0);
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onVerticalDragUpdate: (details) {
             if (_isSwitchingSong) return;
-            setState(() => _dragOffset = (_dragOffset + details.delta.dy).clamp(-height * 0.58, height * 0.58));
+            setState(() => _dragOffset = (_dragOffset + details.delta.dy)
+                .clamp(-height * 0.58, height * 0.58));
           },
-          onVerticalDragEnd: (details) => _finishSongDrag(details.primaryVelocity ?? 0, height),
+          onVerticalDragEnd: (details) =>
+              _finishSongDrag(details.primaryVelocity ?? 0, height),
           onVerticalDragCancel: () {
             if (!_isSwitchingSong) setState(() => _dragOffset = 0.0);
           },
@@ -552,6 +624,13 @@ class _PlayerPageState extends State<PlayerPage> {
         _player.prev();
       }
     });
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (!mounted || !_isSwitchingSong) return;
+      setState(() {
+        _isSwitchingSong = false;
+        _dragOffset = 0.0;
+      });
+    });
   }
 
   Widget _buildPlayerContent(Song song) {
@@ -561,7 +640,8 @@ class _PlayerPageState extends State<PlayerPage> {
         final availableHeight = constraints.maxHeight;
         final width = constraints.maxWidth;
         final compact = availableHeight < 640;
-        final coverSize = min(width * 0.66, availableHeight * 0.34).clamp(compact ? 178.0 : 208.0, compact ? 230.0 : 270.0);
+        final coverSize = min(width * 0.66, availableHeight * 0.34)
+            .clamp(compact ? 178.0 : 208.0, compact ? 230.0 : 270.0);
         final lyricLines = _visibleLyricTexts(song, compact ? 4 : 5);
         final titleSize = compact ? 22.0 : 25.0;
         final singerSize = compact ? 17.0 : 18.0;
@@ -582,26 +662,56 @@ class _PlayerPageState extends State<PlayerPage> {
                 child: Container(
                   width: coverSize,
                   height: coverSize,
-                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(30), color: Colors.white.withOpacity(0.08), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.30), blurRadius: 34, offset: const Offset(0, 18))]),
+                  decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(30),
+                      color: Colors.white.withOpacity(0.08),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(0.30),
+                            blurRadius: 34,
+                            offset: const Offset(0, 18))
+                      ]),
                   clipBehavior: Clip.antiAlias,
-                  child: _coverBytes != null ? Image.memory(_coverBytes!, fit: BoxFit.cover) : Icon(Icons.music_note_rounded, color: AppDesignTokens.lyricWhite.withOpacity(0.72), size: coverSize * 0.26),
+                  child: _coverBytes != null
+                      ? Image.memory(_coverBytes!, fit: BoxFit.cover)
+                      : Icon(Icons.music_note_rounded,
+                          color: AppDesignTokens.lyricWhite.withOpacity(0.72),
+                          size: coverSize * 0.26),
                 ),
               ),
               SizedBox(height: coverToInfoGap),
               Row(
                 children: [
-                  Expanded(child: Text(song.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.display(size: titleSize))),
+                  Expanded(
+                      child: Text(song.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppDesignTokens.display(size: titleSize))),
                   const SizedBox(width: 8),
-                  MusicChip(label: _qualityLabel(), accent: _accent, active: true, onTap: _showQualityPicker),
+                  MusicChip(
+                      label: _qualityLabel(),
+                      accent: _accent,
+                      active: true,
+                      onTap: _showQualityPicker),
                 ],
               ),
               const SizedBox(height: 8),
-              Text(song.singer, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.title(size: singerSize, color: AppDesignTokens.warmWhite.withOpacity(0.76))),
+              Text(song.singer,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppDesignTokens.title(
+                      size: singerSize,
+                      color: AppDesignTokens.warmWhite.withOpacity(0.76))),
               SizedBox(height: infoToLyricGap),
-              Flexible(child: _buildLyricPreview(lyricLines, lyricSize, nextLyricSize)),
+              Flexible(
+                  child:
+                      _buildLyricPreview(lyricLines, lyricSize, nextLyricSize)),
               SizedBox(height: lyricToActionsGap),
               _buildSocialActions(),
-              if (_downloadProgress != null) ...[const SizedBox(height: 8), _buildDownloadProgress()],
+              if (_downloadProgress != null) ...[
+                const SizedBox(height: 8),
+                _buildDownloadProgress()
+              ],
               SizedBox(height: actionsToProgressGap),
               _buildProgressBar(),
               SizedBox(height: compact ? 0 : 8),
@@ -612,15 +722,24 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  Widget _buildLyricPreview(List<String> lines, double currentSize, double nextSize) {
+  Widget _buildLyricPreview(
+      List<String> lines, double currentSize, double nextSize) {
     if (lines.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(lines.first, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppDesignTokens.display(size: currentSize)),
+        Text(lines.first,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: AppDesignTokens.display(size: currentSize)),
         for (final line in lines.skip(1)) ...[
           const SizedBox(height: 8),
-          Text(line, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.title(size: nextSize, color: AppDesignTokens.warmWhite.withOpacity(0.58))),
+          Text(line,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppDesignTokens.title(
+                  size: nextSize,
+                  color: AppDesignTokens.warmWhite.withOpacity(0.58))),
         ],
       ],
     );
@@ -637,10 +756,20 @@ class _PlayerPageState extends State<PlayerPage> {
             children: [
               GestureDetector(
                 onTap: _toggleFavorite,
-                child: Icon(_isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: _isFavorite ? AppDesignTokens.lyricWhite : AppDesignTokens.warmWhite.withOpacity(0.85), size: 38),
+                child: Icon(
+                    _isFavorite
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    color: _isFavorite
+                        ? AppDesignTokens.lyricWhite
+                        : AppDesignTokens.warmWhite.withOpacity(0.85),
+                    size: 38),
               ),
               const SizedBox(height: 5),
-              Text('收藏', style: AppDesignTokens.caption(size: 10, color: AppDesignTokens.warmWhite.withOpacity(0.65))),
+              Text('收藏',
+                  style: AppDesignTokens.caption(
+                      size: 10,
+                      color: AppDesignTokens.warmWhite.withOpacity(0.65))),
             ],
           ),
           Column(
@@ -648,10 +777,15 @@ class _PlayerPageState extends State<PlayerPage> {
             children: [
               GestureDetector(
                 onTap: _showPlaylistSheet,
-                child: Icon(Icons.queue_music_rounded, color: AppDesignTokens.warmWhite.withOpacity(0.85), size: 38),
+                child: Icon(Icons.queue_music_rounded,
+                    color: AppDesignTokens.warmWhite.withOpacity(0.85),
+                    size: 38),
               ),
               const SizedBox(height: 5),
-              Text('列表', style: AppDesignTokens.caption(size: 10, color: AppDesignTokens.warmWhite.withOpacity(0.65))),
+              Text('列表',
+                  style: AppDesignTokens.caption(
+                      size: 10,
+                      color: AppDesignTokens.warmWhite.withOpacity(0.65))),
             ],
           ),
           Column(
@@ -659,10 +793,15 @@ class _PlayerPageState extends State<PlayerPage> {
             children: [
               GestureDetector(
                 onTap: _showSearchSameSheet,
-                child: Icon(Icons.search_rounded, color: AppDesignTokens.warmWhite.withOpacity(0.85), size: 38),
+                child: Icon(Icons.search_rounded,
+                    color: AppDesignTokens.warmWhite.withOpacity(0.85),
+                    size: 38),
               ),
               const SizedBox(height: 5),
-              Text('搜索', style: AppDesignTokens.caption(size: 10, color: AppDesignTokens.warmWhite.withOpacity(0.65))),
+              Text('搜索',
+                  style: AppDesignTokens.caption(
+                      size: 10,
+                      color: AppDesignTokens.warmWhite.withOpacity(0.65))),
             ],
           ),
         ],
@@ -674,16 +813,24 @@ class _PlayerPageState extends State<PlayerPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2, color: _accent, value: _downloadProgress)),
+        SizedBox(
+            width: 15,
+            height: 15,
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: _accent, value: _downloadProgress)),
         const SizedBox(width: 9),
-        Text('缓存中', style: AppDesignTokens.caption(color: AppDesignTokens.warmWhite.withOpacity(0.72))),
+        Text('缓存中',
+            style: AppDesignTokens.caption(
+                color: AppDesignTokens.warmWhite.withOpacity(0.72))),
       ],
     );
   }
 
   Widget _buildProgressBar() {
     final max = _duration.inMilliseconds.toDouble();
-    final current = _isDragging ? _dragValue : _position.inMilliseconds.toDouble().clamp(0.0, max);
+    final current = _isDragging
+        ? _dragValue
+        : _position.inMilliseconds.toDouble().clamp(0.0, max);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: SliderTheme(
@@ -700,9 +847,15 @@ class _PlayerPageState extends State<PlayerPage> {
           min: 0,
           max: max > 0 ? max : 1,
           value: max > 0 ? current.clamp(0.0, max) : 0,
-          onChangeStart: (v) { _isDragging = true; _dragValue = v; },
+          onChangeStart: (v) {
+            _isDragging = true;
+            _dragValue = v;
+          },
           onChanged: (v) => setState(() => _dragValue = v),
-          onChangeEnd: (v) { _isDragging = false; _player.seek(Duration(milliseconds: v.toInt())); },
+          onChangeEnd: (v) {
+            _isDragging = false;
+            _player.seek(Duration(milliseconds: v.toInt()));
+          },
         ),
       ),
     );
@@ -711,7 +864,12 @@ class _PlayerPageState extends State<PlayerPage> {
   List<String> _visibleLyricTexts(Song song, int count) {
     final idx = _currentLrcIndex();
     if (idx >= 0 && idx < _parsedLrc.length) {
-      final lines = _parsedLrc.skip(idx).take(count).map((l) => l.text).where((t) => t.isNotEmpty).toList();
+      final lines = _parsedLrc
+          .skip(idx)
+          .take(count)
+          .map((l) => l.text)
+          .where((t) => t.isNotEmpty)
+          .toList();
       if (lines.isNotEmpty) return lines;
     }
     final first = _firstLyric(song.lyric);
@@ -721,7 +879,11 @@ class _PlayerPageState extends State<PlayerPage> {
 
   String _firstLyric(String? lyric) {
     if (lyric == null || lyric.isEmpty) return '纵此生也不过百岁';
-    final line = lyric.split('\n').firstWhere((l) => l.trim().isNotEmpty, orElse: () => '纵此生也不过百岁').replaceAll(RegExp(r'\[.*?\]'), '').trim();
+    final line = lyric
+        .split('\n')
+        .firstWhere((l) => l.trim().isNotEmpty, orElse: () => '纵此生也不过百岁')
+        .replaceAll(RegExp(r'\[.*?\]'), '')
+        .trim();
     return line.isEmpty ? '纵此生也不过百岁' : line;
   }
 }
@@ -731,7 +893,8 @@ class _MusicSheet extends StatelessWidget {
   final String title;
   final Widget child;
 
-  const _MusicSheet({required this.accent, required this.title, required this.child});
+  const _MusicSheet(
+      {required this.accent, required this.title, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -740,11 +903,18 @@ class _MusicSheet extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
-        decoration: BoxDecoration(color: const Color(0xFF241A14).withOpacity(0.96), borderRadius: BorderRadius.circular(AppDesignTokens.sheetRadius)),
+        decoration: BoxDecoration(
+            color: const Color(0xFF241A14).withOpacity(0.96),
+            borderRadius: BorderRadius.circular(AppDesignTokens.sheetRadius)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(width: 42, height: 4, decoration: BoxDecoration(color: Colors.white.withOpacity(0.32), borderRadius: BorderRadius.circular(999))),
+            Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.32),
+                    borderRadius: BorderRadius.circular(999))),
             const SizedBox(height: 16),
             Text(title, style: AppDesignTokens.title(size: 18)),
             const SizedBox(height: 16),

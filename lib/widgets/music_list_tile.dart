@@ -32,12 +32,14 @@ class MusicListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final active = isCurrent || selected;
+    final baseColor =
+        AppDesignTokens.surfaceFor(accent, opacity: active ? 0.30 : 0.18);
     final row = AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       margin: margin,
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
-        color: active ? Colors.white.withOpacity(0.16) : Colors.white.withOpacity(0.075),
+        color: baseColor.withOpacity(active ? 0.68 : 0.48),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
@@ -48,12 +50,35 @@ class MusicListTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(song.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.body(size: 16, color: active ? AppDesignTokens.lyricWhite : AppDesignTokens.lyricWhite.withOpacity(0.92), weight: FontWeight.w900)),
+                Text(song.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppDesignTokens.body(
+                        size: 16,
+                        color: active
+                            ? AppDesignTokens.lyricWhite
+                            : AppDesignTokens.lyricWhite.withOpacity(0.92),
+                        weight: FontWeight.w900)),
                 const SizedBox(height: 4),
-                Text(song.singer.isEmpty ? '未知歌手' : song.singer, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.body(size: 13, color: AppDesignTokens.warmWhite.withOpacity(0.58), weight: FontWeight.w600)),
+                Text(song.singer.isEmpty ? '未知歌手' : song.singer,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppDesignTokens.body(
+                        size: 13,
+                        color: AppDesignTokens.warmWhite.withOpacity(0.58),
+                        weight: FontWeight.w600)),
                 if (song.album.isNotEmpty || song.source.isNotEmpty) ...[
                   const SizedBox(height: 5),
-                  Text([if (song.album.isNotEmpty) song.album, if (song.source.isNotEmpty) song.source].join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.caption(size: 10.5, color: AppDesignTokens.warmWhite.withOpacity(0.38))),
+                  Text(
+                      [
+                        if (song.album.isNotEmpty) song.album,
+                        if (song.source.isNotEmpty) song.source
+                      ].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppDesignTokens.caption(
+                          size: 10.5,
+                          color: AppDesignTokens.warmWhite.withOpacity(0.38))),
                 ],
               ],
             ),
@@ -62,14 +87,21 @@ class MusicListTile extends StatelessWidget {
         ],
       ),
     );
-    return Material(color: Colors.transparent, child: InkWell(borderRadius: BorderRadius.circular(18), onTap: onTap, child: row));
+    return Material(
+        color: Colors.transparent,
+        child: InkWell(
+            borderRadius: BorderRadius.circular(18), onTap: onTap, child: row));
   }
 
   Widget _buildLeading() {
     if (showCover && song.cover.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Image.network(song.cover, width: 48, height: 48, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _fallbackLeading()),
+        child: Image.network(song.cover,
+            width: 48,
+            height: 48,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _fallbackLeading()),
       );
     }
     return _fallbackLeading();
@@ -79,11 +111,17 @@ class MusicListTile extends StatelessWidget {
     return Container(
       width: 48,
       height: 48,
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: Colors.white.withOpacity(0.10)),
+      decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: AppDesignTokens.softPill(accent).withOpacity(0.62)),
       child: Center(
         child: isCurrent
-            ? MiniWave(playing: true, color: AppDesignTokens.lyricWhite, size: 22)
-            : Text(index == null ? '♪' : '${index! + 1}', style: AppDesignTokens.caption(size: index == null ? 18 : 13, color: AppDesignTokens.lyricWhite)),
+            ? MiniWave(
+                playing: true, color: AppDesignTokens.lyricWhite, size: 22)
+            : Text(index == null ? '♪' : '${index! + 1}',
+                style: AppDesignTokens.caption(
+                    size: index == null ? 18 : 13,
+                    color: AppDesignTokens.lyricWhite)),
       ),
     );
   }
@@ -96,7 +134,13 @@ class MusicEmptyState extends StatelessWidget {
   final String message;
   final Widget? action;
 
-  const MusicEmptyState({super.key, required this.accent, required this.icon, required this.title, required this.message, this.action});
+  const MusicEmptyState(
+      {super.key,
+      required this.accent,
+      required this.icon,
+      required this.title,
+      required this.message,
+      this.action});
 
   @override
   Widget build(BuildContext context) {
@@ -106,11 +150,24 @@ class MusicEmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(width: 76, height: 76, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.10)), child: Icon(icon, color: AppDesignTokens.lyricWhite, size: 36)),
+            Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.10)),
+                child: Icon(icon, color: AppDesignTokens.lyricWhite, size: 36)),
             const SizedBox(height: 20),
-            Text(title, textAlign: TextAlign.center, style: AppDesignTokens.title(size: 22)),
+            Text(title,
+                textAlign: TextAlign.center,
+                style: AppDesignTokens.title(size: 22)),
             const SizedBox(height: 8),
-            Text(message, textAlign: TextAlign.center, style: AppDesignTokens.body(size: 14, color: AppDesignTokens.warmWhite.withOpacity(0.62), weight: FontWeight.w600)),
+            Text(message,
+                textAlign: TextAlign.center,
+                style: AppDesignTokens.body(
+                    size: 14,
+                    color: AppDesignTokens.warmWhite.withOpacity(0.62),
+                    weight: FontWeight.w600)),
             if (action != null) ...[const SizedBox(height: 20), action!],
           ],
         ),

@@ -13,7 +13,11 @@ class FavoritesPage extends StatefulWidget {
   final bool fromPlayer;
   final bool embedded;
   final VoidCallback? onShowPlayer;
-  const FavoritesPage({super.key, this.fromPlayer = false, this.embedded = false, this.onShowPlayer});
+  const FavoritesPage(
+      {super.key,
+      this.fromPlayer = false,
+      this.embedded = false,
+      this.onShowPlayer});
 
   @override
   State<FavoritesPage> createState() => _FavoritesPageState();
@@ -42,7 +46,8 @@ class _FavoritesPageState extends State<FavoritesPage> {
   void _onThemeChange() {
     if (mounted) {
       setState(() {
-        _accent = AppDesignTokens.readableAccent(ThemeService.accentColor.value);
+        _accent =
+            AppDesignTokens.readableAccent(ThemeService.accentColor.value);
         _bgHint = ThemeService.bgHint.value;
       });
     }
@@ -78,8 +83,11 @@ class _FavoritesPageState extends State<FavoritesPage> {
     if (idx > 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
-          final offset = (idx * 76.0).clamp(0.0, _scrollController.position.maxScrollExtent);
-          _scrollController.animateTo(offset, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+          final offset = (idx * 76.0)
+              .clamp(0.0, _scrollController.position.maxScrollExtent);
+          _scrollController.animateTo(offset,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut);
         }
       });
     }
@@ -146,7 +154,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
               _buildHeader(),
               Expanded(child: _buildBody()),
               if (_editMode) _buildEditTray(),
-              if (widget.embedded) const SizedBox(height: 96),
+              if (widget.embedded) const SizedBox(height: 118),
             ],
           ),
         ),
@@ -180,14 +188,20 @@ class _FavoritesPageState extends State<FavoritesPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_editMode ? '已选 ${_selected.length} 首' : '收藏', style: AppDesignTokens.display(size: 28)),
+                Text(_editMode ? '已选 ${_selected.length} 首' : '收藏',
+                    style: AppDesignTokens.display(size: 28)),
                 const SizedBox(height: 4),
-                Text(_editMode ? '选择要移出的歌曲' : '${_songs.length} 首被点亮的歌', style: AppDesignTokens.caption(color: _accent)),
+                Text(_editMode ? '选择要移出的歌曲' : '${_songs.length} 首被点亮的歌',
+                    style: AppDesignTokens.caption(color: _accent)),
               ],
             ),
           ),
           if (!_editMode && _songs.isNotEmpty)
-            MusicChip(label: '整理', icon: Icons.edit_rounded, accent: _accent, onTap: () => setState(() => _editMode = true)),
+            MusicChip(
+                label: '整理',
+                icon: Icons.edit_rounded,
+                accent: _accent,
+                onTap: () => setState(() => _editMode = true)),
         ],
       ),
     );
@@ -202,9 +216,10 @@ class _FavoritesPageState extends State<FavoritesPage> {
         message: '在播放页点亮爱心，歌曲会出现在这里。',
       );
     }
+    final bottomPadding = widget.embedded ? (_editMode ? 36.0 : 132.0) : 24.0;
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.only(top: 4, bottom: 16),
+      padding: EdgeInsets.only(top: 4, bottom: bottomPadding),
       itemCount: _songs.length,
       itemBuilder: (_, i) {
         final s = _songs[i];
@@ -216,9 +231,12 @@ class _FavoritesPageState extends State<FavoritesPage> {
             selected: _selected.contains(i),
             isCurrent: isCurrent,
             accent: _accent,
-            onTap: () => setState(() => _selected.contains(i) ? _selected.remove(i) : _selected.add(i)),
+            onTap: () => setState(() =>
+                _selected.contains(i) ? _selected.remove(i) : _selected.add(i)),
             leadingOverride: Icon(
-              _selected.contains(i) ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+              _selected.contains(i)
+                  ? Icons.check_circle_rounded
+                  : Icons.radio_button_unchecked_rounded,
               color: _selected.contains(i) ? _accent : AppDesignTokens.dimGrey,
               size: 26,
             ),
@@ -228,7 +246,13 @@ class _FavoritesPageState extends State<FavoritesPage> {
           actionLabel: '删除',
           actionColor: AppDesignTokens.danger,
           onAction: () => _removeSong(i),
-          child: MusicListTile(song: s, index: i, isCurrent: isCurrent, accent: _accent, onTap: () => _playAt(i), margin: EdgeInsets.zero),
+          child: MusicListTile(
+              song: s,
+              index: i,
+              isCurrent: isCurrent,
+              accent: _accent,
+              onTap: () => _playAt(i),
+              margin: EdgeInsets.zero),
         );
       },
     );
@@ -238,18 +262,60 @@ class _FavoritesPageState extends State<FavoritesPage> {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 14),
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
         child: GlassPanel(
           accent: _accent,
-          radius: 26,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          radius: 28,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           child: Row(
             children: [
-              Expanded(child: MusicChip(label: _selected.length == _songs.length ? '取消全选' : '全选', icon: Icons.select_all_rounded, accent: _accent, onTap: _toggleSelectAll)),
-              const SizedBox(width: 10),
-              Expanded(child: MusicChip(label: '删除', icon: Icons.delete_rounded, accent: _selected.isEmpty ? AppDesignTokens.dimGrey : AppDesignTokens.danger, active: _selected.isNotEmpty, onTap: _selected.isEmpty ? null : _deleteSelected)),
+              Expanded(
+                  child: _editTrayButton(
+                      label: _selected.length == _songs.length ? '取消全选' : '全选',
+                      icon: Icons.select_all_rounded,
+                      onTap: _toggleSelectAll)),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: _editTrayButton(
+                      label: '删除',
+                      icon: Icons.delete_rounded,
+                      onTap: _selected.isEmpty ? null : _deleteSelected,
+                      danger: _selected.isNotEmpty)),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _editTrayButton(
+      {required String label,
+      required IconData icon,
+      required VoidCallback? onTap,
+      bool danger = false}) {
+    final enabled = onTap != null;
+    final fg = danger
+        ? AppDesignTokens.lyricWhite
+        : AppDesignTokens.warmWhite.withOpacity(enabled ? 0.92 : 0.42);
+    final bg = danger
+        ? AppDesignTokens.danger.withOpacity(0.72)
+        : Colors.white.withOpacity(enabled ? 0.12 : 0.06);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        height: 54,
+        decoration:
+            BoxDecoration(color: bg, borderRadius: BorderRadius.circular(18)),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: fg, size: 21),
+            const SizedBox(width: 8),
+            Text(label,
+                style: AppDesignTokens.body(
+                    size: 16, color: fg, weight: FontWeight.w900)),
+          ],
         ),
       ),
     );
