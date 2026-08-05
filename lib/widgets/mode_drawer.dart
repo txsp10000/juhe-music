@@ -94,8 +94,6 @@ class _ModeDrawerState extends State<ModeDrawer> {
   Widget _buildQuickModes() {
     return Column(
       children: [
-        _modeButton(Icons.album_rounded, '默认模式', '返回当前播放页面', widget.onClose, selected: true),
-        const SizedBox(height: 12),
         _modeButton(Icons.favorite_rounded, '收藏模式', '播放收藏列表里的歌曲', () { widget.onClose(); widget.onOpenFavorites(); }),
         const SizedBox(height: 12),
         _modeButton(Icons.shuffle_rounded, '随机模式', '从所有歌单中随机播放', () { widget.onClose(); widget.onRandomPlay(); }),

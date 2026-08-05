@@ -556,8 +556,6 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   Widget _buildPlayerContent(Song song) {
-    final currentLyric = _currentLyricText(song);
-    final nextLyric = _nextLyricText(song);
     return LayoutBuilder(
       key: ValueKey(song.id),
       builder: (context, constraints) {
@@ -565,6 +563,7 @@ class _PlayerPageState extends State<PlayerPage> {
         final width = constraints.maxWidth;
         final coverSize = min(width * 0.56, availableHeight * 0.28).clamp(160.0, 240.0);
         final compact = availableHeight < 640;
+        final lyricLines = _visibleLyricTexts(song, compact ? 4 : 5);
         final titleSize = compact ? 22.0 : 24.0;
         final singerSize = compact ? 17.0 : 19.0;
         final lyricSize = compact ? 22.0 : 24.0;
@@ -598,9 +597,7 @@ class _PlayerPageState extends State<PlayerPage> {
               const SizedBox(height: 8),
               Text(song.singer, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.title(size: singerSize, color: AppDesignTokens.warmWhite.withOpacity(0.76))),
               SizedBox(height: infoToLyricGap),
-              Text(currentLyric, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppDesignTokens.display(size: lyricSize)),
-              const SizedBox(height: 8),
-              Text(nextLyric, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.title(size: nextLyricSize, color: AppDesignTokens.warmWhite.withOpacity(0.58))),
+              _buildLyricPreview(lyricLines, lyricSize, nextLyricSize),
               const Spacer(),
               _buildSocialActions(),
               if (_downloadProgress != null) ...[const SizedBox(height: 8), _buildDownloadProgress()],
@@ -609,6 +606,20 @@ class _PlayerPageState extends State<PlayerPage> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildLyricPreview(List<String> lines, double currentSize, double nextSize) {
+    if (lines.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(lines.first, maxLines: 2, overflow: TextOverflow.ellipsis, style: AppDesignTokens.display(size: currentSize)),
+        for (final line in lines.skip(1)) ...[
+          const SizedBox(height: 8),
+          Text(line, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.title(size: nextSize, color: AppDesignTokens.warmWhite.withOpacity(0.58))),
+        ],
+      ],
     );
   }
 
@@ -638,17 +649,6 @@ class _PlayerPageState extends State<PlayerPage> {
               ),
               const SizedBox(height: 5),
               Text('列表', style: AppDesignTokens.caption(size: 10, color: AppDesignTokens.warmWhite.withOpacity(0.65))),
-            ],
-          ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              GestureDetector(
-                onTap: _showQualityPicker,
-                child: Icon(Icons.high_quality_rounded, color: AppDesignTokens.warmWhite.withOpacity(0.85), size: 38),
-              ),
-              const SizedBox(height: 5),
-              Text('音质', style: AppDesignTokens.caption(size: 10, color: AppDesignTokens.warmWhite.withOpacity(0.65))),
             ],
           ),
           Column(
@@ -705,16 +705,15 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  String _currentLyricText(Song song) {
+  List<String> _visibleLyricTexts(Song song, int count) {
     final idx = _currentLrcIndex();
-    if (idx >= 0 && idx < _parsedLrc.length) return _parsedLrc[idx].text;
-    return _firstLyric(song.lyric);
-  }
-
-  String _nextLyricText(Song song) {
-    final idx = _currentLrcIndex();
-    if (idx + 1 >= 0 && idx + 1 < _parsedLrc.length) return _parsedLrc[idx + 1].text;
-    return song.album.isNotEmpty ? song.album : '何必沾惹愁滋味';
+    if (idx >= 0 && idx < _parsedLrc.length) {
+      final lines = _parsedLrc.skip(idx).take(count).map((l) => l.text).where((t) => t.isNotEmpty).toList();
+      if (lines.isNotEmpty) return lines;
+    }
+    final first = _firstLyric(song.lyric);
+    final fallback = song.album.isNotEmpty ? song.album : '何必沾惹愁滋味';
+    return first == fallback ? [first] : [first, fallback];
   }
 
   String _firstLyric(String? lyric) {
