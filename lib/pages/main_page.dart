@@ -87,7 +87,7 @@ class _MainPageState extends State<MainPage> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
       child: SizedBox(
-        height: 76,
+        height: 70,
         child: Stack(
           alignment: Alignment.center,
           children: [
