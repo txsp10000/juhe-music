@@ -714,7 +714,7 @@ class _PlayerPageState extends State<PlayerPage> {
               ],
               SizedBox(height: actionsToProgressGap),
               _buildProgressBar(),
-              SizedBox(height: compact ? 0 : 8),
+              SizedBox(height: compact ? 10 : 20),
             ],
           ),
         );
