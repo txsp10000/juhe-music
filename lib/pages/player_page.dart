@@ -560,8 +560,10 @@ class _PlayerPageState extends State<PlayerPage> {
         final availableHeight = constraints.maxHeight;
         final width = constraints.maxWidth;
         final compact = availableHeight < 640;
-        final coverSize = min(width * 0.72, availableHeight * 0.40)
+        final coverHeight = min(width * 0.72, availableHeight * 0.40)
             .clamp(compact ? 200.0 : 230.0, compact ? 270.0 : 320.0);
+        final coverWidth = min(width * 0.86, coverHeight * 1.18)
+            .clamp(coverHeight, width - 8.0);
         final lyricLines = _visibleLyricTexts(song, compact ? 4 : 5);
         final titleSize = compact ? 22.0 : 25.0;
         final singerSize = compact ? 17.0 : 18.0;
@@ -580,8 +582,8 @@ class _PlayerPageState extends State<PlayerPage> {
               SizedBox(height: topGap),
               Center(
                 child: Container(
-                  width: coverSize,
-                  height: coverSize,
+                  width: coverWidth,
+                  height: coverHeight,
                   decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(30),
                       color: Colors.white.withOpacity(0.08),
@@ -596,26 +598,37 @@ class _PlayerPageState extends State<PlayerPage> {
                       ? Image.memory(_coverBytes!, fit: BoxFit.cover)
                       : Icon(Icons.music_note_rounded,
                           color: AppDesignTokens.lyricWhite.withOpacity(0.72),
-                          size: coverSize * 0.26),
+                          size: coverHeight * 0.26),
                 ),
               ),
               SizedBox(height: coverToInfoGap),
-              Text(song.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppDesignTokens.display(size: titleSize)),
-              const SizedBox(height: 8),
-              Text(song.singer,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppDesignTokens.title(
-                      size: singerSize,
-                      color: AppDesignTokens.warmWhite.withOpacity(0.76))),
+              Center(
+                child: SizedBox(
+                  width: coverWidth,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(song.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppDesignTokens.display(size: titleSize)),
+                      const SizedBox(height: 8),
+                      Text(song.singer,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppDesignTokens.title(
+                              size: singerSize,
+                              color:
+                                  AppDesignTokens.warmWhite.withOpacity(0.76))),
+                    ],
+                  ),
+                ),
+              ),
               SizedBox(height: infoToLyricGap),
               Flexible(
                 child: Center(
                   child: SizedBox(
-                    width: coverSize,
+                    width: coverWidth,
                     child: _buildLyricPreview(
                         lyricLines, lyricSize, nextLyricSize),
                   ),
