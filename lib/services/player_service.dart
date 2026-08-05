@@ -28,10 +28,9 @@ class PlayerService {
 
   MediaItem? _currentMediaItem;
 
-  Song? get currentSong =>
-      _currentIndex >= 0 && _currentIndex < playlist.length
-          ? playlist[_currentIndex]
-          : null;
+  Song? get currentSong => _currentIndex >= 0 && _currentIndex < playlist.length
+      ? playlist[_currentIndex]
+      : null;
   int get currentIndex => _currentIndex;
   bool get isPlaying => _isPlaying;
   Duration get position => _position;
@@ -231,17 +230,13 @@ class PlayerService {
     final player = _player;
     _currentIndex = index;
     final song = playlist[index];
-    if (player == null) {
-      _notifySongChange(song);
-      return;
-    }
     final currentGen = ++_playGeneration;
-    // Clear any lingering download progress from previous song
     _notifyDownloadProgress(null);
+    _position = Duration.zero;
+    _duration = Duration.zero;
+    _currentUrl = null;
 
-    final playId = song.lyricId.isNotEmpty ? song.lyricId : song.id;
     final picId = song.picId.isNotEmpty ? song.picId : song.id;
-
     _currentMediaItem = MediaItem(
       id: song.id,
       title: song.name,
@@ -253,125 +248,115 @@ class PlayerService {
       await AudioService.updateMediaItem(_currentMediaItem!);
     } catch (_) {}
 
+    if (player != null) {
+      try {
+        await player.stop();
+      } catch (_) {}
+    }
+
+    final coverCache = CoverCacheService();
+    final localCover = await coverCache.getLocalPath(picId);
+    if (currentGen != _playGeneration) return;
+    if (localCover != null) {
+      song.cover = 'file://$localCover';
+      _currentMediaItem =
+          _currentMediaItem!.copyWith(artUri: Uri.file(localCover));
+      try {
+        AudioService.updateMediaItem(_currentMediaItem!);
+      } catch (_) {}
+    }
+
+    _notifyProgress(Duration.zero, Duration.zero);
+    _notifySongChange(song);
+    if (player == null) return;
+
+    unawaited(_hydrateSongDetails(song, currentGen));
+    unawaited(_prepareAndPlayAudio(song, currentGen));
+  }
+
+  Future<void> _hydrateSongDetails(Song song, int generation) async {
+    final playId = song.lyricId.isNotEmpty ? song.lyricId : song.id;
+    final picId = song.picId.isNotEmpty ? song.picId : song.id;
+
     final lyricCache = LyricCacheService();
     String? lyric = await lyricCache.load(playId);
+    if (generation != _playGeneration) return;
     if (lyric == null || lyric.isEmpty) {
       lyric = await MusicApi.getLyric(playId);
       if (lyric != null && lyric.isNotEmpty) {
         await lyricCache.save(playId, lyric);
-        for (final s in playlist) {
-          final sid = s.lyricId.isNotEmpty ? s.lyricId : s.id;
-          if (sid == playId) {
-            s.lyric = lyric!;
-          }
-        }
       }
     }
-    song.lyric = lyric ?? '';
-    if (currentGen != _playGeneration) return;
-
-    // Check local audio cache first (offline support)
-    final audioCache = AudioCacheService();
-    final cachedPath = await audioCache.findCachedFile(song.id);
-    final hasCachedAudio = cachedPath != null;
-
-    // Load cover from local cache
-    final coverCache = CoverCacheService();
-    final localCover = await coverCache.getLocalPath(picId);
-    if (localCover != null) {
-      if (song.cover.isEmpty) song.cover = 'file://$localCover';
-      final uri = Uri.file(localCover);
-      _currentMediaItem = _currentMediaItem!.copyWith(artUri: uri);
-      try { AudioService.updateMediaItem(_currentMediaItem!); } catch (_) {}
-    }
-
-    // Stop current playback immediately and show new song info
-    await player.stop();
-    _notifySongChange(song);
-
-    // If audio is already cached locally at sufficient quality, play directly
-    if (hasCachedAudio) {
-      _currentPlayingBr = _extractBrFromPath(cachedPath!);
-      await player.open(Media('file://$cachedPath'), play: true);
-      if (currentGen != _playGeneration) return;
-      // 本地播放后仍需获取封面（如果还没有的话）
-      if (song.cover.isEmpty || localCover == null) {
-        final coverUrl = await _fetchCover(picId);
-        if (currentGen != _playGeneration) return;
-        if (coverUrl != null && coverUrl.isNotEmpty) {
-          song.cover = coverUrl;
-          // 更新锁屏/通知中心/控制中心的封面
-          final coverCache = CoverCacheService();
-          final cachedCover = await coverCache.getLocalPath(picId);
-          if (cachedCover != null) {
-            _currentMediaItem = _currentMediaItem!.copyWith(artUri: Uri.file(cachedCover));
-          } else {
-            _currentMediaItem = _currentMediaItem!.copyWith(artUri: Uri.parse(coverUrl));
-          }
-          try { AudioService.updateMediaItem(_currentMediaItem!); } catch (_) {}
-          _notifySongChange(song);
-        }
+    if (generation != _playGeneration) return;
+    if (lyric != null && lyric.isNotEmpty) {
+      for (final s in playlist) {
+        final sid = s.lyricId.isNotEmpty ? s.lyricId : s.id;
+        if (sid == playId) s.lyric = lyric;
       }
-      return;
-    }
-
-    // Not cached: fetch URL from network, download, then play
-    if (currentGen != _playGeneration) return;
-    final results = await Future.wait([
-      _fetchPlayUrl(song),
-      _fetchCover(picId),
-    ]);
-    if (currentGen != _playGeneration) return;
-    final url = results[0] as String?;
-    final coverUrl = results[1] as String?;
-
-    if (coverUrl != null && coverUrl.isNotEmpty) {
-      song.cover = coverUrl;
+      song.lyric = lyric;
       _notifySongChange(song);
     }
-    if (localCover == null) {
-      final networkCover = await coverCache.getLocalPath(picId);
-      if (networkCover != null) {
-        final uri = Uri.file(networkCover);
-        _currentMediaItem = _currentMediaItem!.copyWith(artUri: uri);
-        try { AudioService.updateMediaItem(_currentMediaItem!); } catch (_) {}
-      } else if (coverUrl != null && coverUrl.isNotEmpty) {
-        final uri = Uri.parse(coverUrl);
-        _currentMediaItem = _currentMediaItem!.copyWith(artUri: uri);
-        try { AudioService.updateMediaItem(_currentMediaItem!); } catch (_) {}
+
+    if (song.cover.isEmpty || !song.cover.startsWith('file://')) {
+      final coverUrl = await _fetchCover(picId);
+      if (generation != _playGeneration) return;
+      if (coverUrl != null && coverUrl.isNotEmpty) {
+        song.cover = coverUrl;
+        final cachedCover = await CoverCacheService().getLocalPath(picId);
+        if (generation != _playGeneration) return;
+        if (cachedCover != null) {
+          _currentMediaItem =
+              _currentMediaItem?.copyWith(artUri: Uri.file(cachedCover));
+        } else {
+          _currentMediaItem =
+              _currentMediaItem?.copyWith(artUri: Uri.parse(coverUrl));
+        }
+        try {
+          if (_currentMediaItem != null)
+            AudioService.updateMediaItem(_currentMediaItem!);
+        } catch (_) {}
+        _notifySongChange(song);
       }
     }
+  }
 
-    if (url == null || url.isEmpty) {
-      if (_currentIndex < playlist.length - 1) {
-        playAt(_currentIndex + 1);
-      }
+  Future<void> _prepareAndPlayAudio(Song song, int generation) async {
+    final player = _player;
+    if (player == null) return;
+    final audioCache = AudioCacheService();
+    String? localPath = await audioCache.findCachedFile(song.id);
+    if (generation != _playGeneration) return;
+
+    if (localPath != null && localPath.isNotEmpty) {
+      _currentPlayingBr = _extractBrFromPath(localPath);
+      await player.open(Media('file://$localPath'), play: true);
       return;
     }
-    if (currentGen != _playGeneration) return;
+
+    final url = await _fetchPlayUrl(song);
+    if (generation != _playGeneration) return;
+    if (url == null || url.isEmpty) {
+      if (_currentIndex < playlist.length - 1)
+        unawaited(playAt(_currentIndex + 1));
+      return;
+    }
 
     _currentUrl = url;
     _notifyDownloadProgress(0.0);
-    String? localPath = await audioCache.download(song.id, url, onProgress: (p) {
-      if (currentGen == _playGeneration) {
-        _notifyDownloadProgress(p);
-      }
+    localPath = await audioCache.download(song.id, url, onProgress: (p) {
+      if (generation == _playGeneration) _notifyDownloadProgress(p);
     });
-    if (currentGen == _playGeneration) {
-      _notifyDownloadProgress(null);
-    }
-    if (currentGen != _playGeneration) return;
+    if (generation == _playGeneration) _notifyDownloadProgress(null);
+    if (generation != _playGeneration) return;
 
     if (localPath == null || localPath.isEmpty) {
-      if (_currentIndex < playlist.length - 1) {
-        playAt(_currentIndex + 1);
-      }
+      if (_currentIndex < playlist.length - 1)
+        unawaited(playAt(_currentIndex + 1));
       return;
     }
-    // Download complete, start playback
+
     _currentPlayingBr = SettingsService().quality.br;
     await player.open(Media('file://$localPath'), play: true);
-    if (currentGen != _playGeneration) return;
   }
 
   /// Extract br quality value from cached file path (e.g. songId_320.mp3 -> 320)
@@ -460,7 +445,8 @@ class PlayerService {
 }
 
 class _AudioPlayerTask extends BaseAudioHandler {
-  static const _nowPlayingChannel = MethodChannel('com.miaomiao.music/nowplaying');
+  static const _nowPlayingChannel =
+      MethodChannel('com.miaomiao.music/nowplaying');
 
   String? _pauseReason;
   bool _resumeAfterInterruption = false;
