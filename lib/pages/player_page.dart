@@ -562,8 +562,7 @@ class _PlayerPageState extends State<PlayerPage> {
         final compact = availableHeight < 640;
         final coverHeight = min(width * 0.72, availableHeight * 0.40)
             .clamp(compact ? 200.0 : 230.0, compact ? 270.0 : 320.0);
-        final coverWidth = min(width * 0.86, coverHeight * 1.18)
-            .clamp(coverHeight, width - 8.0);
+        final coverWidth = width;
         final lyricLines = _visibleLyricTexts(song, compact ? 4 : 5);
         final titleSize = compact ? 22.0 : 25.0;
         final singerSize = compact ? 17.0 : 18.0;
@@ -606,14 +605,16 @@ class _PlayerPageState extends State<PlayerPage> {
                 child: SizedBox(
                   width: coverWidth,
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Text(song.name,
+                          textAlign: TextAlign.center,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: AppDesignTokens.display(size: titleSize)),
                       const SizedBox(height: 8),
                       Text(song.singer,
+                          textAlign: TextAlign.center,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: AppDesignTokens.title(
@@ -654,15 +655,17 @@ class _PlayerPageState extends State<PlayerPage> {
       List<String> lines, double currentSize, double nextSize) {
     if (lines.isEmpty) return const SizedBox.shrink();
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(lines.first,
+            textAlign: TextAlign.center,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: AppDesignTokens.display(size: currentSize)),
         for (final line in lines.skip(1)) ...[
           const SizedBox(height: 8),
           Text(line,
+              textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: AppDesignTokens.title(
