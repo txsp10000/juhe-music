@@ -416,7 +416,6 @@ class _PlayerPageState extends State<PlayerPage> {
                   children: [
                     _buildHeader(song),
                     Expanded(child: song != null ? _buildSwipeableContent(song) : _buildEmptyState()),
-                    if (song != null) _buildProgressBar(),
                     const SizedBox(height: 92),
                   ],
                 ),
@@ -561,16 +560,18 @@ class _PlayerPageState extends State<PlayerPage> {
       builder: (context, constraints) {
         final availableHeight = constraints.maxHeight;
         final width = constraints.maxWidth;
-        final coverSize = min(width * 0.56, availableHeight * 0.28).clamp(160.0, 240.0);
         final compact = availableHeight < 640;
+        final coverSize = min(width * 0.66, availableHeight * 0.34).clamp(compact ? 178.0 : 208.0, compact ? 230.0 : 270.0);
         final lyricLines = _visibleLyricTexts(song, compact ? 4 : 5);
-        final titleSize = compact ? 22.0 : 24.0;
-        final singerSize = compact ? 17.0 : 19.0;
-        final lyricSize = compact ? 22.0 : 24.0;
+        final titleSize = compact ? 22.0 : 25.0;
+        final singerSize = compact ? 17.0 : 18.0;
+        final lyricSize = compact ? 22.0 : 25.0;
         final nextLyricSize = compact ? 17.0 : 19.0;
-        final topGap = compact ? 2.0 : 8.0;
-        final coverToInfoGap = compact ? 12.0 : 18.0;
-        final infoToLyricGap = compact ? 14.0 : 18.0;
+        final topGap = compact ? 0.0 : 6.0;
+        final coverToInfoGap = compact ? 12.0 : 20.0;
+        final infoToLyricGap = compact ? 16.0 : 22.0;
+        final lyricToActionsGap = compact ? 22.0 : 34.0;
+        final actionsToProgressGap = compact ? 20.0 : 26.0;
         return Padding(
           padding: const EdgeInsets.fromLTRB(26, 0, 26, 0),
           child: Column(
@@ -581,7 +582,7 @@ class _PlayerPageState extends State<PlayerPage> {
                 child: Container(
                   width: coverSize,
                   height: coverSize,
-                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(28), color: Colors.white.withOpacity(0.08), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.28), blurRadius: 28, offset: const Offset(0, 16))]),
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(30), color: Colors.white.withOpacity(0.08), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.30), blurRadius: 34, offset: const Offset(0, 18))]),
                   clipBehavior: Clip.antiAlias,
                   child: _coverBytes != null ? Image.memory(_coverBytes!, fit: BoxFit.cover) : Icon(Icons.music_note_rounded, color: AppDesignTokens.lyricWhite.withOpacity(0.72), size: coverSize * 0.26),
                 ),
@@ -597,11 +598,13 @@ class _PlayerPageState extends State<PlayerPage> {
               const SizedBox(height: 8),
               Text(song.singer, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.title(size: singerSize, color: AppDesignTokens.warmWhite.withOpacity(0.76))),
               SizedBox(height: infoToLyricGap),
-              _buildLyricPreview(lyricLines, lyricSize, nextLyricSize),
-              const Spacer(),
+              Flexible(child: _buildLyricPreview(lyricLines, lyricSize, nextLyricSize)),
+              SizedBox(height: lyricToActionsGap),
               _buildSocialActions(),
               if (_downloadProgress != null) ...[const SizedBox(height: 8), _buildDownloadProgress()],
-              SizedBox(height: compact ? 4 : 10),
+              SizedBox(height: actionsToProgressGap),
+              _buildProgressBar(),
+              SizedBox(height: compact ? 0 : 8),
             ],
           ),
         );
@@ -682,7 +685,7 @@ class _PlayerPageState extends State<PlayerPage> {
     final max = _duration.inMilliseconds.toDouble();
     final current = _isDragging ? _dragValue : _position.inMilliseconds.toDouble().clamp(0.0, max);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(30, 0, 30, 92),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
       child: SliderTheme(
         data: SliderThemeData(
           trackHeight: 2,
