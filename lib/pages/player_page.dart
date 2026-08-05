@@ -810,6 +810,7 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   Widget _buildDownloadProgress() {
+    final preparing = _downloadProgress != null && _downloadProgress! < 0;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -817,9 +818,11 @@ class _PlayerPageState extends State<PlayerPage> {
             width: 15,
             height: 15,
             child: CircularProgressIndicator(
-                strokeWidth: 2, color: _accent, value: _downloadProgress)),
+                strokeWidth: 2,
+                color: _accent,
+                value: preparing ? null : _downloadProgress)),
         const SizedBox(width: 9),
-        Text('缓存中',
+        Text(preparing ? '正在准备播放' : '缓存中',
             style: AppDesignTokens.caption(
                 color: AppDesignTokens.warmWhite.withOpacity(0.72))),
       ],

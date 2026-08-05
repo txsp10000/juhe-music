@@ -270,6 +270,7 @@ class PlayerService {
     _notifySongChange(song);
     if (player == null) return;
 
+    _notifyDownloadProgress(-1.0);
     unawaited(_hydrateSongDetails(song, currentGen));
     unawaited(_prepareAndPlayAudio(song, currentGen));
   }
@@ -330,14 +331,18 @@ class PlayerService {
     if (localPath != null && localPath.isNotEmpty) {
       _currentPlayingBr = _extractBrFromPath(localPath);
       await player.open(Media('file://$localPath'), play: true);
+      if (generation == _playGeneration) _notifyDownloadProgress(null);
       return;
     }
 
     final url = await _fetchPlayUrl(song);
     if (generation != _playGeneration) return;
     if (url == null || url.isEmpty) {
-      if (_currentIndex < playlist.length - 1)
+      if (_currentIndex < playlist.length - 1) {
         unawaited(playAt(_currentIndex + 1));
+      } else if (generation == _playGeneration) {
+        _notifyDownloadProgress(null);
+      }
       return;
     }
 
@@ -350,13 +355,17 @@ class PlayerService {
     if (generation != _playGeneration) return;
 
     if (localPath == null || localPath.isEmpty) {
-      if (_currentIndex < playlist.length - 1)
+      if (_currentIndex < playlist.length - 1) {
         unawaited(playAt(_currentIndex + 1));
+      } else if (generation == _playGeneration) {
+        _notifyDownloadProgress(null);
+      }
       return;
     }
 
     _currentPlayingBr = SettingsService().quality.br;
     await player.open(Media('file://$localPath'), play: true);
+    if (generation == _playGeneration) _notifyDownloadProgress(null);
   }
 
   /// Extract br quality value from cached file path (e.g. songId_320.mp3 -> 320)
