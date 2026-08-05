@@ -154,7 +154,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
               _buildHeader(),
               Expanded(child: _buildBody()),
               if (_editMode) _buildEditTray(),
-              if (widget.embedded) const SizedBox(height: 118),
+              if (widget.embedded) const SizedBox(height: 128),
             ],
           ),
         ),
@@ -216,7 +216,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
         message: '在播放页点亮爱心，歌曲会出现在这里。',
       );
     }
-    final bottomPadding = widget.embedded ? (_editMode ? 36.0 : 132.0) : 24.0;
+    final bottomPadding = widget.embedded ? (_editMode ? 44.0 : 142.0) : 24.0;
     return ListView.builder(
       controller: _scrollController,
       padding: EdgeInsets.only(top: 4, bottom: bottomPadding),

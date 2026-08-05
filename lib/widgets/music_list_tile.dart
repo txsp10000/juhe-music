@@ -32,14 +32,14 @@ class MusicListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final active = isCurrent || selected;
-    final baseColor =
-        AppDesignTokens.surfaceFor(accent, opacity: active ? 0.30 : 0.18);
     final row = AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       margin: margin,
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
-        color: baseColor.withOpacity(active ? 0.68 : 0.48),
+        color: active
+            ? Colors.white.withOpacity(0.16)
+            : Colors.white.withOpacity(0.075),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
@@ -113,7 +113,7 @@ class MusicListTile extends StatelessWidget {
       height: 48,
       decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          color: AppDesignTokens.softPill(accent).withOpacity(0.62)),
+          color: Colors.white.withOpacity(0.10)),
       child: Center(
         child: isCurrent
             ? MiniWave(

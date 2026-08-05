@@ -33,15 +33,24 @@ class _MainPageState extends State<MainPage> {
   void _onThemeChange() {
     if (mounted) {
       setState(() {
-        _accent = AppDesignTokens.readableAccent(ThemeService.accentColor.value);
+        _accent =
+            AppDesignTokens.readableAccent(ThemeService.accentColor.value);
         _bgHint = ThemeService.bgHint.value;
       });
     }
   }
 
-  void _onPlayState(bool _) { if (mounted) setState(() {}); }
-  void _onSongChange(Song _) { if (mounted) setState(() {}); }
-  void _showPlayer() { if (mounted) setState(() => _tab = 0); }
+  void _onPlayState(bool _) {
+    if (mounted) setState(() {});
+  }
+
+  void _onSongChange(Song _) {
+    if (mounted) setState(() {});
+  }
+
+  void _showPlayer() {
+    if (mounted) setState(() => _tab = 0);
+  }
 
   @override
   void dispose() {
@@ -76,21 +85,21 @@ class _MainPageState extends State<MainPage> {
   Widget _buildBottomNav() {
     final hasSong = _player.currentSong != null;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
       child: SizedBox(
-        height: 92,
+        height: 76,
         child: Stack(
           alignment: Alignment.center,
           children: [
             Positioned(
               left: 0,
               right: 0,
-              bottom: 12,
+              bottom: 8,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _navLabel('搜索', 1),
-                  const SizedBox(width: 92),
+                  const SizedBox(width: 82),
                   _navLabel('收藏', 2),
                 ],
               ),
@@ -107,29 +116,39 @@ class _MainPageState extends State<MainPage> {
                   }
                 },
                 child: SizedBox(
-                  width: 96,
-                  height: 88,
+                  width: 80,
+                  height: 68,
                   child: Center(
                     child: Container(
-                      width: 66,
-                      height: 66,
+                      width: 56,
+                      height: 56,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(color: hasSong ? Colors.white : Colors.white38, width: 3),
+                        border: Border.all(
+                            color: hasSong ? Colors.white : Colors.white38,
+                            width: 2.6),
                         color: Colors.white.withOpacity(hasSong ? 0.05 : 0.02),
                       ),
                       child: Center(
                         child: _tab == 0
                             ? Icon(
                                 hasSong
-                                    ? (_player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded)
+                                    ? (_player.isPlaying
+                                        ? Icons.pause_rounded
+                                        : Icons.play_arrow_rounded)
                                     : Icons.play_arrow_rounded,
                                 color: hasSong ? Colors.white : Colors.white38,
-                                size: 34,
+                                size: 28,
                               )
                             : hasSong
-                                ? Opacity(opacity: _player.isPlaying ? 1.0 : 0.8, child: MiniWave(playing: _player.isPlaying, color: Colors.white, size: 24))
-                                : Icon(Icons.play_arrow_rounded, color: Colors.white24, size: 34),
+                                ? Opacity(
+                                    opacity: _player.isPlaying ? 1.0 : 0.8,
+                                    child: MiniWave(
+                                        playing: _player.isPlaying,
+                                        color: Colors.white,
+                                        size: 20))
+                                : Icon(Icons.play_arrow_rounded,
+                                    color: Colors.white24, size: 34),
                       ),
                     ),
                   ),
@@ -155,7 +174,9 @@ class _MainPageState extends State<MainPage> {
             label,
             style: AppDesignTokens.body(
               size: 14,
-              color: active ? AppDesignTokens.lyricWhite : AppDesignTokens.warmWhite.withOpacity(0.46),
+              color: active
+                  ? AppDesignTokens.lyricWhite
+                  : AppDesignTokens.warmWhite.withOpacity(0.46),
               weight: FontWeight.w800,
             ),
           ),

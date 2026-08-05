@@ -469,7 +469,7 @@ class _PlayerPageState extends State<PlayerPage> {
                         child: song != null
                             ? _buildSwipeableContent(song)
                             : _buildEmptyState()),
-                    const SizedBox(height: 92),
+                    const SizedBox(height: 82),
                   ],
                 ),
               ),
@@ -480,7 +480,7 @@ class _PlayerPageState extends State<PlayerPage> {
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: _closeModePanel,
-                child: Container(color: Colors.black.withOpacity(0.18)),
+                child: Container(color: Colors.black.withOpacity(0.40)),
               ),
             ),
           AnimatedPositioned(

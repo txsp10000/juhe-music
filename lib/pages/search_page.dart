@@ -176,7 +176,7 @@ class _SearchPageState extends State<SearchPage> {
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: _closeModePanel,
-                child: Container(color: Colors.black.withOpacity(0.18)),
+                child: Container(color: Colors.black.withOpacity(0.40)),
               ),
             ),
           AnimatedPositioned(
