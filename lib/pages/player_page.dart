@@ -1,8 +1,6 @@
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import '../api/music_api.dart';
-import '../data/categories.dart';
 import '../models/song.dart';
 import '../services/cover_cache_service.dart';
 import '../services/favorites_service.dart';
@@ -12,7 +10,6 @@ import '../services/theme_service.dart';
 import '../theme/app_design_tokens.dart';
 import '../utils/toast.dart';
 import '../widgets/glass_panel.dart';
-import '../widgets/mode_drawer.dart';
 import '../widgets/music_list_tile.dart';
 import 'search_result_page.dart';
 
@@ -23,7 +20,9 @@ class _LrcLine {
 }
 
 class PlayerPage extends StatefulWidget {
-  const PlayerPage({super.key});
+  final VoidCallback? onOpenDrawer;
+
+  const PlayerPage({super.key, this.onOpenDrawer});
 
   @override
   State<PlayerPage> createState() => _PlayerPageState();
@@ -43,7 +42,6 @@ class _PlayerPageState extends State<PlayerPage> {
   int _swipeDirection = 0;
   double _dragOffset = 0.0;
   bool _isSwitchingSong = false;
-  bool _modePanelOpen = false;
 
   Color _accent = AppDesignTokens.lyricWhite;
   Color _bgHint = AppDesignTokens.inkBlack;
@@ -108,14 +106,6 @@ class _PlayerPageState extends State<PlayerPage> {
 
   void _onPlayStateChange(bool _) {
     if (mounted) setState(() {});
-  }
-
-  void _openModePanel() {
-    if (mounted) setState(() => _modePanelOpen = true);
-  }
-
-  void _closeModePanel() {
-    if (mounted) setState(() => _modePanelOpen = false);
   }
 
   @override
@@ -406,98 +396,29 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  Future<void> _loadAndPlay(PlaylistInfo pl) async {
-    Toast.show(context, '正在加载「${pl.name}」...');
-    try {
-      final songs = await MusicApi.getPlaylist(pl.id);
-      if (!mounted) return;
-      if (songs.isEmpty) {
-        Toast.show(context, '未找到歌曲');
-        return;
-      }
-      _player.playlist.clear();
-      _player.playlist.addAll(songs);
-      _player.playAt(0);
-    } catch (_) {
-      if (mounted) Toast.show(context, '加载失败，请重试');
-    }
-  }
-
-  Future<void> _openFavorites() async {
-    final songs = await FavoritesService.load();
-    if (!mounted) return;
-    if (songs.isEmpty) {
-      Toast.show(context, '收藏列表为空');
-      return;
-    }
-    _player.playlist.clear();
-    _player.playlist.addAll(songs);
-    _player.playAt(0);
-  }
-
-  Future<void> _randomPlay() async {
-    final playlists =
-        playlistCategories.values.expand((items) => items).toList();
-    if (playlists.isEmpty) {
-      Toast.show(context, '暂无可随机播放的歌单');
-      return;
-    }
-    final random = Random();
-    _loadAndPlay(playlists[random.nextInt(playlists.length)]);
-  }
-
   @override
   Widget build(BuildContext context) {
     final song = _player.currentSong;
-    final panelWidth = min(MediaQuery.of(context).size.width * 0.78, 330.0);
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: MusicScaffoldBackground(
-              bgHint: _bgHint,
-              accent: _accent,
-              coverBytes: _coverBytes,
-              useCoverBlur: true,
-              child: SafeArea(
-                bottom: false,
-                child: Column(
-                  children: [
-                    _buildHeader(song),
-                    Expanded(
-                        child: song != null
-                            ? _buildSwipeableContent(song)
-                            : _buildEmptyState()),
-                    const SizedBox(height: 82),
-                  ],
-                ),
-              ),
-            ),
+      body: MusicScaffoldBackground(
+        bgHint: _bgHint,
+        accent: _accent,
+        coverBytes: _coverBytes,
+        useCoverBlur: true,
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              _buildHeader(song),
+              Expanded(
+                  child: song != null
+                      ? _buildSwipeableContent(song)
+                      : _buildEmptyState()),
+              const SizedBox(height: 106),
+            ],
           ),
-          if (_modePanelOpen)
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: _closeModePanel,
-                child: Container(color: Colors.black.withOpacity(0.40)),
-              ),
-            ),
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeOutCubic,
-            left: _modePanelOpen ? 0 : -panelWidth,
-            top: 0,
-            bottom: 0,
-            width: panelWidth,
-            child: ModeDrawer(
-              onSelectPlaylist: _loadAndPlay,
-              onOpenFavorites: _openFavorites,
-              onRandomPlay: _randomPlay,
-              onClose: _closeModePanel,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -508,7 +429,7 @@ class _PlayerPageState extends State<PlayerPage> {
       child: Row(
         children: [
           GestureDetector(
-            onTap: _openModePanel,
+            onTap: () => widget.onOpenDrawer?.call(),
             child: Row(
               children: [
                 const Icon(Icons.menu_rounded,
@@ -541,7 +462,7 @@ class _PlayerPageState extends State<PlayerPage> {
                     color: AppDesignTokens.warmWhite.withOpacity(0.72))),
             const SizedBox(height: 22),
             GestureDetector(
-              onTap: _openModePanel,
+              onTap: () => widget.onOpenDrawer?.call(),
               child: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
@@ -640,8 +561,8 @@ class _PlayerPageState extends State<PlayerPage> {
         final availableHeight = constraints.maxHeight;
         final width = constraints.maxWidth;
         final compact = availableHeight < 640;
-        final coverSize = min(width * 0.66, availableHeight * 0.34)
-            .clamp(compact ? 178.0 : 208.0, compact ? 230.0 : 270.0);
+        final coverSize = min(width * 0.72, availableHeight * 0.40)
+            .clamp(compact ? 200.0 : 230.0, compact ? 270.0 : 320.0);
         final lyricLines = _visibleLyricTexts(song, compact ? 4 : 5);
         final titleSize = compact ? 22.0 : 25.0;
         final singerSize = compact ? 17.0 : 18.0;

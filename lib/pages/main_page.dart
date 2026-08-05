@@ -1,8 +1,14 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import '../api/music_api.dart';
+import '../data/categories.dart';
 import '../models/song.dart';
+import '../services/favorites_service.dart';
 import '../services/player_service.dart';
 import '../services/theme_service.dart';
 import '../theme/app_design_tokens.dart';
+import '../utils/toast.dart';
+import '../widgets/mode_drawer.dart';
 import '../widgets/sound_halo.dart';
 import 'favorites_page.dart';
 import 'player_page.dart';
@@ -19,6 +25,8 @@ class _MainPageState extends State<MainPage> {
   int _tab = 0;
   Color _accent = Colors.white;
   Color _bgHint = AppDesignTokens.inkBlack;
+
+  bool _drawerOpen = false;
 
   @override
   void initState() {
@@ -63,23 +71,106 @@ class _MainPageState extends State<MainPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppDesignTokens.inkBlack,
-      extendBody: true,
-      body: MusicScaffoldBackground(
-        bgHint: _bgHint,
-        accent: _accent,
-        child: IndexedStack(
-          index: _tab,
-          children: [
-            const PlayerPage(),
-            SearchPage(embedded: true, onShowPlayer: _showPlayer),
-            FavoritesPage(embedded: true, onShowPlayer: _showPlayer),
-          ],
+    final panelWidth =
+        MediaQuery.of(context).size.width * 0.78.clamp(0.0, 330.0);
+
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: AppDesignTokens.inkBlack,
+          extendBody: true,
+          body: MusicScaffoldBackground(
+            bgHint: _bgHint,
+            accent: _accent,
+            child: IndexedStack(
+              index: _tab,
+              children: [
+                PlayerPage(onOpenDrawer: () => _openDrawer(0)),
+                SearchPage(
+                    embedded: true,
+                    onShowPlayer: _showPlayer,
+                    onOpenDrawer: () => _openDrawer(1)),
+                FavoritesPage(embedded: true, onShowPlayer: _showPlayer),
+              ],
+            ),
+          ),
+          bottomNavigationBar:
+              SafeArea(top: false, child: _buildBottomNav()),
         ),
-      ),
-      bottomNavigationBar: SafeArea(top: false, child: _buildBottomNav()),
+        if (_drawerOpen)
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => setState(() => _drawerOpen = false),
+              child: Container(color: Colors.black.withOpacity(0.40)),
+            ),
+          ),
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic,
+          left: _drawerOpen ? 0 : -panelWidth,
+          top: 0,
+          bottom: 0,
+          width: panelWidth,
+          child: ModeDrawer(
+            onSelectPlaylist: _loadAndPlay,
+            onOpenFavorites: _openFavorites,
+            onRandomPlay: _randomPlay,
+            onClose: _closeDrawer,
+          ),
+        ),
+      ],
     );
+  }
+
+  void _openDrawer(int source) {
+    if (mounted) setState(() => _drawerOpen = true);
+  }
+
+  void _closeDrawer() {
+    if (mounted) setState(() => _drawerOpen = false);
+  }
+
+  void _loadAndPlay(PlaylistInfo pl) {
+    _closeDrawer();
+    Toast.show(context, '正在加载「${pl.name}」...');
+    MusicApi.getPlaylist(pl.id).then((songs) {
+      if (!mounted) return;
+      if (songs.isEmpty) {
+        Toast.show(context, '未找到歌曲');
+        return;
+      }
+      _player.playlist.clear();
+      _player.playlist.addAll(songs);
+      _player.playAt(0);
+    }).catchError((_) {
+      if (mounted) Toast.show(context, '加载失败，请重试');
+    });
+  }
+
+  Future<void> _openFavorites() async {
+    _closeDrawer();
+    final songs = await FavoritesService.load();
+    if (!mounted) return;
+    if (songs.isEmpty) {
+      Toast.show(context, '收藏列表为空');
+      return;
+    }
+    _player.playlist.clear();
+    _player.playlist.addAll(songs);
+    _player.playAt(0);
+  }
+
+  void _randomPlay() {
+    final playlists =
+        playlistCategories.values.expand((items) => items).toList();
+    if (playlists.isEmpty) {
+      _closeDrawer();
+      Toast.show(context, '暂无可随机播放的歌单');
+      return;
+    }
+    final random = Random();
+    _loadAndPlay(playlists[random.nextInt(playlists.length)]);
   }
 
   Widget _buildBottomNav() {
@@ -125,9 +216,9 @@ class _MainPageState extends State<MainPage> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                            color: hasSong ? Colors.white : Colors.white38,
+                            color: Colors.white,
                             width: 2.6),
-                        color: Colors.white.withOpacity(hasSong ? 0.05 : 0.02),
+                        color: Colors.white.withOpacity(0.05),
                       ),
                       child: Center(
                         child: _tab == 0
@@ -137,7 +228,7 @@ class _MainPageState extends State<MainPage> {
                                         ? Icons.pause_rounded
                                         : Icons.play_arrow_rounded)
                                     : Icons.play_arrow_rounded,
-                                color: hasSong ? Colors.white : Colors.white38,
+                                color: Colors.white,
                                 size: 28,
                               )
                             : hasSong
