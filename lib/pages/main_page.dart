@@ -1,9 +1,9 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../api/music_api.dart';
 import '../data/categories.dart';
 import '../models/song.dart';
-import '../services/favorites_service.dart';
 import '../services/player_service.dart';
 import '../services/theme_service.dart';
 import '../theme/app_design_tokens.dart';
@@ -27,6 +27,7 @@ class _MainPageState extends State<MainPage> {
   Color _bgHint = AppDesignTokens.inkBlack;
 
   bool _drawerOpen = false;
+  int _playlistLoadGeneration = 0;
 
   @override
   void initState() {
@@ -73,7 +74,7 @@ class _MainPageState extends State<MainPage> {
   @override
   Widget build(BuildContext context) {
     final panelWidth =
-        MediaQuery.of(context).size.width * 0.78.clamp(0.0, 330.0);
+        (MediaQuery.of(context).size.width * 0.78).clamp(0.0, 330.0);
 
     return Stack(
       children: [
@@ -103,7 +104,7 @@ class _MainPageState extends State<MainPage> {
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => setState(() => _drawerOpen = false),
-              child: Container(color: Colors.black.withOpacity(0.40)),
+              child: Container(color: Colors.black.withValues(alpha: 0.40)),
             ),
           ),
         AnimatedPositioned(
@@ -133,33 +134,34 @@ class _MainPageState extends State<MainPage> {
   }
 
   void _loadAndPlay(PlaylistInfo pl) {
+    unawaited(_loadAndPlayAsync(pl));
+  }
+
+  Future<void> _loadAndPlayAsync(PlaylistInfo pl) async {
+    final generation = ++_playlistLoadGeneration;
     _closeDrawer();
     Toast.show(context, '正在加载「${pl.name}」...');
-    MusicApi.getPlaylist(pl.id).then((songs) {
-      if (!mounted) return;
+    try {
+      final songs = await MusicApi.getPlaylist(pl.id);
+      if (!mounted || generation != _playlistLoadGeneration) return;
       if (songs.isEmpty) {
-        Toast.show(context, '未找到歌曲');
+        Toast.show(context, '歌单暂时没有歌曲');
         return;
       }
       _player.playlist.clear();
       _player.playlist.addAll(songs);
-      _player.playAt(0);
-    }).catchError((_) {
-      if (mounted) Toast.show(context, '加载失败，请重试');
-    });
+      await _player.playAt(0);
+    } catch (_) {
+      if (mounted && generation == _playlistLoadGeneration) {
+        Toast.show(context, '网络或接口异常，歌单加载失败');
+      }
+    }
   }
 
   Future<void> _openFavorites() async {
     _closeDrawer();
-    final songs = await FavoritesService.load();
     if (!mounted) return;
-    if (songs.isEmpty) {
-      Toast.show(context, '收藏列表为空');
-      return;
-    }
-    _player.playlist.clear();
-    _player.playlist.addAll(songs);
-    _player.playAt(0);
+    setState(() => _tab = 2);
   }
 
   void _randomPlay() {
@@ -199,7 +201,6 @@ class _MainPageState extends State<MainPage> {
             Positioned(
               bottom: 0,
               child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
                 onTap: () {
                   if (_tab == 0 && hasSong) {
                     _player.togglePlayPause();
@@ -217,7 +218,7 @@ class _MainPageState extends State<MainPage> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 2.6),
-                        color: Colors.white.withOpacity(0.05),
+                        color: Colors.white.withValues(alpha: 0.05),
                       ),
                       child: Center(
                         child: _tab == 0
@@ -263,7 +264,6 @@ class _MainPageState extends State<MainPage> {
   Widget _navLabel(String label, int tabIndex) {
     final active = _tab == tabIndex;
     return GestureDetector(
-      behavior: HitTestBehavior.opaque,
       onTap: () => setState(() => _tab = tabIndex),
       child: SizedBox(
         width: 112,
@@ -275,7 +275,7 @@ class _MainPageState extends State<MainPage> {
               size: 14,
               color: active
                   ? AppDesignTokens.lyricWhite
-                  : AppDesignTokens.warmWhite.withOpacity(0.46),
+                  : AppDesignTokens.warmWhite.withValues(alpha: 0.46),
               weight: FontWeight.w800,
             ),
           ),

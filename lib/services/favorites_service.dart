@@ -72,5 +72,4 @@ class SearchHistoryService {
     list.remove(keyword);
     await prefs.setStringList(_key, list);
   }
-
 }

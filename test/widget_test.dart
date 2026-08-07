@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:ios_music/main.dart';
+import 'package:qishui_music/main.dart';
 
 void main() {
   testWidgets('MusicApp builds', (WidgetTester tester) async {

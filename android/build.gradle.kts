@@ -7,6 +7,10 @@ allprojects {
 
 subprojects {
     afterEvaluate {
+        tasks.withType<JavaCompile>().configureEach {
+            options.compilerArgs.remove("-Werror")
+            options.compilerArgs.add("-Xlint:-options")
+        }
         extensions.findByName("android")?.let { androidExtension ->
             when (androidExtension) {
                 is com.android.build.gradle.AppExtension -> {

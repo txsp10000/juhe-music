@@ -43,7 +43,8 @@ class GlassPanel extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
       clipBehavior: clipBehavior,
-      child: BackdropFilter(filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12), child: panel),
+      child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12), child: panel),
     );
   }
 }
@@ -70,11 +71,19 @@ class MusicChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = background ?? (active ? Colors.white.withOpacity(0.16) : Colors.white.withOpacity(0.08));
-    final fg = foreground ?? (active ? AppDesignTokens.lyricWhite : AppDesignTokens.warmWhite.withOpacity(0.82));
+    final bg = background ??
+        (active
+            ? Colors.white.withValues(alpha: 0.16)
+            : Colors.white.withValues(alpha: 0.08));
+    final fg = foreground ??
+        (active
+            ? AppDesignTokens.lyricWhite
+            : AppDesignTokens.warmWhite.withValues(alpha: 0.82));
     final content = Container(
-      padding: EdgeInsets.symmetric(horizontal: icon == null ? 10 : 9, vertical: 5),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(9)),
+      padding:
+          EdgeInsets.symmetric(horizontal: icon == null ? 10 : 9, vertical: 5),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(9)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -87,7 +96,10 @@ class MusicChip extends StatelessWidget {
       ),
     );
     if (onTap == null) return content;
-    return GestureDetector(onTap: onTap, behavior: HitTestBehavior.opaque, child: content);
+    return GestureDetector(
+      onTap: onTap,
+      child: content,
+    );
   }
 }
 
@@ -120,18 +132,27 @@ class IconOrbButton extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: background ?? (active ? Colors.white.withOpacity(0.18) : Colors.white.withOpacity(0.10)),
+        color: background ??
+            (active
+                ? Colors.white.withValues(alpha: 0.18)
+                : Colors.white.withValues(alpha: 0.10)),
       ),
-      child: Icon(icon, color: foreground ?? AppDesignTokens.lyricWhite, size: size * 0.48),
+      child: Icon(icon,
+          color: foreground ?? AppDesignTokens.lyricWhite, size: size * 0.48),
     );
-    final tappable = GestureDetector(onTap: onTap, behavior: HitTestBehavior.opaque, child: button);
+    final tappable = GestureDetector(
+      onTap: onTap,
+      child: button,
+    );
     if (label == null) return tappable;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         tappable,
         const SizedBox(height: 7),
-        Text(label!, style: AppDesignTokens.caption(size: 10, color: AppDesignTokens.quietGrey)),
+        Text(label!,
+            style: AppDesignTokens.caption(
+                size: 10, color: AppDesignTokens.quietGrey)),
       ],
     );
   }

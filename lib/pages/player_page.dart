@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -41,6 +42,8 @@ class _PlayerPageState extends State<PlayerPage> {
   int _swipeDirection = 0;
   double _dragOffset = 0.0;
   bool _isSwitchingSong = false;
+  bool _favoriteOperationInProgress = false;
+  String? _displayedSongId;
 
   Color _accent = AppDesignTokens.lyricWhite;
   Color _bgHint = AppDesignTokens.inkBlack;
@@ -54,6 +57,7 @@ class _PlayerPageState extends State<PlayerPage> {
     _player.addSongChangeListener(_onSongChange);
     _player.addDownloadProgressListener(_onDownloadProgress);
     _player.addPlayStateListener(_onPlayStateChange);
+    _player.addPlaybackErrorListener(_onPlaybackError);
     _syncState();
     _checkFavorite();
     _onThemeChange();
@@ -86,14 +90,18 @@ class _PlayerPageState extends State<PlayerPage> {
 
   void _onSongChange(Song s) {
     if (!mounted) return;
+    final changedSong = _displayedSongId != s.id;
+    _displayedSongId = s.id;
     _parsedLrc = _parseLrc(s.lyric);
     if (s.cover.isEmpty || s.cover != _coverUrl) {
       _coverBytes = null;
       _coverUrl = '';
     }
     setState(() {
-      _dragOffset = 0.0;
-      _isSwitchingSong = false;
+      if (changedSong) {
+        _dragOffset = 0.0;
+        _isSwitchingSong = false;
+      }
     });
     _checkFavorite();
     _loadCover(s);
@@ -107,23 +115,32 @@ class _PlayerPageState extends State<PlayerPage> {
     if (mounted) setState(() {});
   }
 
+  void _onPlaybackError(String message) {
+    if (mounted) Toast.show(context, message);
+  }
+
   @override
   void dispose() {
     _player.removeProgressListener(_onProgressUpdate);
     _player.removeSongChangeListener(_onSongChange);
     _player.removeDownloadProgressListener(_onDownloadProgress);
     _player.removePlayStateListener(_onPlayStateChange);
+    _player.removePlaybackErrorListener(_onPlaybackError);
     ThemeService.accentColor.removeListener(_onThemeChange);
     ThemeService.bgHint.removeListener(_onThemeChange);
     super.dispose();
   }
 
   void _syncState() {
-    if (_player.duration != null) _duration = _player.duration!;
-    _position = _player.position;
+    _duration = _player.liveDuration;
+    _position = _player.livePosition;
     final song = _player.currentSong;
-    if (song != null && _parsedLrc.isEmpty) _parsedLrc = _parseLrc(song.lyric);
-    if (song != null) _loadCover(song);
+    if (song != null && _parsedLrc.isEmpty) {
+      _parsedLrc = _parseLrc(song.lyric);
+    }
+    if (song != null) {
+      _loadCover(song);
+    }
   }
 
   Future<void> _loadCover(Song song) async {
@@ -153,23 +170,31 @@ class _PlayerPageState extends State<PlayerPage> {
   Future<void> _checkFavorite() async {
     final song = _player.currentSong;
     if (song == null) return;
-    _isFavorite = await FavoritesService.isFavorite(song);
-    if (mounted) setState(() {});
+    final songId = song.id;
+    final favorite = await FavoritesService.isFavorite(song);
+    if (!mounted || _player.currentSong?.id != songId) return;
+    setState(() => _isFavorite = favorite);
   }
 
   Future<void> _toggleFavorite() async {
+    if (_favoriteOperationInProgress) return;
     final song = _player.currentSong;
     if (song == null) return;
-    if (_isFavorite) {
-      await FavoritesService.remove(song);
-      _isFavorite = false;
-      if (mounted) Toast.show(context, '已取消收藏');
-    } else {
-      await FavoritesService.save(song);
-      _isFavorite = true;
-      if (mounted) Toast.show(context, '已加入收藏');
+    final songId = song.id;
+    _favoriteOperationInProgress = true;
+    try {
+      final wasFavorite = await FavoritesService.isFavorite(song);
+      if (wasFavorite) {
+        await FavoritesService.remove(song);
+      } else {
+        await FavoritesService.save(song);
+      }
+      if (!mounted || _player.currentSong?.id != songId) return;
+      setState(() => _isFavorite = !wasFavorite);
+      Toast.show(context, wasFavorite ? '已取消收藏' : '已加入收藏');
+    } finally {
+      _favoriteOperationInProgress = false;
     }
-    if (mounted) setState(() {});
   }
 
   List<_LrcLine> _parseLrc(String? lyric) {
@@ -189,8 +214,9 @@ class _PlayerPageState extends State<PlayerPage> {
         if (msStr.length == 2) ms *= 10;
       }
       final text = match.group(4)?.trim() ?? '';
-      if (text.isNotEmpty)
+      if (text.isNotEmpty) {
         lines.add(_LrcLine((min * 60 + sec) * 1000 + ms, text));
+      }
     }
     lines.sort((a, b) => a.timeMs.compareTo(b.timeMs));
     return lines;
@@ -267,10 +293,13 @@ class _PlayerPageState extends State<PlayerPage> {
                   final oldBr = SettingsService().quality.br;
                   await SettingsService().setQuality(q);
                   if (!mounted) return;
-                  Navigator.pop(ctx);
+                  if (ctx.mounted) Navigator.pop(ctx);
                   setState(() {});
-                  if (q.br > oldBr)
-                    PlayerService().redownloadCurrentAtNewQuality();
+                  if (q.br != oldBr) {
+                    unawaited(
+                      PlayerService().redownloadCurrentAtNewQuality(),
+                    );
+                  }
                 },
                 child: Container(
                   width: double.infinity,
@@ -279,7 +308,7 @@ class _PlayerPageState extends State<PlayerPage> {
                   decoration: BoxDecoration(
                     color: selected
                         ? AppDesignTokens.selectedPill
-                        : Colors.white.withOpacity(0.08),
+                        : Colors.white.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: Row(
@@ -319,7 +348,7 @@ class _PlayerPageState extends State<PlayerPage> {
         width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.08),
+            color: Colors.white.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(18)),
         child: Row(
           children: [
@@ -342,15 +371,15 @@ class _PlayerPageState extends State<PlayerPage> {
   String _qualityLabel() {
     switch (SettingsService().quality) {
       case AudioQuality.low128:
-        return '标准';
+        return '128K';
       case AudioQuality.medium192:
-        return '较高';
+        return '192K';
       case AudioQuality.high320:
-        return '极高';
+        return '320K';
       case AudioQuality.lossless740:
-        return '无损';
+        return '16bit';
       case AudioQuality.lossless999:
-        return '极高';
+        return '24bit';
     }
   }
 
@@ -384,7 +413,11 @@ class _PlayerPageState extends State<PlayerPage> {
                       accent: _accent,
                       margin: const EdgeInsets.only(bottom: 8),
                       onTap: () {
-                        _player.playAt(i);
+                        if (i == _player.currentIndex) {
+                          if (!_player.isPlaying) unawaited(_player.play());
+                        } else {
+                          unawaited(_player.playAt(i));
+                        }
                         Navigator.pop(ctx);
                       },
                     ),
@@ -451,14 +484,15 @@ class _PlayerPageState extends State<PlayerPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.music_note_rounded,
-                color: AppDesignTokens.lyricWhite.withOpacity(0.86), size: 78),
+                color: AppDesignTokens.lyricWhite.withValues(alpha: 0.86),
+                size: 78),
             const SizedBox(height: 22),
             Text('选择一个听歌模式', style: AppDesignTokens.title(size: 26)),
             const SizedBox(height: 10),
             Text('让当前专辑的颜色铺满整个房间。',
                 textAlign: TextAlign.center,
                 style: AppDesignTokens.body(
-                    color: AppDesignTokens.warmWhite.withOpacity(0.72))),
+                    color: AppDesignTokens.warmWhite.withValues(alpha: 0.72))),
             const SizedBox(height: 22),
             GestureDetector(
               onTap: () => widget.onOpenDrawer?.call(),
@@ -560,9 +594,9 @@ class _PlayerPageState extends State<PlayerPage> {
         final availableHeight = constraints.maxHeight;
         final width = constraints.maxWidth;
         final compact = availableHeight < 640;
-        final coverHeight = min(width * 0.72, availableHeight * 0.40)
-            .clamp(compact ? 200.0 : 230.0, compact ? 270.0 : 320.0);
-        final coverWidth = width;
+        final coverWidth = min(width * 0.92, compact ? 340.0 : 380.0);
+        final coverHeight = min(coverWidth * 0.92, availableHeight * 0.34)
+            .clamp(compact ? 188.0 : 220.0, compact ? 258.0 : 300.0);
         final lyricLines = _visibleLyricTexts(song, compact ? 4 : 5);
         final titleSize = compact ? 22.0 : 25.0;
         final singerSize = compact ? 17.0 : 18.0;
@@ -570,81 +604,93 @@ class _PlayerPageState extends State<PlayerPage> {
         final nextLyricSize = compact ? 17.0 : 19.0;
         final topGap = compact ? 0.0 : 6.0;
         final coverToInfoGap = compact ? 12.0 : 20.0;
-        final infoToLyricGap = compact ? 16.0 : 22.0;
-        final lyricToActionsGap = compact ? 22.0 : 34.0;
-        final actionsToProgressGap = compact ? 20.0 : 26.0;
+        final infoToLyricGap = compact ? 14.0 : 22.0;
+        final lyricToActionsGap = compact ? 18.0 : 30.0;
+        final actionsToProgressGap = compact ? 18.0 : 24.0;
         return Padding(
           padding: const EdgeInsets.fromLTRB(26, 0, 26, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(height: topGap),
-              Center(
-                child: Container(
-                  width: coverWidth,
-                  height: coverHeight,
-                  decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(30),
-                      color: Colors.white.withOpacity(0.08),
-                      boxShadow: [
-                        BoxShadow(
-                            color: Colors.black.withOpacity(0.30),
-                            blurRadius: 34,
-                            offset: const Offset(0, 18))
-                      ]),
-                  clipBehavior: Clip.antiAlias,
-                  child: _coverBytes != null
-                      ? Image.memory(_coverBytes!, fit: BoxFit.cover)
-                      : Icon(Icons.music_note_rounded,
-                          color: AppDesignTokens.lyricWhite.withOpacity(0.72),
-                          size: coverHeight * 0.26),
-                ),
-              ),
-              SizedBox(height: coverToInfoGap),
-              Center(
-                child: SizedBox(
-                  width: coverWidth,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(song.name,
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppDesignTokens.display(size: titleSize)),
-                      const SizedBox(height: 8),
-                      Text(song.singer,
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppDesignTokens.title(
-                              size: singerSize,
-                              color:
-                                  AppDesignTokens.warmWhite.withOpacity(0.76))),
-                    ],
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: availableHeight),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(height: topGap),
+                  Center(
+                    child: Container(
+                      width: coverWidth,
+                      height: coverHeight,
+                      decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(30),
+                          color: Colors.white.withValues(alpha: 0.08),
+                          boxShadow: [
+                            BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.30),
+                                blurRadius: 34,
+                                offset: const Offset(0, 18))
+                          ]),
+                      clipBehavior: Clip.antiAlias,
+                      child: _coverBytes != null
+                          ? Image.memory(_coverBytes!, fit: BoxFit.cover)
+                          : Icon(Icons.music_note_rounded,
+                              color: AppDesignTokens.lyricWhite
+                                  .withValues(alpha: 0.72),
+                              size: coverHeight * 0.26),
+                    ),
                   ),
-                ),
-              ),
-              SizedBox(height: infoToLyricGap),
-              Flexible(
-                child: Center(
-                  child: SizedBox(
-                    width: coverWidth,
-                    child: _buildLyricPreview(
-                        lyricLines, lyricSize, nextLyricSize),
+                  SizedBox(height: coverToInfoGap),
+                  Center(
+                    child: SizedBox(
+                      width: coverWidth,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(song.name,
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppDesignTokens.display(size: titleSize)),
+                          const SizedBox(height: 8),
+                          Text(song.singer,
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppDesignTokens.title(
+                                  size: singerSize,
+                                  color: AppDesignTokens.warmWhite
+                                      .withValues(alpha: 0.76))),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                  SizedBox(height: infoToLyricGap),
+                  Center(
+                    child: SizedBox(
+                      width: coverWidth,
+                      child: ConstrainedBox(
+                        constraints:
+                            BoxConstraints(minHeight: compact ? 128.0 : 156.0),
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          child: _buildLyricPreview(
+                              lyricLines, lyricSize, nextLyricSize),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: lyricToActionsGap),
+                  _buildSocialActions(),
+                  if (_downloadProgress != null) ...[
+                    const SizedBox(height: 8),
+                    _buildDownloadProgress()
+                  ],
+                  SizedBox(height: actionsToProgressGap),
+                  _buildProgressBar(),
+                  SizedBox(height: compact ? 10 : 20),
+                ],
               ),
-              SizedBox(height: lyricToActionsGap),
-              _buildSocialActions(),
-              if (_downloadProgress != null) ...[
-                const SizedBox(height: 8),
-                _buildDownloadProgress()
-              ],
-              SizedBox(height: actionsToProgressGap),
-              _buildProgressBar(),
-              SizedBox(height: compact ? 10 : 20),
-            ],
+            ),
           ),
         );
       },
@@ -670,7 +716,7 @@ class _PlayerPageState extends State<PlayerPage> {
               overflow: TextOverflow.ellipsis,
               style: AppDesignTokens.title(
                   size: nextSize,
-                  color: AppDesignTokens.warmWhite.withOpacity(0.58))),
+                  color: AppDesignTokens.warmWhite.withValues(alpha: 0.58))),
         ],
       ],
     );
@@ -719,7 +765,7 @@ class _PlayerPageState extends State<PlayerPage> {
   }) {
     final color = active
         ? AppDesignTokens.lyricWhite
-        : AppDesignTokens.warmWhite.withOpacity(0.85);
+        : AppDesignTokens.warmWhite.withValues(alpha: 0.85);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -730,7 +776,8 @@ class _PlayerPageState extends State<PlayerPage> {
         const SizedBox(height: 5),
         Text(label,
             style: AppDesignTokens.caption(
-                size: 10, color: AppDesignTokens.warmWhite.withOpacity(0.65))),
+                size: 10,
+                color: AppDesignTokens.warmWhite.withValues(alpha: 0.65))),
       ],
     );
   }
@@ -750,7 +797,7 @@ class _PlayerPageState extends State<PlayerPage> {
         const SizedBox(width: 9),
         Text(preparing ? '正在准备播放' : '缓存中',
             style: AppDesignTokens.caption(
-                color: AppDesignTokens.warmWhite.withOpacity(0.72))),
+                color: AppDesignTokens.warmWhite.withValues(alpha: 0.72))),
       ],
     );
   }
@@ -768,9 +815,9 @@ class _PlayerPageState extends State<PlayerPage> {
           thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
           overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
           activeTrackColor: AppDesignTokens.lyricWhite,
-          inactiveTrackColor: Colors.white.withOpacity(0.26),
+          inactiveTrackColor: Colors.white.withValues(alpha: 0.26),
           thumbColor: AppDesignTokens.lyricWhite,
-          overlayColor: Colors.white.withOpacity(0.10),
+          overlayColor: Colors.white.withValues(alpha: 0.10),
         ),
         child: Slider(
           min: 0,
@@ -833,7 +880,7 @@ class _MusicSheet extends StatelessWidget {
         margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
         decoration: BoxDecoration(
-            color: const Color(0xFF241A14).withOpacity(0.96),
+            color: const Color(0xFF241A14).withValues(alpha: 0.96),
             borderRadius: BorderRadius.circular(AppDesignTokens.sheetRadius)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -842,7 +889,7 @@ class _MusicSheet extends StatelessWidget {
                 width: 42,
                 height: 4,
                 decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.32),
+                    color: Colors.white.withValues(alpha: 0.32),
                     borderRadius: BorderRadius.circular(999))),
             const SizedBox(height: 16),
             Text(title, style: AppDesignTokens.title(size: 18)),

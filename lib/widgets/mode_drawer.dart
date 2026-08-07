@@ -86,7 +86,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
           '选择一种方式开始播放',
           style: AppDesignTokens.body(
             size: 17,
-            color: AppDesignTokens.warmWhite.withOpacity(0.62),
+            color: AppDesignTokens.warmWhite.withValues(alpha: 0.62),
             weight: FontWeight.w800,
           ),
         ),
@@ -125,7 +125,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
         decoration: BoxDecoration(
           color: selected
               ? AppDesignTokens.selectedPill
-              : Colors.white.withOpacity(0.08),
+              : Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(18),
         ),
         child: Row(
@@ -134,7 +134,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
               icon,
               color: selected
                   ? const Color(0xFF3B2418)
-                  : AppDesignTokens.lyricWhite.withOpacity(0.90),
+                  : AppDesignTokens.lyricWhite.withValues(alpha: 0.90),
               size: 28,
             ),
             const SizedBox(width: 14),
@@ -156,8 +156,8 @@ class _ModeDrawerState extends State<ModeDrawer> {
                     subtitle,
                     style: AppDesignTokens.caption(
                       color: selected
-                          ? const Color(0xFF3B2418).withOpacity(0.72)
-                          : AppDesignTokens.warmWhite.withOpacity(0.62),
+                          ? const Color(0xFF3B2418).withValues(alpha: 0.72)
+                          : AppDesignTokens.warmWhite.withValues(alpha: 0.62),
                     ),
                   ),
                 ],
@@ -214,13 +214,14 @@ class _ModeDrawerState extends State<ModeDrawer> {
 
   Widget _playlistTile(IconData icon, String label, VoidCallback onTap) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
             icon,
-            color: AppDesignTokens.lyricWhite.withOpacity(0.90),
+            color: AppDesignTokens.lyricWhite.withValues(alpha: 0.90),
             size: 30,
           ),
           const SizedBox(height: 12),
@@ -231,7 +232,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
             overflow: TextOverflow.ellipsis,
             style: AppDesignTokens.body(
               size: 14,
-              color: AppDesignTokens.warmWhite.withOpacity(0.86),
+              color: AppDesignTokens.warmWhite.withValues(alpha: 0.86),
               weight: FontWeight.w800,
             ),
           ),

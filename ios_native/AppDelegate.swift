@@ -1,4 +1,4 @@
-import Flutter
+﻿import Flutter
 import UIKit
 import AVFAudio
 import MediaPlayer
@@ -148,7 +148,7 @@ import MediaPlayer
   private func setupNowPlayingChannel(messenger: FlutterBinaryMessenger) {
     guard nowPlayingChannel == nil else { return }
     let channel = FlutterMethodChannel(
-      name: "com.miaomiao.music/nowplaying",
+      name: "com.qishui.music/nowplaying",
       binaryMessenger: messenger
     )
     nowPlayingChannel = channel

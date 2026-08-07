@@ -41,8 +41,8 @@ class _SoundHaloPainter extends CustomPainter {
     final glow = Paint()
       ..shader = RadialGradient(
         colors: [
-          color.withOpacity(0.28 * intensity),
-          color.withOpacity(0.08 * intensity),
+          color.withValues(alpha: 0.28 * intensity),
+          color.withValues(alpha: 0.08 * intensity),
           Colors.transparent,
         ],
         stops: const [0.0, 0.52, 1.0],
@@ -52,31 +52,43 @@ class _SoundHaloPainter extends CustomPainter {
     final ringPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.1
-      ..color = color.withOpacity(0.22 * intensity);
-    canvas.drawOval(Rect.fromCenter(center: center, width: size.width * 0.86, height: size.height * 0.58), ringPaint);
+      ..color = color.withValues(alpha: 0.22 * intensity);
+    canvas.drawOval(
+        Rect.fromCenter(
+            center: center,
+            width: size.width * 0.86,
+            height: size.height * 0.58),
+        ringPaint);
 
     final ringPaint2 = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.8
-      ..color = Colors.white.withOpacity(0.09 * intensity);
+      ..color = Colors.white.withValues(alpha: 0.09 * intensity);
     canvas.save();
     canvas.translate(center.dx, center.dy);
     canvas.rotate(-0.34);
     canvas.translate(-center.dx, -center.dy);
-    canvas.drawOval(Rect.fromCenter(center: center, width: size.width * 0.72, height: size.height * 0.42), ringPaint2);
+    canvas.drawOval(
+        Rect.fromCenter(
+            center: center,
+            width: size.width * 0.72,
+            height: size.height * 0.42),
+        ringPaint2);
     canvas.restore();
 
     final tickPaint = Paint()
       ..strokeCap = StrokeCap.round
       ..strokeWidth = 1.5
-      ..color = color.withOpacity(0.30 * intensity);
+      ..color = color.withValues(alpha: 0.30 * intensity);
     for (var i = 0; i < 20; i++) {
       final angle = -math.pi * 0.85 + i * math.pi * 1.7 / 19;
       if (i % 3 == 1) continue;
       final inner = radius * (0.72 + (i % 4) * 0.015);
       final outer = inner + 7 + (i % 5);
-      final p1 = center + Offset(math.cos(angle) * inner, math.sin(angle) * inner * 0.72);
-      final p2 = center + Offset(math.cos(angle) * outer, math.sin(angle) * outer * 0.72);
+      final p1 = center +
+          Offset(math.cos(angle) * inner, math.sin(angle) * inner * 0.72);
+      final p2 = center +
+          Offset(math.cos(angle) * outer, math.sin(angle) * outer * 0.72);
       canvas.drawLine(p1, p2, tickPaint);
     }
   }
@@ -92,19 +104,22 @@ class MiniWave extends StatefulWidget {
   final Color color;
   final double size;
 
-  const MiniWave({super.key, required this.playing, required this.color, this.size = 22});
+  const MiniWave(
+      {super.key, required this.playing, required this.color, this.size = 22});
 
   @override
   State<MiniWave> createState() => _MiniWaveState();
 }
 
-class _MiniWaveState extends State<MiniWave> with SingleTickerProviderStateMixin {
+class _MiniWaveState extends State<MiniWave>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 860));
+    _controller = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 860));
     if (widget.playing) _controller.repeat();
   }
 

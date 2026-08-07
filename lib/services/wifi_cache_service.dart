@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../api/music_api.dart';
-import '../models/song.dart';
 import 'favorites_service.dart';
 import 'audio_cache_service.dart';
 import 'settings_service.dart';

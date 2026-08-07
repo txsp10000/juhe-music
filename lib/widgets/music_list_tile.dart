@@ -38,8 +38,8 @@ class MusicListTile extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
         color: active
-            ? Colors.white.withOpacity(0.16)
-            : Colors.white.withOpacity(0.075),
+            ? Colors.white.withValues(alpha: 0.16)
+            : Colors.white.withValues(alpha: 0.075),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
@@ -57,7 +57,8 @@ class MusicListTile extends StatelessWidget {
                         size: 16,
                         color: active
                             ? AppDesignTokens.lyricWhite
-                            : AppDesignTokens.lyricWhite.withOpacity(0.92),
+                            : AppDesignTokens.lyricWhite
+                                .withValues(alpha: 0.92),
                         weight: FontWeight.w900)),
                 const SizedBox(height: 4),
                 Text(song.singer.isEmpty ? '未知歌手' : song.singer,
@@ -65,7 +66,8 @@ class MusicListTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: AppDesignTokens.body(
                         size: 13,
-                        color: AppDesignTokens.warmWhite.withOpacity(0.58),
+                        color:
+                            AppDesignTokens.warmWhite.withValues(alpha: 0.58),
                         weight: FontWeight.w600)),
                 if (song.album.isNotEmpty || song.source.isNotEmpty) ...[
                   const SizedBox(height: 5),
@@ -78,7 +80,8 @@ class MusicListTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: AppDesignTokens.caption(
                           size: 10.5,
-                          color: AppDesignTokens.warmWhite.withOpacity(0.38))),
+                          color: AppDesignTokens.warmWhite
+                              .withValues(alpha: 0.38))),
                 ],
               ],
             ),
@@ -88,9 +91,13 @@ class MusicListTile extends StatelessWidget {
       ),
     );
     return Material(
-        color: Colors.transparent,
-        child: InkWell(
-            borderRadius: BorderRadius.circular(18), onTap: onTap, child: row));
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: row,
+      ),
+    );
   }
 
   Widget _buildLeading() {
@@ -113,7 +120,7 @@ class MusicListTile extends StatelessWidget {
       height: 48,
       decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          color: Colors.white.withOpacity(0.10)),
+          color: Colors.white.withValues(alpha: 0.10)),
       child: Center(
         child: isCurrent
             ? MiniWave(
@@ -155,7 +162,7 @@ class MusicEmptyState extends StatelessWidget {
                 height: 76,
                 decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.10)),
+                    color: Colors.white.withValues(alpha: 0.10)),
                 child: Icon(icon, color: AppDesignTokens.lyricWhite, size: 36)),
             const SizedBox(height: 20),
             Text(title,
@@ -166,7 +173,7 @@ class MusicEmptyState extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: AppDesignTokens.body(
                     size: 14,
-                    color: AppDesignTokens.warmWhite.withOpacity(0.62),
+                    color: AppDesignTokens.warmWhite.withValues(alpha: 0.62),
                     weight: FontWeight.w600)),
             if (action != null) ...[const SizedBox(height: 20), action!],
           ],

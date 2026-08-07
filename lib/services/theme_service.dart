@@ -4,9 +4,12 @@ import 'package:palette_generator/palette_generator.dart';
 
 class ThemeService {
   /// 主强调色（可变，跟随当前封面图的主色调）
-  static final ValueNotifier<Color> accentColor = ValueNotifier(Colors.white);
+  static final ValueNotifier<Color> accentColor =
+      ValueNotifier(const Color(0xFF87C7B4));
+
   /// 背景微调色（封面主色的极暗版本）
-  static final ValueNotifier<Color> bgHint = ValueNotifier(const Color(0xFF000000));
+  static final ValueNotifier<Color> bgHint =
+      ValueNotifier(const Color(0xFF132B31));
 
   static Future<void> updateFromCover(Uint8List bytes) async {
     try {
@@ -21,7 +24,8 @@ class ThemeService {
         palette.dominantColor?.color,
         Colors.white,
       ];
-      final raw = candidates.firstWhere((c) => c != null, orElse: () => Colors.white)!;
+      final raw =
+          candidates.firstWhere((c) => c != null, orElse: () => Colors.white)!;
       final hsl = HSLColor.fromColor(raw);
 
       final accent = hsl
@@ -39,7 +43,7 @@ class ThemeService {
 
   /// 重置为默认白色
   static void reset() {
-    accentColor.value = Colors.white;
-    bgHint.value = const Color(0xFF000000);
+    accentColor.value = const Color(0xFF87C7B4);
+    bgHint.value = const Color(0xFF132B31);
   }
 }

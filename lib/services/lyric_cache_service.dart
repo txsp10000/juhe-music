@@ -42,5 +42,4 @@ class LyricCacheService {
       await file.writeAsString(lyric);
     } catch (_) {}
   }
-
 }

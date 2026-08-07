@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../api/music_api.dart';
 import '../models/song.dart';
@@ -7,12 +9,17 @@ import '../services/theme_service.dart';
 import '../theme/app_design_tokens.dart';
 import '../widgets/glass_panel.dart';
 import '../widgets/music_list_tile.dart';
+import '../utils/toast.dart';
 
 class SearchResultPage extends StatefulWidget {
   final String keyword;
   final bool fromPlayer;
   final VoidCallback? onShowPlayer;
-  const SearchResultPage({super.key, required this.keyword, this.fromPlayer = false, this.onShowPlayer});
+  const SearchResultPage(
+      {super.key,
+      required this.keyword,
+      this.fromPlayer = false,
+      this.onShowPlayer});
 
   @override
   State<SearchResultPage> createState() => _SearchResultPageState();
@@ -43,7 +50,8 @@ class _SearchResultPageState extends State<SearchResultPage> {
   void _onThemeChange() {
     if (mounted) {
       setState(() {
-        _accent = AppDesignTokens.readableAccent(ThemeService.accentColor.value);
+        _accent =
+            AppDesignTokens.readableAccent(ThemeService.accentColor.value);
         _bgHint = ThemeService.bgHint.value;
       });
     }
@@ -61,6 +69,16 @@ class _SearchResultPageState extends State<SearchResultPage> {
     if (mounted) setState(() => _loading = false);
   }
 
+  void _retryInitialLoad() {
+    setState(() {
+      _loading = true;
+      _errorMsg = '';
+      _currentPage = 1;
+      _hasMore = true;
+    });
+    unawaited(_initialLoad());
+  }
+
   Future<void> _loadFavorites() async {
     final favorites = await FavoritesService.load();
     _favoriteIds
@@ -71,11 +89,14 @@ class _SearchResultPageState extends State<SearchResultPage> {
 
   Future<void> _search({bool append = false}) async {
     try {
-      final result = await MusicApi.searchRaw(widget.keyword, num: 20, page: _currentPage);
+      final result =
+          await MusicApi.searchRaw(widget.keyword, num: 20, page: _currentPage);
       if (!mounted) return;
       if (result.songs.isNotEmpty) {
         final coverTargets = result.songs.take(8).toList();
-        final picIds = coverTargets.map((s) => s.picId.isNotEmpty ? s.picId : s.id).toList();
+        final picIds = coverTargets
+            .map((s) => s.picId.isNotEmpty ? s.picId : s.id)
+            .toList();
         MusicApi.getCovers(picIds).then((covers) {
           if (!mounted) return;
           for (final s in coverTargets) {
@@ -105,10 +126,16 @@ class _SearchResultPageState extends State<SearchResultPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _hasMore = false;
+        if (append) {
+          _currentPage = (_currentPage - 1).clamp(1, 1 << 30);
+          _hasMore = true;
+        } else {
+          _hasMore = false;
+        }
         _isLoadingMore = false;
         if (!append) _errorMsg = '搜索失败';
       });
+      if (append) Toast.show(context, '加载更多失败，上滑可重试');
     }
   }
 
@@ -123,7 +150,9 @@ class _SearchResultPageState extends State<SearchResultPage> {
     if (_player.currentSong?.id != _songs[index].id) {
       _player.playlist.clear();
       _player.playlist.addAll(_songs);
-      _player.playAt(index);
+      unawaited(_player.playAt(index));
+    } else if (!_player.isPlaying) {
+      unawaited(_player.play());
     }
     if (widget.fromPlayer) {
       Navigator.pop(context);
@@ -146,20 +175,17 @@ class _SearchResultPageState extends State<SearchResultPage> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: !_isLoadingMore,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: MusicScaffoldBackground(
-          bgHint: _bgHint,
-          accent: _accent,
-          child: SafeArea(
-            child: Column(
-              children: [
-                _buildHeader(),
-                Expanded(child: _buildBody()),
-              ],
-            ),
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: MusicScaffoldBackground(
+        bgHint: _bgHint,
+        accent: _accent,
+        child: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(),
+              Expanded(child: _buildBody()),
+            ],
           ),
         ),
       ),
@@ -171,15 +197,23 @@ class _SearchResultPageState extends State<SearchResultPage> {
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 10),
       child: Row(
         children: [
-          IconOrbButton(icon: Icons.arrow_back_rounded, accent: _accent, size: 42, onTap: _isLoadingMore ? null : () => Navigator.pop(context)),
+          IconOrbButton(
+              icon: Icons.arrow_back_rounded,
+              accent: _accent,
+              size: 42,
+              onTap: () => Navigator.pop(context)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_loading ? '搜索中' : widget.keyword, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppDesignTokens.title(size: 22)),
+                Text(_loading ? '搜索中' : widget.keyword,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppDesignTokens.title(size: 22)),
                 const SizedBox(height: 4),
-                Text(_loading ? '正在翻找音乐房间' : '共 ${_songs.length} 首歌', style: AppDesignTokens.caption(color: _accent)),
+                Text(_loading ? '正在翻找音乐房间' : '共 ${_songs.length} 首歌',
+                    style: AppDesignTokens.caption(color: _accent)),
               ],
             ),
           ),
@@ -190,14 +224,29 @@ class _SearchResultPageState extends State<SearchResultPage> {
 
   Widget _buildBody() {
     if (_loading) {
-      return MusicEmptyState(accent: _accent, icon: Icons.graphic_eq_rounded, title: '正在搜索', message: '把相关歌曲从云端唱片箱里找出来。');
+      return MusicEmptyState(
+          accent: _accent,
+          icon: Icons.graphic_eq_rounded,
+          title: '正在搜索',
+          message: '把相关歌曲从云端唱片箱里找出来。');
     }
     if (_songs.isEmpty && !_isLoadingMore) {
       return MusicEmptyState(
         accent: _accent,
-        icon: _errorMsg == '搜索失败' ? Icons.wifi_off_rounded : Icons.search_off_rounded,
+        icon: _errorMsg == '搜索失败'
+            ? Icons.wifi_off_rounded
+            : Icons.search_off_rounded,
         title: _errorMsg.isNotEmpty ? _errorMsg : '没有找到相关歌曲',
         message: _errorMsg == '搜索失败' ? '网络或接口暂时没有回应，稍后再试。' : '换个歌名或歌手试试。',
+        action: _errorMsg == '搜索失败'
+            ? GestureDetector(
+                onTap: _retryInitialLoad,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  child: Text('重新搜索'),
+                ),
+              )
+            : null,
       );
     }
     return Stack(
@@ -205,7 +254,8 @@ class _SearchResultPageState extends State<SearchResultPage> {
         NotificationListener<ScrollNotification>(
           onNotification: (notification) {
             if (notification is ScrollEndNotification &&
-                notification.metrics.pixels >= notification.metrics.maxScrollExtent - 100 &&
+                notification.metrics.pixels >=
+                    notification.metrics.maxScrollExtent - 100 &&
                 !_isLoadingMore &&
                 _hasMore) {
               _loadNextPage();
@@ -219,7 +269,9 @@ class _SearchResultPageState extends State<SearchResultPage> {
               if (i >= _songs.length) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 18),
-                  child: Center(child: CircularProgressIndicator(color: _accent, strokeWidth: 2.4)),
+                  child: Center(
+                      child: CircularProgressIndicator(
+                          color: _accent, strokeWidth: 2.4)),
                 );
               }
               final s = _songs[i];
@@ -236,7 +288,14 @@ class _SearchResultPageState extends State<SearchResultPage> {
                   behavior: HitTestBehavior.opaque,
                   child: Padding(
                     padding: const EdgeInsets.all(8),
-                    child: Icon(favored ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: favored ? AppDesignTokens.danger : AppDesignTokens.quietGrey, size: 23),
+                    child: Icon(
+                        favored
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        color: favored
+                            ? AppDesignTokens.danger
+                            : AppDesignTokens.quietGrey,
+                        size: 23),
                   ),
                 ),
               );
@@ -246,18 +305,25 @@ class _SearchResultPageState extends State<SearchResultPage> {
         if (_isLoadingMore)
           Positioned.fill(
             child: Container(
-              color: AppDesignTokens.inkBlack.withOpacity(0.42),
+              color: AppDesignTokens.inkBlack.withValues(alpha: 0.42),
               child: Center(
                 child: GlassPanel(
                   accent: _accent,
                   radius: 22,
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: _accent, strokeWidth: 2)),
+                      SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              color: _accent, strokeWidth: 2)),
                       const SizedBox(width: 12),
-                      Text('加载更多', style: AppDesignTokens.body(size: 14, color: AppDesignTokens.quietGrey)),
+                      Text('加载更多',
+                          style: AppDesignTokens.body(
+                              size: 14, color: AppDesignTokens.quietGrey)),
                     ],
                   ),
                 ),

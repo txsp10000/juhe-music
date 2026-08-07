@@ -7,8 +7,8 @@ class Song {
   final String picId;
   final String lyricId;
   final int duration;
-  String cover;   // 封面URL，异步获取后填入
-  String lyric;   // 歌词，异步获取后填入
+  String cover;
+  String lyric;
 
   Song({
     required this.id,
@@ -30,20 +30,45 @@ class Song {
       return artist.toString();
     }
 
+    String firstString(List<dynamic> values) {
+      for (final value in values) {
+        final text = value?.toString() ?? '';
+        if (text.isNotEmpty && text != 'null') return text;
+      }
+      return '';
+    }
+
+    final albumJson = json['album'];
+    final albumName = albumJson is Map
+        ? albumJson['name']?.toString() ?? ''
+        : albumJson?.toString() ?? '';
     final dur = json['interval'] ?? json['time'] ?? json['duration'] ?? 0;
     return Song(
       id: json['id']?.toString() ?? '',
       name: json['name'] ?? '未知歌曲',
       singer: parseSinger(json['artist']),
-      album: json['album'] ?? '',
+      album: albumName,
       source: json['source'] ?? 'netease',
-      picId: json['pic_id']?.toString() ?? '',
-      lyricId: json['lyric_id']?.toString() ?? '',
+      picId: firstString([
+        json['pic_id'],
+        json['picId'],
+        json['pic'],
+        if (albumJson is Map) albumJson['pic_str'],
+        if (albumJson is Map) albumJson['pic'],
+        if (albumJson is Map) albumJson['id'],
+      ]),
+      lyricId: firstString([json['lyric_id'], json['lyricId'], json['id']]),
       duration: dur is int ? dur : int.tryParse(dur.toString()) ?? 0,
+      cover: firstString([
+        json['cover'],
+        json['coverUrl'],
+        json['cover_url'],
+        json['pic_url'],
+        if (albumJson is Map) albumJson['picUrl'],
+      ]),
     );
   }
 
-  /// 从本地存储的 JSON 反序列化（toJson 的逆操作）
   factory Song.fromJson(Map<String, dynamic> json) {
     return Song(
       id: json['id']?.toString() ?? '',
@@ -53,22 +78,24 @@ class Song {
       source: json['source'] ?? 'netease',
       picId: json['pic_id']?.toString() ?? '',
       lyricId: json['lyric_id']?.toString() ?? '',
-      duration: json['duration'] is int ? json['duration'] : int.tryParse(json['duration']?.toString() ?? '') ?? 0,
+      duration: json['duration'] is int
+          ? json['duration']
+          : int.tryParse(json['duration']?.toString() ?? '') ?? 0,
       cover: json['cover'] ?? '',
       lyric: json['lyric'] ?? '',
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'singer': singer,
-    'album': album,
-    'source': source,
-    'pic_id': picId,
-    'lyric_id': lyricId,
-    'duration': duration,
-    'cover': cover,
-    'lyric': lyric,
-  };
+        'id': id,
+        'name': name,
+        'singer': singer,
+        'album': album,
+        'source': source,
+        'pic_id': picId,
+        'lyric_id': lyricId,
+        'duration': duration,
+        'cover': cover,
+        'lyric': lyric,
+      };
 }

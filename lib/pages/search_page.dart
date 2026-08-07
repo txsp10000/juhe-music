@@ -8,7 +8,8 @@ class SearchPage extends StatefulWidget {
   final bool embedded;
   final VoidCallback? onShowPlayer;
   final VoidCallback? onOpenDrawer;
-  const SearchPage({super.key, this.embedded = false, this.onShowPlayer, this.onOpenDrawer});
+  const SearchPage(
+      {super.key, this.embedded = false, this.onShowPlayer, this.onOpenDrawer});
 
   @override
   State<SearchPage> createState() => _SearchPageState();
@@ -146,12 +147,13 @@ class _SearchPageState extends State<SearchPage> {
       height: 52,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.10),
+          color: Colors.white.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(26)),
       child: Row(
         children: [
           Icon(Icons.search_rounded,
-              color: AppDesignTokens.warmWhite.withOpacity(0.65), size: 25),
+              color: AppDesignTokens.warmWhite.withValues(alpha: 0.65),
+              size: 25),
           const SizedBox(width: 10),
           Expanded(
             child: TextField(
@@ -170,7 +172,7 @@ class _SearchPageState extends State<SearchPage> {
             GestureDetector(
                 onTap: () => _controller.clear(),
                 child: Icon(Icons.close_rounded,
-                    color: AppDesignTokens.warmWhite.withOpacity(0.65),
+                    color: AppDesignTokens.warmWhite.withValues(alpha: 0.65),
                     size: 20)),
         ],
       ),
@@ -189,7 +191,7 @@ class _SearchPageState extends State<SearchPage> {
               GestureDetector(
                   onTap: _clearHistory,
                   child: Icon(Icons.delete_outline_rounded,
-                      color: AppDesignTokens.warmWhite.withOpacity(0.58),
+                      color: AppDesignTokens.warmWhite.withValues(alpha: 0.58),
                       size: 28)),
           ],
         ),
@@ -197,7 +199,7 @@ class _SearchPageState extends State<SearchPage> {
         if (_history.isEmpty)
           Text('暂无搜索历史',
               style: AppDesignTokens.body(
-                  color: AppDesignTokens.warmWhite.withOpacity(0.55)))
+                  color: AppDesignTokens.warmWhite.withValues(alpha: 0.55)))
         else
           Wrap(
             spacing: 10,
@@ -212,7 +214,7 @@ class _SearchPageState extends State<SearchPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.08),
+          color: Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(18)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -226,7 +228,7 @@ class _SearchPageState extends State<SearchPage> {
           GestureDetector(
               onTap: () => _removeHistory(kw),
               child: Icon(Icons.close_rounded,
-                  color: AppDesignTokens.warmWhite.withOpacity(0.60),
+                  color: AppDesignTokens.warmWhite.withValues(alpha: 0.60),
                   size: 16)),
         ],
       ),

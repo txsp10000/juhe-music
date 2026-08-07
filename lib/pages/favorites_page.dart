@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../models/song.dart';
 import '../services/favorites_service.dart';
@@ -31,6 +33,8 @@ class _FavoritesPageState extends State<FavoritesPage> {
   final ScrollController _scrollController = ScrollController();
   Color _accent = AppDesignTokens.lyricWhite;
   Color _bgHint = AppDesignTokens.inkBlack;
+  int _loadGeneration = 0;
+  bool _mutatingFavorites = false;
 
   @override
   void initState() {
@@ -53,7 +57,10 @@ class _FavoritesPageState extends State<FavoritesPage> {
     }
   }
 
-  void _onFavoritesChanged() => _load();
+  void _onFavoritesChanged() {
+    if (!_mutatingFavorites) unawaited(_load());
+  }
+
   void _onSongChange(Song _) {
     if (mounted) setState(() {});
   }
@@ -69,8 +76,9 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   Future<void> _load() async {
+    final generation = ++_loadGeneration;
     final songs = await FavoritesService.load();
-    if (mounted) {
+    if (mounted && generation == _loadGeneration) {
       setState(() => _songs = songs);
       _scrollToPlaying();
     }
@@ -97,7 +105,9 @@ class _FavoritesPageState extends State<FavoritesPage> {
     if (_player.currentSong?.id != _songs[index].id) {
       _player.playlist.clear();
       _player.playlist.addAll(_songs);
-      _player.playAt(index);
+      unawaited(_player.playAt(index));
+    } else if (!_player.isPlaying) {
+      unawaited(_player.play());
     }
     if (widget.fromPlayer) {
       Navigator.pop(context);
@@ -108,8 +118,14 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
   Future<void> _removeSong(int index) async {
     final song = _songs[index];
-    await FavoritesService.remove(song);
-    setState(() => _songs.removeAt(index));
+    _mutatingFavorites = true;
+    try {
+      await FavoritesService.remove(song);
+      if (!mounted) return;
+      setState(() => _songs.removeWhere((item) => item.id == song.id));
+    } finally {
+      _mutatingFavorites = false;
+    }
   }
 
   void _toggleSelectAll() {
@@ -125,19 +141,22 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
   Future<void> _deleteSelected() async {
     final toDelete = _selected.toList()..sort((a, b) => b.compareTo(a));
-    for (final i in toDelete) {
-      await FavoritesService.remove(_songs[i]);
+    final selectedIds = toDelete.map((i) => _songs[i].id).toSet();
+    _mutatingFavorites = true;
+    try {
+      for (final i in toDelete) {
+        await FavoritesService.remove(_songs[i]);
+      }
+      if (!mounted) return;
+      setState(() {
+        _songs.removeWhere((song) => selectedIds.contains(song.id));
+        _selected.clear();
+        _editMode = false;
+      });
+      Toast.show(context, '已删除 ${toDelete.length} 首');
+    } finally {
+      _mutatingFavorites = false;
     }
-    final remaining = <Song>[];
-    for (var i = 0; i < _songs.length; i++) {
-      if (!_selected.contains(i)) remaining.add(_songs[i]);
-    }
-    setState(() {
-      _songs = remaining;
-      _selected.clear();
-      _editMode = false;
-    });
-    Toast.show(context, '已删除 ${toDelete.length} 首');
   }
 
   @override
@@ -296,10 +315,10 @@ class _FavoritesPageState extends State<FavoritesPage> {
     final enabled = onTap != null;
     final fg = danger
         ? AppDesignTokens.lyricWhite
-        : AppDesignTokens.warmWhite.withOpacity(enabled ? 0.92 : 0.42);
+        : AppDesignTokens.warmWhite.withValues(alpha: enabled ? 0.92 : 0.42);
     final bg = danger
-        ? AppDesignTokens.danger.withOpacity(0.72)
-        : Colors.white.withOpacity(enabled ? 0.12 : 0.06);
+        ? AppDesignTokens.danger.withValues(alpha: 0.72)
+        : Colors.white.withValues(alpha: enabled ? 0.12 : 0.06);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,

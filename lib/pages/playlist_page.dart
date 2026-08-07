@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../models/song.dart';
 import '../services/player_service.dart';
@@ -34,7 +36,8 @@ class _PlaylistPageState extends State<PlaylistPage> {
   void _onThemeChange() {
     if (mounted) {
       setState(() {
-        _accent = AppDesignTokens.readableAccent(ThemeService.accentColor.value);
+        _accent =
+            AppDesignTokens.readableAccent(ThemeService.accentColor.value);
         _bgHint = ThemeService.bgHint.value;
       });
     }
@@ -43,8 +46,10 @@ class _PlaylistPageState extends State<PlaylistPage> {
   void _scrollToPlaying() {
     final idx = _player.currentIndex;
     if (idx > 0 && _scrollController.hasClients) {
-      final offset = (idx * 76.0).clamp(0.0, _scrollController.position.maxScrollExtent);
-      _scrollController.animateTo(offset, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+      final offset =
+          (idx * 76.0).clamp(0.0, _scrollController.position.maxScrollExtent);
+      _scrollController.animateTo(offset,
+          duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
     }
   }
 
@@ -63,7 +68,9 @@ class _PlaylistPageState extends State<PlaylistPage> {
 
   void _playAt(int index) {
     if (_player.currentSong?.id != _player.playlist[index].id) {
-      _player.playAt(index);
+      unawaited(_player.playAt(index));
+    } else if (!_player.isPlaying) {
+      unawaited(_player.play());
     }
     Navigator.pop(context);
   }
@@ -83,7 +90,11 @@ class _PlaylistPageState extends State<PlaylistPage> {
               _buildHeader(songs.length, currentIdx),
               Expanded(
                 child: songs.isEmpty
-                    ? MusicEmptyState(accent: _accent, icon: Icons.queue_music_rounded, title: '队列是空的', message: '去搜索或播放收藏里的歌曲。')
+                    ? MusicEmptyState(
+                        accent: _accent,
+                        icon: Icons.queue_music_rounded,
+                        title: '队列是空的',
+                        message: '去搜索或播放收藏里的歌曲。')
                     : ListView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.only(top: 4, bottom: 24),
@@ -99,7 +110,13 @@ class _PlaylistPageState extends State<PlaylistPage> {
                                 if (mounted) setState(() {});
                               });
                             },
-                            child: MusicListTile(song: s, index: i, isCurrent: isCurrent, accent: _accent, onTap: () => _playAt(i), margin: EdgeInsets.zero),
+                            child: MusicListTile(
+                                song: s,
+                                index: i,
+                                isCurrent: isCurrent,
+                                accent: _accent,
+                                onTap: () => _playAt(i),
+                                margin: EdgeInsets.zero),
                           );
                         },
                       ),
@@ -116,7 +133,11 @@ class _PlaylistPageState extends State<PlaylistPage> {
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
       child: Row(
         children: [
-          IconOrbButton(icon: Icons.arrow_back_rounded, accent: _accent, size: 42, onTap: () => Navigator.pop(context)),
+          IconOrbButton(
+              icon: Icons.arrow_back_rounded,
+              accent: _accent,
+              size: 42,
+              onTap: () => Navigator.pop(context)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -124,7 +145,11 @@ class _PlaylistPageState extends State<PlaylistPage> {
               children: [
                 Text('播放队列', style: AppDesignTokens.title(size: 24)),
                 const SizedBox(height: 4),
-                Text(count == 0 ? '没有歌曲' : '${currentIdx + 1}/$count · 跟着当前歌曲继续播放', style: AppDesignTokens.caption(color: _accent)),
+                Text(
+                    count == 0
+                        ? '没有歌曲'
+                        : '${currentIdx + 1}/$count · 跟着当前歌曲继续播放',
+                    style: AppDesignTokens.caption(color: _accent)),
               ],
             ),
           ),

@@ -1,10 +1,9 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import '../utils/retry_helper.dart';
 import 'settings_service.dart';
 
-/// Quality tiers ordered from lowest to highest
 const List<int> _qualityOrder = [128, 192, 320, 740, 999];
 
 class AudioCacheService {
@@ -25,7 +24,6 @@ class AudioCacheService {
     return _cacheDir!;
   }
 
-  /// Clean up any leftover .tmp files from interrupted downloads
   Future<void> cleanupIncomplete() async {
     try {
       final dir = await _getCacheDir();
@@ -37,8 +35,6 @@ class AudioCacheService {
     } catch (_) {}
   }
 
-  /// Migrate old-format files (songId.ext) to new format (songId_999.ext)
-  /// Call once on startup
   Future<void> migrateOldFiles() async {
     try {
       final dir = await _getCacheDir();
@@ -51,33 +47,25 @@ class AudioCacheService {
       }
       for (final file in files) {
         final name = file.path.split('/').last.split('\\').last;
-        // Old format: songId.ext (no underscore+number before ext)
-        // New format: songId_br.ext
         if (!RegExp(r'_\d+\.[a-z0-9]+$').hasMatch(name)) {
-          // It's old format, rename to _999 (assume old downloads were lossless)
           final dotIdx = name.lastIndexOf('.');
           if (dotIdx > 0) {
             final baseName = name.substring(0, dotIdx);
             final ext = name.substring(dotIdx);
-            final newName = '${baseName}_999$ext';
-            final newPath = file.path.replaceAll(name, newName);
-            await file.rename(newPath);
+            await file
+                .rename(file.path.replaceAll(name, '${baseName}_999$ext'));
           }
         }
       }
     } catch (_) {}
   }
 
-  /// Build file path with quality: songId_br.ext
   Future<String> getFilePath(String songId, String url, int br) async {
     final dir = await _getCacheDir();
     final ext = _extractExt(url);
     return '${dir.path}/${songId}_$br.$ext';
   }
 
-  /// Find the best cached file for this songId.
-  /// Returns the path if a cached file exists with quality >= requested quality.
-  /// If only lower quality exists, returns null (caller should re-download).
   Future<String?> findCachedFile(String songId, {int? requestedBr}) async {
     final dir = await _getCacheDir();
     if (!await dir.exists()) return null;
@@ -85,59 +73,74 @@ class AudioCacheService {
     final br = requestedBr ?? SettingsService().quality.br;
 
     String? bestPath;
-    int bestBr = -1;
+    int bestRank = -1;
+    final requestedRank = _qualityRank(br);
 
     try {
       await for (final entity in dir.list()) {
-        if (entity is File) {
-          final name = entity.path.split('/').last.split('\\').last;
-          if (name.endsWith('.tmp')) continue;
-          if (name.startsWith(prefix)) {
-            if (await entity.length() > 0) {
-              // Extract br from filename: songId_br.ext
-              final afterPrefix = name.substring(prefix.length);
-              final dotIdx = afterPrefix.indexOf('.');
-              if (dotIdx > 0) {
-                final brStr = afterPrefix.substring(0, dotIdx);
-                final fileBr = int.tryParse(brStr) ?? 0;
-                if (fileBr > bestBr) {
-                  bestBr = fileBr;
-                  bestPath = entity.path;
-                }
-              }
-            }
-          }
+        if (entity is! File) continue;
+        final name = entity.path.split('/').last.split('\\').last;
+        if (name.endsWith('.tmp') || !name.startsWith(prefix)) continue;
+        if (await entity.length() <= 0) continue;
+        final afterPrefix = name.substring(prefix.length);
+        final dotIdx = afterPrefix.indexOf('.');
+        if (dotIdx <= 0) continue;
+        final fileBr = int.tryParse(afterPrefix.substring(0, dotIdx)) ?? 0;
+        final fileRank = _qualityRank(fileBr);
+        if (fileRank > bestRank) {
+          bestRank = fileRank;
+          bestPath = entity.path;
         }
       }
     } catch (_) {}
 
-    // If we have a file with quality >= requested, use it
-    if (bestPath != null && bestBr >= br) {
-      return bestPath;
-    }
-
-    // If we have a lower quality file and user wants higher, return null
-    // (caller will download higher quality and we'll delete the old one)
+    if (bestPath != null && bestRank >= requestedRank) return bestPath;
     return null;
   }
 
-  /// Delete all cached files for a songId (all qualities)
   Future<void> _deleteAllForSong(String songId, {String? exceptPath}) async {
     final dir = await _getCacheDir();
     if (!await dir.exists()) return;
     final prefix = '${songId}_';
+    final normalizedExceptPath =
+        exceptPath == null ? null : _normalizePath(exceptPath);
     try {
       await for (final entity in dir.list()) {
         if (entity is File) {
           final name = entity.path.split('/').last.split('\\').last;
+          final isExceptedFile = normalizedExceptPath != null &&
+              _normalizePath(entity.path) == normalizedExceptPath;
           if (name.startsWith(prefix) &&
               !name.endsWith('.tmp') &&
-              entity.path != exceptPath) {
+              !isExceptedFile) {
             await entity.delete();
           }
         }
       }
     } catch (_) {}
+  }
+
+  String _normalizePath(String path) =>
+      File(path).absolute.path.replaceAll('\\', '/').toLowerCase();
+
+  Future<void> commitDownloadedFile(
+    String songId,
+    String temporaryPath,
+    String finalPath,
+  ) async {
+    final temporaryFile = File(temporaryPath);
+    if (!await temporaryFile.exists() || await temporaryFile.length() <= 0) {
+      throw const FileSystemException('Downloaded audio file is empty');
+    }
+    final finalFile = File(finalPath);
+    if (await finalFile.exists()) await finalFile.delete();
+    await temporaryFile.rename(finalPath);
+    await _deleteAllForSong(songId, exceptPath: finalPath);
+  }
+
+  int _qualityRank(int br) {
+    final index = _qualityOrder.indexOf(br);
+    return index >= 0 ? index : br;
   }
 
   String _extractExt(String? url) {
@@ -153,9 +156,6 @@ class AudioCacheService {
     return 'mp3';
   }
 
-  /// Download with progress callback. Returns local file path on success.
-  /// Uses a temporary file during download; only renames to final path on complete.
-  /// Deletes any existing lower-quality cache for this song.
   Future<String?> download(
     String songId,
     String url, {
@@ -169,13 +169,10 @@ class AudioCacheService {
     try {
       path = await getFilePath(songId, url, quality);
       final file = File(path);
-
-      // Already fully cached at this quality
       if (await file.exists() && await file.length() > 0) {
         onProgress?.call(1.0);
         return path;
       }
-
       tmpFile = File('$path.tmp');
     } catch (_) {
       return null;
@@ -183,39 +180,31 @@ class AudioCacheService {
 
     try {
       return await RetryHelper.run(() async {
-        if (await tmpFile.exists()) {
-          await tmpFile.delete();
-        }
+        if (await tmpFile.exists()) await tmpFile.delete();
 
         final request = http.Request('GET', Uri.parse(url));
         request.headers['User-Agent'] = 'Mozilla/5.0';
         final response = await _client.send(request);
-
         if (response.statusCode != 200) {
           throw Exception('HTTP ${response.statusCode}');
         }
 
         final totalBytes = response.contentLength ?? 0;
-        int receivedBytes = 0;
-
+        var receivedBytes = 0;
         final sink = tmpFile.openWrite();
-        await for (final chunk in response.stream) {
-          sink.add(chunk);
-          receivedBytes += chunk.length;
-          if (totalBytes > 0) {
-            final progress = (receivedBytes / totalBytes).clamp(0.0, 1.0);
-            onProgress?.call(progress);
-          } else {
-            final mbReceived = receivedBytes / (1024 * 1024);
-            final estimatedProgress = (mbReceived / 15.0).clamp(0.0, 0.95);
-            onProgress?.call(estimatedProgress);
+        try {
+          await for (final chunk in response.stream) {
+            sink.add(chunk);
+            receivedBytes += chunk.length;
+            if (totalBytes > 0) {
+              onProgress?.call((receivedBytes / totalBytes).clamp(0.0, 1.0));
+            }
           }
+        } finally {
+          await sink.close();
         }
-        await sink.close();
 
-        if (await tmpFile.length() <= 0) {
-          throw Exception('下载文件为空');
-        }
+        if (await tmpFile.length() <= 0) throw Exception('下载文件为空');
         if (totalBytes > 0 && receivedBytes < totalBytes) {
           throw Exception('下载未完成');
         }
@@ -227,9 +216,7 @@ class AudioCacheService {
       });
     } catch (_) {
       try {
-        if (await tmpFile.exists()) {
-          await tmpFile.delete();
-        }
+        if (await tmpFile.exists()) await tmpFile.delete();
       } catch (_) {}
       return null;
     }

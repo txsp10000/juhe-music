@@ -1,4 +1,4 @@
-import Flutter
+﻿import Flutter
 import UIKit
 import AVFAudio
 import MediaPlayer
@@ -140,7 +140,7 @@ import MediaPlayer
   private func setupNowPlayingChannel(messenger: FlutterBinaryMessenger) {
     guard nowPlayingChannel == nil else { return }
     let channel = FlutterMethodChannel(
-      name: "com.miaomiao.music/nowplaying",
+      name: "com.qishui.music/nowplaying",
       binaryMessenger: messenger
     )
     nowPlayingChannel = channel
@@ -148,6 +148,7 @@ import MediaPlayer
       guard let self = self else { result(nil); return }
       if call.method == "update", let args = call.arguments as? [String: Any] {
         var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+        var artworkToLoad: String?
         if let title = args["title"] as? String, !title.isEmpty {
           info[MPMediaItemPropertyTitle] = title
         }
@@ -167,14 +168,21 @@ import MediaPlayer
         self.isPlaybackActive = playbackRate > 0
         info[MPNowPlayingInfoPropertyPlaybackRate] = playbackRate
 
-        if let artwork = self.cachedArtwork {
+        let artUri = (args["artUri"] as? String) ?? ""
+        if artUri != self.lastArtUri {
+          self.lastArtUri = artUri
+          self.cachedArtwork = nil
+          info.removeValue(forKey: MPMediaItemPropertyArtwork)
+          if !artUri.isEmpty {
+            artworkToLoad = artUri
+          }
+        } else if let artwork = self.cachedArtwork {
           info[MPMediaItemPropertyArtwork] = artwork
         }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
 
-        if let artUri = args["artUri"] as? String, !artUri.isEmpty, artUri != self.lastArtUri {
-          self.lastArtUri = artUri
-          self.loadArtwork(from: artUri)
+        if let artworkToLoad = artworkToLoad {
+          self.loadArtwork(from: artworkToLoad)
         }
         result(nil)
       }
@@ -184,12 +192,13 @@ import MediaPlayer
   private func loadArtwork(from urlString: String) {
     if urlString.hasPrefix("file://") || urlString.hasPrefix("/") {
       let path = urlString.hasPrefix("file://")
-        ? String(urlString.dropFirst(7))
+        ? (URL(string: urlString)?.path ?? String(urlString.dropFirst(7)))
         : urlString
       guard let data = FileManager.default.contents(atPath: path),
             let image = UIImage(data: data) else { return }
       let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
       DispatchQueue.main.async {
+        guard self.lastArtUri == urlString else { return }
         self.cachedArtwork = artwork
         if var info = MPNowPlayingInfoCenter.default().nowPlayingInfo {
           info[MPMediaItemPropertyArtwork] = artwork
@@ -206,6 +215,7 @@ import MediaPlayer
             let image = UIImage(data: data) else { return }
       let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
       DispatchQueue.main.async {
+        guard self.lastArtUri == urlString else { return }
         self.cachedArtwork = artwork
         if var info = MPNowPlayingInfoCenter.default().nowPlayingInfo {
           info[MPMediaItemPropertyArtwork] = artwork

@@ -10,6 +10,7 @@ class CoverCacheService {
   CoverCacheService._();
 
   Directory? _dir;
+  final Map<String, Future<Uint8List?>> _inFlightDownloads = {};
 
   Future<Directory> _getDir() async {
     if (_dir != null) return _dir!;
@@ -35,10 +36,25 @@ class CoverCacheService {
     final cached = await load(id);
     if (cached != null) return cached;
 
+    final existing = _inFlightDownloads[id];
+    if (existing != null) return existing;
+    final future = _downloadAndSave(id, url);
+    _inFlightDownloads[id] = future;
+    try {
+      return await future;
+    } finally {
+      if (identical(_inFlightDownloads[id], future)) {
+        _inFlightDownloads.remove(id);
+      }
+    }
+  }
+
+  Future<Uint8List?> _downloadAndSave(String id, String url) async {
     try {
       return await RetryHelper.run(() async {
-        final resp = await http
-            .get(Uri.parse(url), headers: {'User-Agent': 'Mozilla/5.0'});
+        final resp = await http.get(Uri.parse(url), headers: {
+          'User-Agent': 'Mozilla/5.0'
+        }).timeout(const Duration(seconds: 10));
         if (resp.statusCode == 200 && resp.bodyBytes.isNotEmpty) {
           final dir = await _getDir();
           final file = File('${dir.path}/$id.jpg');
@@ -46,7 +62,7 @@ class CoverCacheService {
           return resp.bodyBytes;
         }
         throw Exception('HTTP ${resp.statusCode}');
-      });
+      }, attempts: 3, delay: const Duration(seconds: 1));
     } catch (_) {
       return null;
     }

@@ -28,18 +28,26 @@ class AppDesignTokens {
   }
 
   static Color surfaceFor(Color bgHint, {double opacity = 0.58}) {
-    return Color.alphaBlend(bgHint.withOpacity(opacity), const Color(0xFF17100C));
+    return Color.alphaBlend(
+        bgHint.withValues(alpha: opacity), const Color(0xFF17100C));
   }
 
   static Color softPill(Color bgHint) {
-    return Color.alphaBlend(bgHint.withOpacity(0.46), const Color(0xFF2B211B));
+    return Color.alphaBlend(
+        bgHint.withValues(alpha: 0.46), const Color(0xFF2B211B));
   }
 
   static LinearGradient albumWashGradient(Color bgHint) {
     final hsl = HSLColor.fromColor(bgHint);
-    final top = hsl.withLightness((hsl.lightness + 0.10).clamp(0.16, 0.34).toDouble()).toColor();
-    final mid = hsl.withLightness((hsl.lightness + 0.02).clamp(0.12, 0.28).toDouble()).toColor();
-    final bottom = hsl.withLightness((hsl.lightness - 0.08).clamp(0.06, 0.18).toDouble()).toColor();
+    final top = hsl
+        .withLightness((hsl.lightness + 0.10).clamp(0.16, 0.34).toDouble())
+        .toColor();
+    final mid = hsl
+        .withLightness((hsl.lightness + 0.02).clamp(0.12, 0.28).toDouble())
+        .toColor();
+    final bottom = hsl
+        .withLightness((hsl.lightness - 0.08).clamp(0.06, 0.18).toDouble())
+        .toColor();
     return LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
@@ -59,15 +67,17 @@ class AppDesignTokens {
   }) {
     final base = color ?? surfaceFor(accent, opacity: 0.18);
     return BoxDecoration(
-      color: base.withOpacity(opacity),
+      color: base.withValues(alpha: opacity),
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
-        color: active ? Colors.white.withOpacity(0.22) : Colors.white.withOpacity(0.08),
+        color: active
+            ? Colors.white.withValues(alpha: 0.22)
+            : Colors.white.withValues(alpha: 0.08),
         width: 0.8,
       ),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(active ? 0.24 : 0.16),
+          color: Colors.black.withValues(alpha: active ? 0.24 : 0.16),
           blurRadius: active ? 24 : 16,
           offset: const Offset(0, 10),
         ),
@@ -76,19 +86,38 @@ class AppDesignTokens {
   }
 
   static TextStyle display({double size = 30, Color color = lyricWhite}) {
-    return TextStyle(color: color, fontSize: size, height: 1.08, fontWeight: FontWeight.w800, letterSpacing: -0.7);
+    return TextStyle(
+        color: color,
+        fontSize: size,
+        height: 1.08,
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.7);
   }
 
   static TextStyle title({double size = 20, Color color = lyricWhite}) {
-    return TextStyle(color: color, fontSize: size, height: 1.15, fontWeight: FontWeight.w800, letterSpacing: -0.25);
+    return TextStyle(
+        color: color,
+        fontSize: size,
+        height: 1.15,
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.25);
   }
 
-  static TextStyle body({double size = 15, Color color = lyricWhite, FontWeight weight = FontWeight.w500}) {
-    return TextStyle(color: color, fontSize: size, height: 1.35, fontWeight: weight);
+  static TextStyle body(
+      {double size = 15,
+      Color color = lyricWhite,
+      FontWeight weight = FontWeight.w500}) {
+    return TextStyle(
+        color: color, fontSize: size, height: 1.35, fontWeight: weight);
   }
 
   static TextStyle caption({double size = 12, Color color = quietGrey}) {
-    return TextStyle(color: color, fontSize: size, height: 1.25, fontWeight: FontWeight.w700, letterSpacing: 0.2);
+    return TextStyle(
+        color: color,
+        fontSize: size,
+        height: 1.25,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.2);
   }
 }
 
@@ -112,9 +141,13 @@ class MusicScaffoldBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = neutralize ? Color.alphaBlend(bgHint.withOpacity(0.18), AppDesignTokens.inkBlack) : bgHint;
+    final backgroundColor = neutralize
+        ? Color.alphaBlend(
+            bgHint.withValues(alpha: 0.18), AppDesignTokens.inkBlack)
+        : bgHint;
     return DecoratedBox(
-      decoration: BoxDecoration(gradient: AppDesignTokens.albumWashGradient(backgroundColor)),
+      decoration: BoxDecoration(
+          gradient: AppDesignTokens.albumWashGradient(backgroundColor)),
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -132,9 +165,9 @@ class MusicScaffoldBackground extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.black.withOpacity(0.12),
-                  Colors.black.withOpacity(0.18),
-                  Colors.black.withOpacity(0.46),
+                  Colors.black.withValues(alpha: 0.12),
+                  Colors.black.withValues(alpha: 0.18),
+                  Colors.black.withValues(alpha: 0.46),
                 ],
                 stops: const [0.0, 0.48, 1.0],
               ),

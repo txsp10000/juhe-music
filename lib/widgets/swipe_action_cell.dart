@@ -7,13 +7,19 @@ class SwipeActionCell extends StatefulWidget {
   final Color actionColor;
   final VoidCallback onAction;
 
-  const SwipeActionCell({super.key, required this.child, required this.actionLabel, required this.actionColor, required this.onAction});
+  const SwipeActionCell(
+      {super.key,
+      required this.child,
+      required this.actionLabel,
+      required this.actionColor,
+      required this.onAction});
 
   @override
   State<SwipeActionCell> createState() => _SwipeActionCellState();
 }
 
-class _SwipeActionCellState extends State<SwipeActionCell> with SingleTickerProviderStateMixin {
+class _SwipeActionCellState extends State<SwipeActionCell>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   bool _isOpen = false;
   static _SwipeActionCellState? _currentOpen;
@@ -21,7 +27,8 @@ class _SwipeActionCellState extends State<SwipeActionCell> with SingleTickerProv
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 200));
+    _controller = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 200));
   }
 
   @override
@@ -31,12 +38,23 @@ class _SwipeActionCellState extends State<SwipeActionCell> with SingleTickerProv
     super.dispose();
   }
 
-  void _close() { _controller.reverse(); _isOpen = false; if (_currentOpen == this) _currentOpen = null; }
-  void _open() { _currentOpen?._close(); _currentOpen = this; _controller.forward(); _isOpen = true; }
+  void _close() {
+    _controller.reverse();
+    _isOpen = false;
+    if (_currentOpen == this) _currentOpen = null;
+  }
+
+  void _open() {
+    _currentOpen?._close();
+    _currentOpen = this;
+    _controller.forward();
+    _isOpen = true;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final buttonWidth = 82.0 + ((widget.actionLabel.length - 2).clamp(0, 4) as num).toDouble() * 8.0;
+    final buttonWidth = 82.0 +
+        ((widget.actionLabel.length - 2).clamp(0, 4) as num).toDouble() * 8.0;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
       child: LayoutBuilder(
@@ -51,21 +69,39 @@ class _SwipeActionCellState extends State<SwipeActionCell> with SingleTickerProv
               borderRadius: BorderRadius.circular(18),
               child: Stack(
                 children: [
-                  Positioned.fill(child: Container(color: widget.actionColor.withOpacity(0.82))),
+                  Positioned.fill(
+                      child: Container(
+                          color: widget.actionColor.withValues(alpha: 0.82))),
                   Positioned(
-                    top: 0, bottom: 0, right: 0, width: buttonWidth,
+                    top: 0,
+                    bottom: 0,
+                    right: 0,
+                    width: buttonWidth,
                     child: AnimatedBuilder(
                       animation: _controller,
-                      builder: (context, child) => Transform.translate(offset: Offset(buttonWidth * (1 - _controller.value), 0), child: child),
+                      builder: (context, child) => Transform.translate(
+                          offset:
+                              Offset(buttonWidth * (1 - _controller.value), 0),
+                          child: child),
                       child: GestureDetector(
-                        onTap: () { if (_isOpen) { widget.onAction(); _close(); } },
-                        child: Center(child: Text(widget.actionLabel, style: AppDesignTokens.body(size: 15, weight: FontWeight.w900))),
+                        onTap: () {
+                          if (_isOpen) {
+                            widget.onAction();
+                            _close();
+                          }
+                        },
+                        child: Center(
+                            child: Text(widget.actionLabel,
+                                style: AppDesignTokens.body(
+                                    size: 15, weight: FontWeight.w900))),
                       ),
                     ),
                   ),
                   AnimatedBuilder(
                     animation: _controller,
-                    builder: (context, child) => Transform.translate(offset: Offset(-buttonWidth * _controller.value, 0), child: child),
+                    builder: (context, child) => Transform.translate(
+                        offset: Offset(-buttonWidth * _controller.value, 0),
+                        child: child),
                     child: widget.child,
                   ),
                 ],
