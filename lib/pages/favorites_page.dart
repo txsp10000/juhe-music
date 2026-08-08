@@ -50,8 +50,8 @@ class _FavoritesPageState extends State<FavoritesPage> {
   void _onThemeChange() {
     if (mounted) {
       setState(() {
-        _accent =
-            AppDesignTokens.readableAccent(ThemeService.accentColor.value);
+        // Favorites uses the same neutral glass treatment in both view modes.
+        _accent = AppDesignTokens.lyricWhite;
         _bgHint = ThemeService.bgHint.value;
       });
     }
@@ -103,8 +103,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
   void _playAt(int index) {
     if (_player.currentSong?.id != _songs[index].id) {
-      _player.playlist.clear();
-      _player.playlist.addAll(_songs);
+      _player.replaceQueue(_songs);
       unawaited(_player.playAt(index));
     } else if (!_player.isPlaying) {
       unawaited(_player.play());
@@ -166,14 +165,27 @@ class _FavoritesPageState extends State<FavoritesPage> {
       body: MusicScaffoldBackground(
         bgHint: _bgHint,
         accent: _accent,
+        neutralize: true,
         child: SafeArea(
           bottom: false,
           child: Column(
             children: [
               _buildHeader(),
-              Expanded(child: _buildBody()),
-              if (_editMode) _buildEditTray(),
-              if (widget.embedded) const SizedBox(height: 122),
+              Expanded(
+                child: Stack(
+                  children: [
+                    _buildBody(),
+                    if (_editMode)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: widget.embedded ? 8 : 0,
+                        child: _buildEditTray(),
+                      ),
+                  ],
+                ),
+              ),
+              if (widget.embedded && !_editMode) const SizedBox(height: 122),
             ],
           ),
         ),
@@ -235,7 +247,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
         message: '在播放页点亮爱心，歌曲会出现在这里。',
       );
     }
-    final bottomPadding = widget.embedded ? (_editMode ? 44.0 : 136.0) : 24.0;
+    final bottomPadding = widget.embedded ? (_editMode ? 168.0 : 136.0) : 104.0;
     return ListView.builder(
       controller: _scrollController,
       padding: EdgeInsets.only(top: 4, bottom: bottomPadding),

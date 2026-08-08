@@ -34,8 +34,7 @@ class _TvQueuePageState extends State<TvQueuePage> {
   Future<void> _playAt(int index) async {
     await _player.playAt(index);
     if (!mounted) return;
-    TvRoutes.requestHomeQueueFocus();
-    Navigator.of(context).pushReplacementNamed(TvRoutes.home);
+    TvRoutes.returnHome(context);
   }
 
   @override
@@ -43,9 +42,9 @@ class _TvQueuePageState extends State<TvQueuePage> {
     return TvPageScaffold(
       child: TvSongList(
         title: '播放队列',
-        subtitle: '${_player.playlist.length} 首歌曲',
-        songs: _player.playlist,
-        emptyText: '还没有播放队列，先去歌单页选择一个歌单。',
+        subtitle: '${_player.queue.length} 首歌曲',
+        songs: _player.queue,
+        emptyText: '还没有播放队列，先去场景或搜索选择歌曲。',
         onPlay: _playAt,
       ),
     );

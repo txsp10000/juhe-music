@@ -1,205 +1,344 @@
-import '../services/settings_service.dart';
-import '../data/categories.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/song.dart';
+import '../services/settings_service.dart';
 import '../utils/retry_helper.dart';
-import '../services/app_environment.dart';
 
 class MusicApi {
-  static const _base = 'https://music-api.gdstudio.xyz/api.php';
-  static const _requestTimeout = Duration(seconds: 10);
+  static const _base = 'http://pc.w8a.cn:8787';
+  static const _requestTimeout = Duration(seconds: 15);
   static final _client = http.Client();
-  static String _enc(String s) => Uri.encodeComponent(s);
+  static final Map<String, Future<TrackDetails>> _trackRequests = {};
+  static final Map<String, Future<StreamInfo>> _streamRequests = {};
 
-  static Future<String> _httpGet(String url) async {
-    final resp = await _client.get(Uri.parse(url),
-        headers: {'User-Agent': 'Mozilla/5.0'}).timeout(_requestTimeout);
-    if (resp.statusCode >= 400) throw Exception('HTTP ${resp.statusCode}');
-    return resp.body;
-  }
-
-  static Future<T> _retry<T>(Future<T> Function() block) {
-    return RetryHelper.run(
-      block,
-      attempts: 3,
-      delay: const Duration(seconds: 1),
-    );
-  }
-
-  /// 搜索歌曲（返回原始响应体，用于错误展示；[] 会失败等待后重试）
-  static Future<SearchRawResult> searchRaw(String keyword,
-      {int num = 20, int page = 1}) async {
-    final encoded = _enc(keyword);
-    return _retry(() async {
-      final url =
-          '$_base?types=search&source=netease&name=$encoded&count=$num&pages=$page';
-      final rawBody = await _httpGet(url);
-      final list = jsonDecode(rawBody);
-      if (list is! List) throw const FormatException('搜索响应格式无效');
-      final songs = list
-          .whereType<Map<String, dynamic>>()
-          .map((item) {
-            final song = Song.fromApiJson(item);
-            if (isTvApp) song.cover = '';
-            return song;
-          })
-          .where((s) => s.id.isNotEmpty)
-          .toList();
-      return SearchRawResult(songs.take(num).toList(), rawBody);
-    });
-  }
-
-  /// 获取歌单（网易云歌单ID，返回真实歌单歌曲列表；空歌单会失败等待后重试）
-  static Future<List<Song>> getPlaylist(String id) async {
-    return _retry(() async {
-      final url = '$_base?types=playlist&id=${_enc(id)}';
-      final body = await _httpGet(url);
-      final json = jsonDecode(body);
-      if (json is! Map || json['code'] != 200) throw Exception('歌单响应无效');
-      final tracks = json['playlist']?['tracks'];
-      if (tracks is! List) throw const FormatException('歌单曲目格式无效');
-      final songs = tracks
-          .whereType<Map<String, dynamic>>()
-          .map((t) {
-            final ar = t['ar'] as List? ?? [];
-            final singer = ar
-                .map((a) => a['name']?.toString() ?? '')
-                .where((n) => n.isNotEmpty)
-                .join(' / ');
-            final al = t['al'] as Map<String, dynamic>? ?? {};
-            final dt = t['dt'];
-            final sid = t['id']?.toString() ?? '';
-            final picId =
-                (al['pic_str'] ?? al['pic'] ?? al['id'] ?? '').toString();
-            final cover =
-                isTvApp ? '' : (al['picUrl'] ?? al['pic_url'] ?? '').toString();
-            return Song(
-              id: sid,
-              name: t['name'] ?? '未知歌曲',
-              singer: singer.isEmpty ? '未知歌手' : singer,
-              album: al['name'] ?? '',
-              source: 'netease',
-              picId: picId,
-              lyricId: sid,
-              duration: dt is int ? dt ~/ 1000 : 0,
-              cover: cover,
-            );
-          })
-          .where((s) => s.id.isNotEmpty)
-          .toList();
-      return songs;
-    });
-  }
-
-  /// 获取歌单基本信息（名称 + 封面URL，每次启动从网络刷新；空信息会失败等待后重试）
-  static final Map<String, PlaylistInfo> _playlistInfoCache = {};
-
-  static Future<PlaylistInfo?> getPlaylistInfo(String id) async {
-    if (!isTvApp && _playlistInfoCache.containsKey(id)) {
-      return _playlistInfoCache[id];
-    }
-    try {
-      return await _retry(() async {
-        final url = '$_base?types=playlist&id=${_enc(id)}';
-        final body = await _httpGet(url);
-        final json = jsonDecode(body);
-        if (json is! Map || json['code'] != 200) throw Exception('歌单信息响应无效');
-        final playlist = json['playlist'] as Map<String, dynamic>? ?? {};
-        final name = playlist['name']?.toString() ?? '';
-        final cover = playlist['coverImgUrl']?.toString() ?? '';
-        if (name.isEmpty) throw Exception('歌单名称为空');
-        final info = PlaylistInfo(name, id, coverUrl: isTvApp ? '' : cover);
-        if (!isTvApp) _playlistInfoCache[id] = info;
-        if (!isTvApp) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('playlist_name_$id', name);
-          await prefs.setString('playlist_cover_$id', cover);
-        }
-        return info;
-      });
-    } catch (_) {}
-    // 网络失败时用本地缓存兜底
-    if (isTvApp) return null;
-    final prefs = await SharedPreferences.getInstance();
-    final cachedName = prefs.getString('playlist_name_$id');
-    final cachedCover = prefs.getString('playlist_cover_$id');
-    if (cachedName != null) {
-      final info = PlaylistInfo(cachedName, id, coverUrl: cachedCover ?? '');
-      if (!isTvApp) _playlistInfoCache[id] = info;
-      return info;
-    }
-    return null;
-  }
-
-  /// 获取播放URL（空结果会失败等待后重试）
-  static Future<String> getPlayUrl(String trackId) async {
-    return _retry(() async {
-      final br = SettingsService().quality.br;
-      final url = '$_base?types=url&source=netease&id=${_enc(trackId)}&br=$br';
-      final body = await _httpGet(url);
-      final json = jsonDecode(body);
-      final u = json['url'] as String?;
-      if (u == null || u.isEmpty) throw Exception('播放地址为空');
-      return u;
-    });
-  }
-
-  /// 获取歌词（空结果会失败等待后重试）
-  static Future<String> getLyric(String lyricId) async {
-    try {
-      return await _retry(() async {
-        final url = '$_base?types=lyric&source=netease&id=${_enc(lyricId)}';
-        final body = await _httpGet(url);
-        final json = jsonDecode(body);
-        final lyric = json['lyric'] as String? ?? '';
-        if (lyric.trim().isEmpty) throw Exception('歌词为空');
-        return lyric;
-      });
-    } catch (_) {
-      return '';
-    }
-  }
-
-  /// 获取专辑封面URL（空结果会失败等待后重试）
-  static Future<String> getCover(String picId) async {
-    if (isTvApp) return '';
-    try {
-      return await _retry(() async {
-        final url =
-            '$_base?types=pic&source=netease&id=${_enc(picId)}&size=500';
-        final body = await _httpGet(url);
-        final json = jsonDecode(body);
-        final u = json['url'] as String?;
-        if (u == null || u.isEmpty) throw Exception('封面为空');
-        return u;
-      });
-    } catch (_) {
-      return '';
-    }
-  }
-
-  /// 批量获取封面（并发请求）
-  static Future<Map<String, String>> getCovers(List<String> picIds) async {
-    if (isTvApp) {
-      return {for (final id in picIds) id: ''};
-    }
-    final futures = picIds.map((id) async {
+  static Future<String> _httpGet(Uri uri) async {
+    final response = await _client.get(uri,
+        headers: {'User-Agent': 'SodaMusic'}).timeout(_requestTimeout);
+    if (response.statusCode >= 400) {
+      var message = 'HTTP ${response.statusCode}';
       try {
-        return MapEntry(id, await getCover(id));
+        final error = jsonDecode(response.body);
+        if (error is Map && error['error'] != null) {
+          message = error['error'].toString();
+        }
+      } catch (_) {}
+      throw Exception(message);
+    }
+    return utf8.decode(response.bodyBytes);
+  }
+
+  static Future<T> _retry<T>(Future<T> Function() action) => RetryHelper.run(
+        action,
+        attempts: 3,
+        delay: const Duration(seconds: 1),
+      );
+
+  static Future<SearchTracksResult> searchTracks(String keyword,
+      {int cursor = 0}) {
+    return _retry(() async {
+      final uri = Uri.parse('$_base/search/tracks').replace(
+        queryParameters: {'q': keyword, 'cursor': cursor.toString()},
+      );
+      final body = await _httpGet(uri);
+      final decoded = jsonDecode(body);
+      final groups = decoded is Map ? decoded['result_groups'] : null;
+      final group = groups is List && groups.isNotEmpty ? groups.first : null;
+      final data = group is Map ? group['data'] : null;
+      if (data is! List) throw const FormatException('搜索响应格式无效');
+      final songs = data
+          .whereType<Map<String, dynamic>>()
+          .map(Song.fromApiJson)
+          .where((song) => song.id.isNotEmpty)
+          .take(20)
+          .toList();
+      return SearchTracksResult(
+        songs,
+        nextCursor: group is Map ? group['next_cursor']?.toString() : null,
+        hasMore: group is Map && group['has_more'] == true,
+      );
+    });
+  }
+
+  static Future<TrackDetails> getTrackDetails(String trackId) {
+    return _trackRequests.putIfAbsent(trackId, () async {
+      try {
+        final uri = Uri.parse('$_base/track/${Uri.encodeComponent(trackId)}');
+        final decoded = jsonDecode(await _retry(() => _httpGet(uri)));
+        if (decoded is! Map || decoded['track'] is! Map) {
+          throw const FormatException('单曲详情缺少 track');
+        }
+        final lyric = decoded['lyric'];
+        return TrackDetails(
+          song: Song.fromApiJson(
+              Map<String, dynamic>.from(decoded['track'] as Map)),
+          lyric: lyric is Map ? lyric['content']?.toString() ?? '' : '',
+        );
       } catch (_) {
-        return MapEntry(id, '');
+        _trackRequests.remove(trackId);
+        rethrow;
       }
     });
-    final entries = await Future.wait(futures);
-    return Map.fromEntries(entries);
+  }
+
+  static Future<SearchPlaylistsResult> searchPlaylists(String keyword,
+      {int cursor = 0}) {
+    return _retry(() async {
+      final uri = Uri.parse('$_base/search/playlists').replace(
+        queryParameters: {'q': keyword, 'cursor': cursor.toString()},
+      );
+      final decoded = jsonDecode(await _httpGet(uri));
+      final groups = decoded is Map ? decoded['result_groups'] : null;
+      final group = groups is List && groups.isNotEmpty ? groups.first : null;
+      final data = group is Map ? group['data'] : null;
+      if (data is! List) throw const FormatException('歌单搜索响应格式无效');
+      final playlists = data
+          .whereType<Map>()
+          .map((item) {
+            final entity = item['entity'];
+            final playlist = entity is Map ? entity['playlist'] : null;
+            return playlist is Map ? PlaylistInfo.fromApiJson(playlist) : null;
+          })
+          .whereType<PlaylistInfo>()
+          .where((item) => item.id.isNotEmpty)
+          .toList();
+      return SearchPlaylistsResult(
+        playlists,
+        nextCursor: group is Map ? group['next_cursor']?.toString() : null,
+        hasMore: group is Map && group['has_more'] == true,
+      );
+    });
+  }
+
+  static Future<PlaylistPage> getPlaylistPage(String playlistId,
+      {int cursor = 0, int count = 20}) {
+    return _retry(() async {
+      final uri =
+          Uri.parse('$_base/playlist/${Uri.encodeComponent(playlistId)}')
+              .replace(queryParameters: {
+        'cursor': cursor.toString(),
+        'count': count.toString(),
+      });
+      final decoded = jsonDecode(await _httpGet(uri));
+      final resources = decoded is Map ? decoded['media_resources'] : null;
+      if (resources is! List) throw const FormatException('歌单歌曲响应格式无效');
+      final songs = _songsFromResources(resources);
+      final map = decoded is Map ? decoded : const <String, dynamic>{};
+      final playlist = map['playlist'] is Map
+          ? PlaylistInfo.fromApiJson(map['playlist'] as Map)
+          : null;
+      return PlaylistPage(
+        songs,
+        playlist: playlist,
+        nextCursor: map['next_cursor']?.toString(),
+        hasMore: map['has_more'] == true,
+      );
+    });
+  }
+
+  static Future<List<Song>> getPlaylistTracks(String playlistId) async {
+    final songs = <Song>[];
+    var cursor = 0;
+    var pageCount = 0;
+    while (true) {
+      final page = await getPlaylistPage(playlistId, cursor: cursor, count: 50);
+      songs.addAll(page.songs);
+      pageCount++;
+      final next = int.tryParse(page.nextCursor ?? '');
+      if (!page.hasMore || next == null || next <= cursor || pageCount >= 40) {
+        break;
+      }
+      cursor = next;
+    }
+    return songs;
+  }
+
+  static Future<List<Song>> getModeTracks(int sceneModeId) async {
+    final uri = Uri.parse('$_base/radio/$sceneModeId');
+    final decoded = jsonDecode(await _retry(() => _httpGet(uri)));
+    final items = decoded is Map ? decoded['items'] : null;
+    if (items is! List) throw const FormatException('模式歌曲响应格式无效');
+    return _songsFromResources(items);
+  }
+
+  static List<Song> _songsFromResources(List resources) {
+    return resources
+        .whereType<Map>()
+        .map((item) {
+          final entity = item['entity'];
+          final wrapper = entity is Map ? entity['track_wrapper'] : null;
+          final track = wrapper is Map ? wrapper['track'] : entity;
+          return track is Map
+              ? Song.fromApiJson(Map<String, dynamic>.from(track))
+              : null;
+        })
+        .whereType<Song>()
+        .where((song) => song.id.isNotEmpty)
+        .toList();
+  }
+
+  static Future<StreamInfo> getStreamInfo(String trackId) {
+    return _streamRequests.putIfAbsent(trackId, () async {
+      try {
+        final uri =
+            Uri.parse('$_base/stream/info/${Uri.encodeComponent(trackId)}');
+        final decoded = jsonDecode(await _retry(() => _httpGet(uri)));
+        final list = decoded is Map ? decoded['qualities'] : null;
+        if (list is! List) throw const FormatException('音质响应格式无效');
+        return StreamInfo(
+            trackId,
+            list
+                .whereType<Map>()
+                .map(StreamQuality.fromJson)
+                .where((q) => q.url.isNotEmpty)
+                .toList());
+      } catch (_) {
+        _streamRequests.remove(trackId);
+        rethrow;
+      }
+    });
+  }
+
+  static Future<StreamSelection> resolveStream(
+      String trackId, AudioQuality requested) async {
+    final requestedName = requested.apiValue;
+    try {
+      final info = await getStreamInfo(trackId);
+      if (info.qualities.isNotEmpty) {
+        final ranked = [...info.qualities]
+          ..sort((a, b) => b.rank.compareTo(a.rank));
+        final exact = ranked.where((q) => q.quality == requestedName).toList();
+        final targetRank = _qualityRank(requestedName);
+        final eligible = ranked.where((q) => q.rank <= targetRank).toList();
+        final chosen = exact.isNotEmpty
+            ? exact.first
+            : (eligible.isNotEmpty ? eligible.first : ranked.last);
+        return StreamSelection(
+            chosen.url.startsWith('http') ? chosen.url : '$_base${chosen.url}',
+            chosen.bitrateKbps,
+            chosen.quality);
+      }
+    } catch (_) {}
+    return StreamSelection(streamUrl(trackId, quality: requestedName),
+        requested.br, requestedName);
+  }
+
+  static String streamUrl(String trackId, {String? quality}) {
+    final selectedQuality = quality ?? SettingsService().quality.apiValue;
+    return Uri.parse('$_base/stream/${Uri.encodeComponent(trackId)}')
+        .replace(queryParameters: {'quality': selectedQuality}).toString();
+  }
+
+  static int _qualityRank(String quality) => switch (quality) {
+        'medium' => 0,
+        'higher' => 1,
+        'highest' => 2,
+        'hi_res' => 3,
+        'spatial' => 4,
+        _ => 1,
+      };
+}
+
+class SearchTracksResult {
+  final List<Song> songs;
+  final String? nextCursor;
+  final bool hasMore;
+  const SearchTracksResult(this.songs, {this.nextCursor, this.hasMore = false});
+}
+
+class SearchPlaylistsResult {
+  final List<PlaylistInfo> playlists;
+  final String? nextCursor;
+  final bool hasMore;
+  const SearchPlaylistsResult(this.playlists,
+      {this.nextCursor, this.hasMore = false});
+}
+
+class PlaylistInfo {
+  final String id;
+  final String title;
+  final String coverUrl;
+  final String description;
+  final String owner;
+  final int trackCount;
+
+  const PlaylistInfo({
+    required this.id,
+    required this.title,
+    this.coverUrl = '',
+    this.description = '',
+    this.owner = '',
+    this.trackCount = 0,
+  });
+
+  factory PlaylistInfo.fromApiJson(Map json) {
+    final owner = json['owner'];
+    return PlaylistInfo(
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? json['name']?.toString() ?? '',
+      coverUrl: buildSodaImageUrl(json['url_cover'], size: 360),
+      description: json['desc']?.toString() ?? '',
+      owner: owner is Map
+          ? (owner['nickname']?.toString() ??
+              owner['public_name']?.toString() ??
+              '')
+          : '',
+      trackCount: (json['count_tracks'] ??
+              json['resource_cnt']?['track_cnt'] ??
+              0) is num
+          ? ((json['count_tracks'] ?? json['resource_cnt']?['track_cnt'] ?? 0)
+                  as num)
+              .toInt()
+          : int.tryParse((json['count_tracks'] ??
+                      json['resource_cnt']?['track_cnt'] ??
+                      0)
+                  .toString()) ??
+              0,
+    );
   }
 }
 
-/// 搜索原始结果包装
-class SearchRawResult {
+class PlaylistPage {
   final List<Song> songs;
-  final String rawBody;
-  SearchRawResult(this.songs, this.rawBody);
+  final PlaylistInfo? playlist;
+  final String? nextCursor;
+  final bool hasMore;
+  const PlaylistPage(this.songs,
+      {this.playlist, this.nextCursor, this.hasMore = false});
+}
+
+class TrackDetails {
+  final Song song;
+  final String lyric;
+  const TrackDetails({required this.song, required this.lyric});
+}
+
+class StreamQuality {
+  final String quality;
+  final int bitrateKbps;
+  final String url;
+  final int rank;
+  const StreamQuality(this.quality, this.bitrateKbps, this.url, this.rank);
+
+  factory StreamQuality.fromJson(Map json) {
+    final quality = json['quality']?.toString() ?? '';
+    final bitrate = json['bitrate_kbps'] ?? json['bitrate'];
+    final kbps = bitrate is num
+        ? (bitrate > 1000 ? bitrate / 1000 : bitrate).round()
+        : int.tryParse(bitrate?.toString() ?? '') ?? 0;
+    return StreamQuality(quality, kbps, json['stream_url']?.toString() ?? '',
+        MusicApi._qualityRank(quality));
+  }
+}
+
+class StreamInfo {
+  final String trackId;
+  final List<StreamQuality> qualities;
+  const StreamInfo(this.trackId, this.qualities);
+}
+
+class StreamSelection {
+  final String url;
+  final int bitrateKbps;
+  final String quality;
+  const StreamSelection(this.url, this.bitrateKbps, this.quality);
 }

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import '../api/music_api.dart';
 import '../models/song.dart';
 import '../services/cover_cache_service.dart';
 import '../services/favorites_service.dart';
@@ -10,14 +11,9 @@ import '../services/settings_service.dart';
 import '../services/theme_service.dart';
 import '../theme/app_design_tokens.dart';
 import '../utils/toast.dart';
+import '../utils/lyric_parser.dart';
 import '../widgets/music_list_tile.dart';
 import 'search_result_page.dart';
-
-class _LrcLine {
-  final int timeMs;
-  final String text;
-  const _LrcLine(this.timeMs, this.text);
-}
 
 class PlayerPage extends StatefulWidget {
   final VoidCallback? onOpenDrawer;
@@ -33,7 +29,7 @@ class _PlayerPageState extends State<PlayerPage> {
   bool _isFavorite = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
-  List<_LrcLine> _parsedLrc = [];
+  List<LyricLine> _parsedLrc = [];
   bool _isDragging = false;
   double _dragValue = 0.0;
   double? _downloadProgress;
@@ -197,30 +193,7 @@ class _PlayerPageState extends State<PlayerPage> {
     }
   }
 
-  List<_LrcLine> _parseLrc(String? lyric) {
-    if (lyric == null || lyric.isEmpty) return [];
-    final lines = <_LrcLine>[];
-    final regex = RegExp(r'\[(\d{2}):(\d{2})(?:\.(\d{1,3}))?\](.*)');
-    for (final line in lyric.split('\n')) {
-      final match = regex.firstMatch(line.trim());
-      if (match == null) continue;
-      final min = int.parse(match.group(1)!);
-      final sec = int.parse(match.group(2)!);
-      final msStr = match.group(3);
-      var ms = 0;
-      if (msStr != null) {
-        ms = int.parse(msStr);
-        if (msStr.length == 1) ms *= 100;
-        if (msStr.length == 2) ms *= 10;
-      }
-      final text = match.group(4)?.trim() ?? '';
-      if (text.isNotEmpty) {
-        lines.add(_LrcLine((min * 60 + sec) * 1000 + ms, text));
-      }
-    }
-    lines.sort((a, b) => a.timeMs.compareTo(b.timeMs));
-    return lines;
-  }
+  List<LyricLine> _parseLrc(String? lyric) => parseLyrics(lyric);
 
   int _currentLrcIndex() {
     if (_parsedLrc.isEmpty) return -1;
@@ -230,7 +203,7 @@ class _PlayerPageState extends State<PlayerPage> {
     var idx = -1;
     while (left <= right) {
       final mid = (left + right) ~/ 2;
-      if (_parsedLrc[mid].timeMs <= posMs) {
+      if (_parsedLrc[mid].startMs <= posMs) {
         idx = mid;
         left = mid + 1;
       } else {
@@ -275,7 +248,20 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  void _showQualityPicker() {
+  Future<void> _showQualityPicker() async {
+    List<StreamQuality> available = const [];
+    final song = _player.currentSong;
+    if (song != null) {
+      try {
+        available = (await MusicApi.getStreamInfo(song.id)).qualities;
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    final options = available.isEmpty
+        ? AudioQuality.values.toList()
+        : AudioQuality.values
+            .where((q) => available.any((item) => item.quality == q.apiValue))
+            .toList();
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -284,8 +270,11 @@ class _PlayerPageState extends State<PlayerPage> {
         title: '音质选择',
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: AudioQuality.values.map((q) {
+          children: options.map((q) {
             final selected = SettingsService().quality == q;
+            final matching =
+                available.where((item) => item.quality == q.apiValue).toList();
+            final actual = matching.isEmpty ? null : matching.first;
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: GestureDetector(
@@ -323,7 +312,10 @@ class _PlayerPageState extends State<PlayerPage> {
                           size: 20),
                       const SizedBox(width: 12),
                       Expanded(
-                          child: Text(q.label,
+                          child: Text(
+                              actual == null
+                                  ? q.label
+                                  : '${_qualityName(q)} · ${actual.bitrateKbps}kbps',
                               style: AppDesignTokens.body(
                                   color: selected
                                       ? Colors.black87
@@ -369,19 +361,29 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   String _qualityLabel() {
+    final actual = _player.currentPlayingBr;
+    if (actual > 0 && actual < 999) return '${actual}K';
     switch (SettingsService().quality) {
-      case AudioQuality.low128:
-        return '128K';
-      case AudioQuality.medium192:
-        return '192K';
-      case AudioQuality.high320:
+      case AudioQuality.medium:
+        return '68K';
+      case AudioQuality.higher:
+        return '132K';
+      case AudioQuality.highest:
+        return '260K';
+      case AudioQuality.hiRes:
         return '320K';
-      case AudioQuality.lossless740:
-        return '16bit';
-      case AudioQuality.lossless999:
-        return '24bit';
+      case AudioQuality.spatial:
+        return '空间音频';
     }
   }
+
+  String _qualityName(AudioQuality quality) => switch (quality) {
+        AudioQuality.medium => '标准',
+        AudioQuality.higher => '高品质',
+        AudioQuality.highest => '最高',
+        AudioQuality.hiRes => 'Hi-Res',
+        AudioQuality.spatial => '空间音频',
+      };
 
   void _showPlaylistSheet() {
     showModalBottomSheet(
@@ -391,7 +393,7 @@ class _PlayerPageState extends State<PlayerPage> {
       constraints:
           BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.62),
       builder: (ctx) {
-        final songs = _player.playlist;
+        final songs = _player.queue;
         final currentIdx = _player.currentIndex;
         return _MusicSheet(
           accent: _accent,
@@ -698,19 +700,15 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   Widget _buildLyricPreview(
-      List<String> lines, double currentSize, double nextSize) {
+      List<LyricLine> lines, double currentSize, double nextSize) {
     if (lines.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(lines.first,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: AppDesignTokens.display(size: currentSize)),
+        _buildKaraokeText(lines.first, currentSize),
         for (final line in lines.skip(1)) ...[
           const SizedBox(height: 8),
-          Text(line,
+          Text(line.text,
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -720,6 +718,30 @@ class _PlayerPageState extends State<PlayerPage> {
         ],
       ],
     );
+  }
+
+  Widget _buildKaraokeText(LyricLine line, double size) {
+    final elapsed = _position.inMilliseconds;
+    final completed = lyricTextAt(line, elapsed);
+    final style = AppDesignTokens.display(size: size);
+    if (completed.isEmpty || completed.length >= line.text.length) {
+      return Text(line.text,
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: style);
+    }
+    return RichText(
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        text: TextSpan(children: [
+          TextSpan(text: completed, style: style.copyWith(color: _accent)),
+          TextSpan(
+              text: line.text.substring(completed.length),
+              style: style.copyWith(
+                  color: AppDesignTokens.warmWhite.withValues(alpha: 0.4))),
+        ]));
   }
 
   Widget _buildSocialActions() {
@@ -837,20 +859,22 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  List<String> _visibleLyricTexts(Song song, int count) {
+  List<LyricLine> _visibleLyricTexts(Song song, int count) {
     final idx = _currentLrcIndex();
     if (idx >= 0 && idx < _parsedLrc.length) {
       final lines = _parsedLrc
           .skip(idx)
           .take(count)
-          .map((l) => l.text)
-          .where((t) => t.isNotEmpty)
+          .where((l) => l.text.isNotEmpty)
           .toList();
       if (lines.isNotEmpty) return lines;
     }
     final first = _firstLyric(song.lyric);
     final fallback = song.album.isNotEmpty ? song.album : '何必沾惹愁滋味';
-    return first == fallback ? [first] : [first, fallback];
+    return [
+      LyricLine(0, 0, [LyricSyllable(0, 0, first)]),
+      LyricLine(0, 0, [LyricSyllable(0, 0, fallback)])
+    ];
   }
 
   String _firstLyric(String? lyric) {
@@ -859,6 +883,7 @@ class _PlayerPageState extends State<PlayerPage> {
         .split('\n')
         .firstWhere((l) => l.trim().isNotEmpty, orElse: () => '纵此生也不过百岁')
         .replaceAll(RegExp(r'\[.*?\]'), '')
+        .replaceAll(RegExp(r'<\d+,\d+,\d+>'), '')
         .trim();
     return line.isEmpty ? '纵此生也不过百岁' : line;
   }

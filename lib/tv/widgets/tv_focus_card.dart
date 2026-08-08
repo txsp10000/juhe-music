@@ -81,6 +81,7 @@ class _TvFocusCardState extends State<TvFocusCard> {
         event.logicalKey == LogicalKeyboardKey.enter ||
         event.logicalKey == LogicalKeyboardKey.space;
     if (!isConfirm) return KeyEventResult.ignored;
+    if (event is KeyRepeatEvent) return KeyEventResult.handled;
     if (widget.onLongPress == null) {
       if (event is KeyDownEvent) {
         _activate();

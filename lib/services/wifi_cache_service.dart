@@ -63,9 +63,10 @@ class WifiCacheService {
 
         // 获取播放地址并下载
         try {
-          final url = await MusicApi.getPlayUrl(song.id);
-          if (url.isEmpty) continue;
-          await cache.download(song.id, url, br: br);
+          final stream =
+              await MusicApi.resolveStream(song.id, SettingsService().quality);
+          if (stream.url.isEmpty) continue;
+          await cache.download(song.id, stream.url, br: stream.bitrateKbps);
         } catch (_) {
           continue;
         }

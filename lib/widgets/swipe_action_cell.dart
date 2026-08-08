@@ -69,9 +69,6 @@ class _SwipeActionCellState extends State<SwipeActionCell>
               borderRadius: BorderRadius.circular(18),
               child: Stack(
                 children: [
-                  Positioned.fill(
-                      child: Container(
-                          color: widget.actionColor.withValues(alpha: 0.82))),
                   Positioned(
                     top: 0,
                     bottom: 0,
@@ -83,17 +80,20 @@ class _SwipeActionCellState extends State<SwipeActionCell>
                           offset:
                               Offset(buttonWidth * (1 - _controller.value), 0),
                           child: child),
-                      child: GestureDetector(
-                        onTap: () {
-                          if (_isOpen) {
-                            widget.onAction();
-                            _close();
-                          }
-                        },
-                        child: Center(
-                            child: Text(widget.actionLabel,
-                                style: AppDesignTokens.body(
-                                    size: 15, weight: FontWeight.w900))),
+                      child: ColoredBox(
+                        color: widget.actionColor.withValues(alpha: 0.82),
+                        child: GestureDetector(
+                          onTap: () {
+                            if (_isOpen) {
+                              widget.onAction();
+                              _close();
+                            }
+                          },
+                          child: Center(
+                              child: Text(widget.actionLabel,
+                                  style: AppDesignTokens.body(
+                                      size: 15, weight: FontWeight.w900))),
+                        ),
                       ),
                     ),
                   ),

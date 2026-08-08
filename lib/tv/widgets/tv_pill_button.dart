@@ -31,44 +31,52 @@ class TvPillButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final metrics = TvLayoutMetrics.of(context);
-    return TvFocusCard(
-      onTap: onTap,
-      autofocus: autofocus,
-      focusNode: focusNode,
-      onKeyEvent: onKeyEvent,
-      radius: metrics.value(999, minimum: 18),
-      focusedScale: 1.04,
-      color: selected
-          ? TvTokens.focus.withValues(alpha: 0.18)
-          : Colors.black.withValues(alpha: 0.14),
-      borderColor: borderColor ?? Colors.white.withValues(alpha: 0.22),
-      padding: EdgeInsets.symmetric(
-        horizontal: metrics.value(26, minimum: 14),
-        vertical: metrics.value(16, minimum: 10),
-      ),
-      child: SizedBox(
-        width: fullWidth ? double.infinity : null,
-        child: Row(
-          mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (icon != null) ...[
-              Icon(
-                icon,
-                size: metrics.value(26, minimum: 18),
-                color: selected ? TvTokens.focus : TvTokens.text,
+    return Semantics(
+      button: true,
+      label: label,
+      enabled: onTap != null,
+      excludeSemantics: true,
+      child: TvFocusCard(
+        onTap: onTap,
+        autofocus: autofocus,
+        focusNode: focusNode,
+        onKeyEvent: onKeyEvent,
+        radius: metrics.value(999, minimum: 18),
+        focusedScale: fullWidth ? 1.015 : 1.035,
+        color: selected
+            ? TvTokens.focus.withValues(alpha: 0.18)
+            : Colors.black.withValues(alpha: 0.14),
+        borderColor: borderColor ?? Colors.white.withValues(alpha: 0.22),
+        padding: EdgeInsets.symmetric(
+          horizontal: metrics.value(26, minimum: 14),
+          vertical: metrics.value(16, minimum: 10),
+        ),
+        child: SizedBox(
+          width: fullWidth ? double.infinity : null,
+          child: Row(
+            mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (icon != null) ...[
+                Icon(
+                  icon,
+                  size: metrics.value(26, minimum: 18),
+                  color: selected ? TvTokens.focus : TvTokens.text,
+                ),
+                SizedBox(width: metrics.value(10, minimum: 6)),
+              ],
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TvTokens.body(
+                  size: metrics.font(24),
+                  weight: FontWeight.w700,
+                  color: selected ? TvTokens.focus : TvTokens.text,
+                ),
               ),
-              SizedBox(width: metrics.value(10, minimum: 6)),
             ],
-            Text(
-              label,
-              style: TvTokens.body(
-                size: metrics.font(24),
-                weight: FontWeight.w700,
-                color: selected ? TvTokens.focus : TvTokens.text,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

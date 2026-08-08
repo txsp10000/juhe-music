@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import '../api/music_api.dart';
-import '../data/categories.dart';
+import '../models/listening_mode.dart';
 import '../models/song.dart';
 import '../services/player_service.dart';
+import '../services/favorites_service.dart';
 import '../services/theme_service.dart';
 import '../theme/app_design_tokens.dart';
 import '../utils/toast.dart';
@@ -27,7 +27,7 @@ class _MainPageState extends State<MainPage> {
   Color _bgHint = AppDesignTokens.inkBlack;
 
   bool _drawerOpen = false;
-  int _playlistLoadGeneration = 0;
+  int _modeLoadGeneration = 0;
 
   @override
   void initState() {
@@ -115,10 +115,12 @@ class _MainPageState extends State<MainPage> {
           bottom: 0,
           width: panelWidth,
           child: ModeDrawer(
-            onSelectPlaylist: _loadAndPlay,
+            onSelectMode: _loadAndPlay,
+            onOpenCurrentMode: _openCurrentMode,
             onOpenFavorites: _openFavorites,
             onRandomPlay: _randomPlay,
             onClose: _closeDrawer,
+            currentMode: _player.activeMode,
           ),
         ),
       ],
@@ -133,47 +135,51 @@ class _MainPageState extends State<MainPage> {
     if (mounted) setState(() => _drawerOpen = false);
   }
 
-  void _loadAndPlay(PlaylistInfo pl) {
-    unawaited(_loadAndPlayAsync(pl));
+  void _openCurrentMode() {
+    if (mounted) setState(() => _tab = 0);
   }
 
-  Future<void> _loadAndPlayAsync(PlaylistInfo pl) async {
-    final generation = ++_playlistLoadGeneration;
+  void _loadAndPlay(ListeningMode mode) {
+    unawaited(_loadAndPlayAsync(mode));
+  }
+
+  Future<void> _loadAndPlayAsync(ListeningMode mode) async {
+    final generation = ++_modeLoadGeneration;
     _closeDrawer();
-    Toast.show(context, '正在加载「${pl.name}」...');
+    Toast.show(context, '正在加载「${mode.name}」...');
     try {
-      final songs = await MusicApi.getPlaylist(pl.id);
-      if (!mounted || generation != _playlistLoadGeneration) return;
+      final songs = await MusicApi.getModeTracks(mode.sceneModeId);
+      if (!mounted || generation != _modeLoadGeneration) return;
       if (songs.isEmpty) {
-        Toast.show(context, '歌单暂时没有歌曲');
+        Toast.show(context, '这个模式暂时没有歌曲');
         return;
       }
-      _player.playlist.clear();
-      _player.playlist.addAll(songs);
+      _player.replaceQueue(songs, mode: mode);
       await _player.playAt(0);
     } catch (_) {
-      if (mounted && generation == _playlistLoadGeneration) {
-        Toast.show(context, '网络或接口异常，歌单加载失败');
+      if (mounted && generation == _modeLoadGeneration) {
+        Toast.show(context, '网络或接口异常，模式加载失败');
       }
     }
   }
 
   Future<void> _openFavorites() async {
     _closeDrawer();
+    final songs = await FavoritesService.load();
     if (!mounted) return;
-    setState(() => _tab = 2);
+    if (songs.isEmpty) {
+      Toast.show(context, '收藏里还没有歌曲');
+      return;
+    }
+    _player.replaceQueue(songs);
+    await _player.playAt(0);
+    if (mounted) setState(() => _tab = 0);
   }
 
   void _randomPlay() {
-    final playlists =
-        playlistCategories.values.expand((items) => items).toList();
-    if (playlists.isEmpty) {
-      _closeDrawer();
-      Toast.show(context, '暂无可随机播放的歌单');
-      return;
-    }
-    final random = Random();
-    _loadAndPlay(playlists[random.nextInt(playlists.length)]);
+    final mode = listeningModes[
+        DateTime.now().microsecondsSinceEpoch % listeningModes.length];
+    _loadAndPlay(mode);
   }
 
   Widget _buildBottomNav() {

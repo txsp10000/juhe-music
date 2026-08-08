@@ -20,17 +20,21 @@ class _TvSearchPageState extends State<TvSearchPage> {
   late final FocusNode _searchFocusNode;
   final _historyFocusNode = FocusNode();
   List<String> _history = [];
+  bool _editing = false;
 
   @override
   void initState() {
     super.initState();
     _searchFocusNode = FocusNode(onKeyEvent: _handleSearchInputKey);
+    _searchFocusNode.addListener(_onSearchFocusChanged);
     _loadHistory();
   }
 
   @override
   void dispose() {
-    _searchFocusNode.dispose();
+    _searchFocusNode
+      ..removeListener(_onSearchFocusChanged)
+      ..dispose();
     _historyFocusNode.dispose();
     _searchController.dispose();
     super.dispose();
@@ -39,6 +43,16 @@ class _TvSearchPageState extends State<TvSearchPage> {
   Future<void> _loadHistory() async {
     final history = await SearchHistoryService.load();
     if (mounted) setState(() => _history = history);
+  }
+
+  void _onSearchFocusChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _startEditing() {
+    if (!_editing) setState(() => _editing = true);
+    _searchFocusNode.requestFocus();
+    SystemChannels.textInput.invokeMethod<void>('TextInput.show');
   }
 
   KeyEventResult _moveFocusOnArrow(
@@ -67,7 +81,7 @@ class _TvSearchPageState extends State<TvSearchPage> {
     }
     if (event.logicalKey == LogicalKeyboardKey.select ||
         event.logicalKey == LogicalKeyboardKey.enter) {
-      SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+      _startEditing();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -76,6 +90,8 @@ class _TvSearchPageState extends State<TvSearchPage> {
   Future<void> _search() async {
     final keyword = _searchController.text.trim();
     if (keyword.isEmpty) return;
+    setState(() => _editing = false);
+    await SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
     await SearchHistoryService.save(keyword);
     if (!mounted) return;
     await Navigator.of(context)
@@ -128,12 +144,20 @@ class _TvSearchPageState extends State<TvSearchPage> {
               color: Colors.transparent,
               borderRadius:
                   BorderRadius.circular(metrics.value(24, minimum: 14)),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+              border: Border.all(
+                color: _searchFocusNode.hasFocus
+                    ? TvTokens.focus
+                    : Colors.white.withValues(alpha: 0.1),
+                width: _searchFocusNode.hasFocus ? 3 : 1,
+              ),
             ),
             child: TextField(
               autofocus: true,
+              readOnly: !_editing,
+              showCursor: _editing,
               controller: _searchController,
               focusNode: _searchFocusNode,
+              onTap: _startEditing,
               style: TvTokens.body(
                   size: metrics.font(24), weight: FontWeight.w700),
               textInputAction: TextInputAction.search,
@@ -143,7 +167,7 @@ class _TvSearchPageState extends State<TvSearchPage> {
                 icon: Icon(Icons.search_rounded,
                     color: TvTokens.muted,
                     size: metrics.value(28, minimum: 20)),
-                hintText: '输入歌名或者全拼',
+                hintText: _editing ? '输入歌名或者全拼' : '按确认键开始输入',
                 hintStyle: TvTokens.body(
                     size: metrics.font(22), color: TvTokens.muted),
               ),
@@ -178,7 +202,7 @@ class _TvSearchPageState extends State<TvSearchPage> {
                       final keyword = history[index];
                       return TvSearchActionButton(
                         label: keyword,
-                        autofocus: index == 0,
+                        autofocus: false,
                         focusNode: index == 0 ? _historyFocusNode : null,
                         onKeyEvent: index == 0
                             ? (_, event) => _moveFocusOnArrow(event,

@@ -37,11 +37,12 @@ class TvLayoutMetrics {
 
   double font(double base) => value(base, minimum: base * 0.62);
 
-  double get edge => value(36, minimum: 18);
+  /// TV content must remain visible on panels that still apply overscan.
+  double get edge => (size.width * 0.05).clamp(36.0, 96.0).toDouble();
 
-  double get topInset => value(24, minimum: 12);
+  double get topInset => (size.height * 0.05).clamp(24.0, 54.0).toDouble();
 
-  double get bottomInset => value(24, minimum: 12);
+  double get bottomInset => (size.height * 0.05).clamp(24.0, 54.0).toDouble();
 
   double get navigationWidth => value(74, minimum: 48);
 

@@ -1,20 +1,25 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
 import '../api/music_api.dart';
 import '../models/song.dart';
 import '../services/favorites_service.dart';
 import '../services/player_service.dart';
 import '../services/theme_service.dart';
 import '../theme/app_design_tokens.dart';
+import '../utils/toast.dart';
 import '../widgets/glass_panel.dart';
 import '../widgets/music_list_tile.dart';
-import '../utils/toast.dart';
+import 'playlist_detail_page.dart';
+
+enum _SearchType { tracks, playlists }
 
 class SearchResultPage extends StatefulWidget {
   final String keyword;
   final bool fromPlayer;
   final VoidCallback? onShowPlayer;
+
   const SearchResultPage(
       {super.key,
       required this.keyword,
@@ -27,133 +32,100 @@ class SearchResultPage extends StatefulWidget {
 
 class _SearchResultPageState extends State<SearchResultPage> {
   final _player = PlayerService();
-  bool _loading = true;
-  bool _isLoadingMore = false;
-  int _currentPage = 1;
-  bool _hasMore = true;
+  _SearchType _type = _SearchType.tracks;
   List<Song> _songs = [];
+  List<PlaylistInfo> _playlists = [];
   final Set<String> _favoriteIds = {};
-  String _errorMsg = '';
-  Color _accent = AppDesignTokens.lyricWhite;
-  Color _bgHint = AppDesignTokens.inkBlack;
+  bool _loading = true;
+  bool _loadingMore = false;
+  String? _error;
+  String? _trackCursor = '0';
+  String? _playlistCursor = '0';
+  bool _tracksHaveMore = true;
+  bool _playlistsHaveMore = true;
 
   @override
   void initState() {
     super.initState();
-    _initialLoad();
+    _loadInitial();
     _loadFavorites();
-    _onThemeChange();
-    ThemeService.accentColor.addListener(_onThemeChange);
-    ThemeService.bgHint.addListener(_onThemeChange);
-  }
-
-  void _onThemeChange() {
-    if (mounted) {
-      setState(() {
-        _accent =
-            AppDesignTokens.readableAccent(ThemeService.accentColor.value);
-        _bgHint = ThemeService.bgHint.value;
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    ThemeService.accentColor.removeListener(_onThemeChange);
-    ThemeService.bgHint.removeListener(_onThemeChange);
-    super.dispose();
-  }
-
-  Future<void> _initialLoad() async {
-    await _search();
-    if (mounted) setState(() => _loading = false);
-  }
-
-  void _retryInitialLoad() {
-    setState(() {
-      _loading = true;
-      _errorMsg = '';
-      _currentPage = 1;
-      _hasMore = true;
-    });
-    unawaited(_initialLoad());
   }
 
   Future<void> _loadFavorites() async {
-    final favorites = await FavoritesService.load();
-    _favoriteIds
-      ..clear()
-      ..addAll(favorites.map((s) => s.id));
+    final songs = await FavoritesService.load();
+    _favoriteIds.addAll(songs.map((song) => song.id));
     if (mounted) setState(() {});
   }
 
-  Future<void> _search({bool append = false}) async {
+  Future<void> _loadInitial() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      final result =
-          await MusicApi.searchRaw(widget.keyword, num: 20, page: _currentPage);
+      final results = await Future.wait([
+        MusicApi.searchTracks(widget.keyword),
+        MusicApi.searchPlaylists(widget.keyword)
+      ]);
       if (!mounted) return;
-      if (result.songs.isNotEmpty) {
-        final coverTargets = result.songs.take(8).toList();
-        final picIds = coverTargets
-            .map((s) => s.picId.isNotEmpty ? s.picId : s.id)
-            .toList();
-        MusicApi.getCovers(picIds).then((covers) {
-          if (!mounted) return;
-          for (final s in coverTargets) {
-            final key = s.picId.isNotEmpty ? s.picId : s.id;
-            final cover = covers[key];
-            if (cover != null && cover.isNotEmpty) s.cover = cover;
-          }
-          setState(() {});
-        });
-        setState(() {
-          if (append) {
-            _songs.addAll(result.songs);
-          } else {
-            _songs = result.songs;
-          }
-          _hasMore = result.songs.length >= 20;
-          _isLoadingMore = false;
-        });
-      } else {
-        setState(() {
-          if (!append) _errorMsg = '未找到结果';
-          _hasMore = false;
-          _isLoadingMore = false;
-        });
-      }
-    } catch (_) {
-      if (!mounted) return;
+      final tracks = results[0] as SearchTracksResult;
+      final playlists = results[1] as SearchPlaylistsResult;
       setState(() {
-        _loading = false;
-        if (append) {
-          _currentPage = (_currentPage - 1).clamp(1, 1 << 30);
-          _hasMore = true;
-        } else {
-          _hasMore = false;
-        }
-        _isLoadingMore = false;
-        if (!append) _errorMsg = '搜索失败';
+        _songs = tracks.songs;
+        _playlists = playlists.playlists;
+        _trackCursor = tracks.nextCursor;
+        _playlistCursor = playlists.nextCursor;
+        _tracksHaveMore = tracks.hasMore && tracks.nextCursor != null;
+        _playlistsHaveMore = playlists.hasMore && playlists.nextCursor != null;
       });
-      if (append) Toast.show(context, '加载更多失败，上滑可重试');
+    } catch (_) {
+      if (mounted) setState(() => _error = '搜索失败，请检查网络后重试。');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _loadNextPage() async {
-    if (!_hasMore || _isLoadingMore) return;
-    _currentPage++;
-    setState(() => _isLoadingMore = true);
-    await _search(append: true);
+  Future<void> _loadMore() async {
+    if (_loadingMore) return;
+    final isTracks = _type == _SearchType.tracks;
+    final cursor = isTracks ? _trackCursor : _playlistCursor;
+    final hasMore = isTracks ? _tracksHaveMore : _playlistsHaveMore;
+    if (!hasMore || cursor == null) return;
+    setState(() => _loadingMore = true);
+    try {
+      if (isTracks) {
+        final result = await MusicApi.searchTracks(widget.keyword,
+            cursor: int.tryParse(cursor) ?? 0);
+        if (mounted) {
+          setState(() {
+            _songs.addAll(result.songs);
+            _trackCursor = result.nextCursor;
+            _tracksHaveMore = result.hasMore && result.nextCursor != null;
+          });
+        }
+      } else {
+        final result = await MusicApi.searchPlaylists(widget.keyword,
+            cursor: int.tryParse(cursor) ?? 0);
+        if (mounted) {
+          setState(() {
+            _playlists.addAll(result.playlists);
+            _playlistCursor = result.nextCursor;
+            _playlistsHaveMore = result.hasMore && result.nextCursor != null;
+          });
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        Toast.show(context, '加载更多失败，上滑可重试');
+      }
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
   }
 
   void _playAt(int index) {
-    if (_player.currentSong?.id != _songs[index].id) {
-      _player.playlist.clear();
-      _player.playlist.addAll(_songs);
-      unawaited(_player.playAt(index));
-    } else if (!_player.isPlaying) {
-      unawaited(_player.play());
-    }
+    _player.replaceQueue(_songs);
+    unawaited(_player.playAt(index));
     if (widget.fromPlayer) {
       Navigator.pop(context);
     } else if (widget.onShowPlayer != null) {
@@ -163,174 +135,209 @@ class _SearchResultPageState extends State<SearchResultPage> {
   }
 
   Future<void> _toggleFavorite(Song song) async {
-    if (_favoriteIds.contains(song.id)) {
+    if (_favoriteIds.remove(song.id)) {
       await FavoritesService.remove(song);
-      _favoriteIds.remove(song.id);
     } else {
-      await FavoritesService.save(song);
       _favoriteIds.add(song.id);
+      await FavoritesService.save(song);
     }
     if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
+    final accent =
+        AppDesignTokens.readableAccent(ThemeService.accentColor.value);
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: MusicScaffoldBackground(
-        bgHint: _bgHint,
-        accent: _accent,
+        bgHint: ThemeService.bgHint.value,
+        accent: accent,
         child: SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(),
-              Expanded(child: _buildBody()),
-            ],
-          ),
-        ),
+            child: Column(children: [
+          _header(accent),
+          _tabs(accent),
+          Expanded(child: _body(accent)),
+        ])),
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 10),
-      child: Row(
-        children: [
+  Widget _header(Color accent) => Padding(
+        padding: const EdgeInsets.fromLTRB(18, 12, 18, 10),
+        child: Row(children: [
           IconOrbButton(
               icon: Icons.arrow_back_rounded,
-              accent: _accent,
+              accent: accent,
               size: 42,
               onTap: () => Navigator.pop(context)),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(_loading ? '搜索中' : widget.keyword,
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(widget.keyword,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppDesignTokens.title(size: 22)),
                 const SizedBox(height: 4),
-                Text(_loading ? '正在翻找音乐房间' : '共 ${_songs.length} 首歌',
-                    style: AppDesignTokens.caption(color: _accent)),
-              ],
-            ),
-          ),
-        ],
+                Text(
+                    _type == _SearchType.tracks
+                        ? '${_songs.length} 首歌曲'
+                        : '${_playlists.length} 个歌单',
+                    style: AppDesignTokens.caption(color: accent)),
+              ])),
+        ]),
+      );
+
+  Widget _tabs(Color accent) => Padding(
+        padding: const EdgeInsets.fromLTRB(18, 2, 18, 12),
+        child: Row(children: [
+          _tab('歌曲', _SearchType.tracks, accent),
+          const SizedBox(width: 10),
+          _tab('歌单', _SearchType.playlists, accent),
+        ]),
+      );
+
+  Widget _tab(String label, _SearchType type, Color accent) {
+    final selected = _type == type;
+    return Expanded(
+        child: GestureDetector(
+      onTap: () => setState(() => _type = type),
+      child: Container(
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+            color: selected
+                ? accent.withValues(alpha: 0.18)
+                : Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: selected ? accent : Colors.white12)),
+        child: Text(label,
+            style: AppDesignTokens.body(size: 15, weight: FontWeight.w800)),
       ),
+    ));
+  }
+
+  Widget _body(Color accent) {
+    if (_loading) {
+      return Center(child: CircularProgressIndicator(color: accent));
+    }
+    if (_error != null) {
+      return MusicEmptyState(
+          accent: accent,
+          icon: Icons.wifi_off_rounded,
+          title: '搜索失败',
+          message: _error!,
+          action:
+              TextButton(onPressed: _loadInitial, child: const Text('重新搜索')));
+    }
+    final empty =
+        _type == _SearchType.tracks ? _songs.isEmpty : _playlists.isEmpty;
+    if (empty) {
+      return MusicEmptyState(
+          accent: accent,
+          icon: Icons.search_off_rounded,
+          title: '没有找到结果',
+          message: '换个关键词试试。');
+    }
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (notification.metrics.pixels >=
+            notification.metrics.maxScrollExtent - 100) {
+          unawaited(_loadMore());
+        }
+        return false;
+      },
+      child: _type == _SearchType.tracks
+          ? _songList(accent)
+          : _playlistList(accent),
     );
   }
 
-  Widget _buildBody() {
-    if (_loading) {
-      return MusicEmptyState(
-          accent: _accent,
-          icon: Icons.graphic_eq_rounded,
-          title: '正在搜索',
-          message: '把相关歌曲从云端唱片箱里找出来。');
-    }
-    if (_songs.isEmpty && !_isLoadingMore) {
-      return MusicEmptyState(
-        accent: _accent,
-        icon: _errorMsg == '搜索失败'
-            ? Icons.wifi_off_rounded
-            : Icons.search_off_rounded,
-        title: _errorMsg.isNotEmpty ? _errorMsg : '没有找到相关歌曲',
-        message: _errorMsg == '搜索失败' ? '网络或接口暂时没有回应，稍后再试。' : '换个歌名或歌手试试。',
-        action: _errorMsg == '搜索失败'
-            ? GestureDetector(
-                onTap: _retryInitialLoad,
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  child: Text('重新搜索'),
-                ),
-              )
-            : null,
+  Widget _songList(Color accent) => ListView.builder(
+        padding: const EdgeInsets.only(top: 4, bottom: 24),
+        itemCount: _songs.length + (_loadingMore ? 1 : 0),
+        itemBuilder: (_, index) {
+          if (index == _songs.length) {
+            return const Padding(
+                padding: EdgeInsets.all(18),
+                child: Center(child: CircularProgressIndicator()));
+          }
+          final song = _songs[index];
+          return MusicListTile(
+              song: song,
+              index: index,
+              isCurrent: _player.currentSong?.id == song.id,
+              accent: accent,
+              onTap: () => _playAt(index),
+              trailing: IconButton(
+                  onPressed: () => _toggleFavorite(song),
+                  icon: Icon(_favoriteIds.contains(song.id)
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded)));
+        },
       );
-    }
-    return Stack(
-      children: [
-        NotificationListener<ScrollNotification>(
-          onNotification: (notification) {
-            if (notification is ScrollEndNotification &&
-                notification.metrics.pixels >=
-                    notification.metrics.maxScrollExtent - 100 &&
-                !_isLoadingMore &&
-                _hasMore) {
-              _loadNextPage();
-            }
-            return false;
-          },
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(0, 4, 0, 24),
-            itemCount: _songs.length + (_hasMore ? 1 : 0),
-            itemBuilder: (_, i) {
-              if (i >= _songs.length) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  child: Center(
-                      child: CircularProgressIndicator(
-                          color: _accent, strokeWidth: 2.4)),
-                );
-              }
-              final s = _songs[i];
-              final isCurrent = _player.currentSong?.id == s.id;
-              final favored = _favoriteIds.contains(s.id);
-              return MusicListTile(
-                song: s,
-                index: i,
-                isCurrent: isCurrent,
-                accent: _accent,
-                onTap: () => _playAt(i),
-                trailing: GestureDetector(
-                  onTap: () => _toggleFavorite(s),
-                  behavior: HitTestBehavior.opaque,
-                  child: Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Icon(
-                        favored
-                            ? Icons.favorite_rounded
-                            : Icons.favorite_border_rounded,
-                        color: favored
-                            ? AppDesignTokens.danger
-                            : AppDesignTokens.quietGrey,
-                        size: 23),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        if (_isLoadingMore)
-          Positioned.fill(
+
+  Widget _playlistList(Color accent) => ListView.builder(
+        padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
+        itemCount: _playlists.length + (_loadingMore ? 1 : 0),
+        itemBuilder: (_, index) {
+          if (index == _playlists.length) {
+            return const Padding(
+                padding: EdgeInsets.all(18),
+                child: Center(child: CircularProgressIndicator()));
+          }
+          final playlist = _playlists[index];
+          return GestureDetector(
+            onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => PlaylistDetailPage(
+                        playlist: playlist,
+                        fromPlayer: widget.fromPlayer,
+                        onShowPlayer: widget.onShowPlayer))),
             child: Container(
-              color: AppDesignTokens.inkBlack.withValues(alpha: 0.42),
-              child: Center(
-                child: GlassPanel(
-                  accent: _accent,
-                  radius: 22,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                              color: _accent, strokeWidth: 2)),
-                      const SizedBox(width: 12),
-                      Text('加载更多',
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Row(children: [
+                ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: SizedBox(
+                        width: 64,
+                        height: 64,
+                        child: playlist.coverUrl.isEmpty
+                            ? Icon(Icons.queue_music_rounded, color: accent)
+                            : Image.network(playlist.coverUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Icon(
+                                    Icons.queue_music_rounded,
+                                    color: accent)))),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(playlist.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: AppDesignTokens.body(
-                              size: 14, color: AppDesignTokens.quietGrey)),
-                    ],
-                  ),
-                ),
-              ),
+                              size: 16, weight: FontWeight.w800)),
+                      const SizedBox(height: 5),
+                      Text(
+                          '${playlist.trackCount} 首${playlist.owner.isEmpty ? '' : ' · ${playlist.owner}'}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppDesignTokens.caption(
+                              color: AppDesignTokens.quietGrey)),
+                    ])),
+                const Icon(Icons.chevron_right_rounded),
+              ]),
             ),
-          ),
-      ],
-    );
-  }
+          );
+        },
+      );
 }

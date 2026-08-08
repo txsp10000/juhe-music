@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_environment.dart';
 
@@ -24,18 +23,6 @@ class TvCacheCleanupService {
         if (await directory.exists()) {
           await directory.delete(recursive: true);
         }
-      }
-    } catch (_) {}
-
-    try {
-      final preferences = await SharedPreferences.getInstance();
-      final cachedPlaylistKeys = preferences.getKeys().where(
-            (key) =>
-                key.startsWith('playlist_name_') ||
-                key.startsWith('playlist_cover_'),
-          );
-      for (final key in cachedPlaylistKeys) {
-        await preferences.remove(key);
       }
     } catch (_) {}
   }

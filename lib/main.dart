@@ -15,7 +15,6 @@ Future<void> _bootstrapBackgroundServices() async {
       await TvCacheCleanupService.clearLegacyMediaCaches();
     } else {
       await AudioCacheService().cleanupIncomplete();
-      await AudioCacheService().migrateOldFiles();
     }
     await PlayerService.init();
   } catch (e, st) {

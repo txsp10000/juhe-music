@@ -4,8 +4,6 @@ import 'package:http/http.dart' as http;
 import '../utils/retry_helper.dart';
 import 'settings_service.dart';
 
-const List<int> _qualityOrder = [128, 192, 320, 740, 999];
-
 class AudioCacheService {
   static final AudioCacheService _instance = AudioCacheService._();
   factory AudioCacheService() => _instance;
@@ -73,8 +71,7 @@ class AudioCacheService {
     final br = requestedBr ?? SettingsService().quality.br;
 
     String? bestPath;
-    int bestRank = -1;
-    final requestedRank = _qualityRank(br);
+    var bestBitrate = -1;
 
     try {
       await for (final entity in dir.list()) {
@@ -86,15 +83,14 @@ class AudioCacheService {
         final dotIdx = afterPrefix.indexOf('.');
         if (dotIdx <= 0) continue;
         final fileBr = int.tryParse(afterPrefix.substring(0, dotIdx)) ?? 0;
-        final fileRank = _qualityRank(fileBr);
-        if (fileRank > bestRank) {
-          bestRank = fileRank;
+        if (fileBr >= br && (bestBitrate < br || fileBr < bestBitrate)) {
+          bestBitrate = fileBr;
           bestPath = entity.path;
         }
       }
     } catch (_) {}
 
-    if (bestPath != null && bestRank >= requestedRank) return bestPath;
+    if (bestPath != null) return bestPath;
     return null;
   }
 
@@ -136,11 +132,6 @@ class AudioCacheService {
     if (await finalFile.exists()) await finalFile.delete();
     await temporaryFile.rename(finalPath);
     await _deleteAllForSong(songId, exceptPath: finalPath);
-  }
-
-  int _qualityRank(int br) {
-    final index = _qualityOrder.indexOf(br);
-    return index >= 0 ? index : br;
   }
 
   String _extractExt(String? url) {

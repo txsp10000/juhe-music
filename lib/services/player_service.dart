@@ -5,6 +5,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import '../models/song.dart';
+import '../models/listening_mode.dart';
 import '../api/music_api.dart';
 import 'lyric_cache_service.dart';
 import 'audio_cache_service.dart';
@@ -22,7 +23,11 @@ class PlayerService {
   AudioHandler? _audioHandler;
   bool _initialized = false;
   Future<void>? _initializing;
-  final List<Song> playlist = [];
+  final List<Song> queue = [];
+  ListeningMode? _activeMode;
+  bool _loadingModeSongs = false;
+  ListeningMode? get activeMode => _activeMode;
+  bool get loadingModeSongs => _loadingModeSongs;
   int _currentIndex = -1;
   int _currentPlayingBr = 999;
   bool _isPlaying = false;
@@ -32,8 +37,8 @@ class PlayerService {
 
   MediaItem? _currentMediaItem;
 
-  Song? get currentSong => _currentIndex >= 0 && _currentIndex < playlist.length
-      ? playlist[_currentIndex]
+  Song? get currentSong => _currentIndex >= 0 && _currentIndex < queue.length
+      ? queue[_currentIndex]
       : null;
   int get currentIndex => _currentIndex;
   bool get isPlaying => _player?.state.playing ?? _isPlaying;
@@ -177,24 +182,22 @@ class PlayerService {
       } catch (_) {}
     }
 
-    if (!isTvApp) {
-      try {
-        _audioHandler = await AudioService.init(
-          builder: () => _AudioPlayerTask(),
-          config: const AudioServiceConfig(
-            androidNotificationChannelId: 'com.qishui.music.channel',
-            androidNotificationChannelName: '汽水音乐',
-            androidNotificationOngoing: false,
-            androidStopForegroundOnPause: true,
-            androidShowNotificationBadge: false,
-          ),
-        );
-        await _configureAndroidAudioSession();
-      } catch (_) {
-        await createdPlayer.dispose();
-        if (identical(_player, createdPlayer)) _player = null;
-        rethrow;
-      }
+    try {
+      _audioHandler = await AudioService.init(
+        builder: () => _AudioPlayerTask(),
+        config: const AudioServiceConfig(
+          androidNotificationChannelId: 'com.qishui.music.channel',
+          androidNotificationChannelName: '汽水音乐',
+          androidNotificationOngoing: false,
+          androidStopForegroundOnPause: true,
+          androidShowNotificationBadge: false,
+        ),
+      );
+      await _configureAndroidAudioSession();
+    } catch (_) {
+      await createdPlayer.dispose();
+      if (identical(_player, createdPlayer)) _player = null;
+      rethrow;
     }
     final player = createdPlayer;
     _initialized = true;
@@ -206,7 +209,7 @@ class PlayerService {
 
     _durationSub = player.stream.duration.listen((dur) {
       _duration = dur;
-      if (!isTvApp && _currentMediaItem != null) {
+      if (_audioHandler != null && _currentMediaItem != null) {
         try {
           unawaited(
             _audioHandler!.updateMediaItem(
@@ -234,7 +237,7 @@ class PlayerService {
   }
 
   Future<void> _configureAndroidAudioSession() async {
-    if (!Platform.isAndroid || isTvApp) return;
+    if (!Platform.isAndroid) return;
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.music());
     _androidAudioSession = session;
@@ -286,33 +289,73 @@ class PlayerService {
 
   void _onComplete() {
     if (_isSeeking || _suppressCompletion) return;
-    if (_currentIndex < playlist.length - 1) {
+    if (_currentIndex < queue.length - 1) {
       playAt(_currentIndex + 1);
-    } else if (playlist.isNotEmpty) {
-      playAt(0);
+    } else if (queue.isNotEmpty) {
+      if (_activeMode != null) {
+        unawaited(_loadMoreModeSongsAndPlay());
+      } else {
+        playAt(0);
+      }
     }
   }
 
   void prev() {
-    if (playlist.isEmpty) return;
-    final newIdx = _currentIndex > 0 ? _currentIndex - 1 : playlist.length - 1;
+    if (queue.isEmpty) return;
+    final newIdx = _currentIndex > 0 ? _currentIndex - 1 : queue.length - 1;
     playAt(newIdx);
   }
 
   void next() {
-    if (playlist.isEmpty) return;
-    final newIdx = _currentIndex < playlist.length - 1 ? _currentIndex + 1 : 0;
-    playAt(newIdx);
+    if (queue.isEmpty) return;
+    if (_currentIndex < queue.length - 1) {
+      playAt(_currentIndex + 1);
+    } else if (_activeMode != null) {
+      unawaited(_loadMoreModeSongsAndPlay());
+    } else {
+      playAt(0);
+    }
+  }
+
+  void replaceQueue(List<Song> songs, {ListeningMode? mode}) {
+    _activeMode = mode;
+    queue
+      ..clear()
+      ..addAll(songs);
+    _currentIndex = -1;
+  }
+
+  void clearMode() => _activeMode = null;
+
+  Future<void> _loadMoreModeSongsAndPlay() async {
+    final mode = _activeMode;
+    if (mode == null || _loadingModeSongs) return;
+    _loadingModeSongs = true;
+    final previousLength = queue.length;
+    try {
+      final songs = await MusicApi.getModeTracks(mode.sceneModeId);
+      if (!identical(_activeMode, mode) || songs.isEmpty) return;
+      queue.addAll(songs);
+      if (_currentIndex >= previousLength - 1 &&
+          _currentIndex < queue.length - 1) {
+        await playAt(_currentIndex + 1);
+      }
+    } catch (_) {
+      // Keep the current song playable; a later next/completion retries.
+    } finally {
+      _loadingModeSongs = false;
+    }
   }
 
   Future<void> removeAt(int index) async {
-    if (index < 0 || index >= playlist.length) return;
+    if (index < 0 || index >= queue.length) return;
 
     final removingCurrent = index == _currentIndex;
     final wasPlaying = isPlaying;
-    playlist.removeAt(index);
+    queue.removeAt(index);
 
-    if (playlist.isEmpty) {
+    if (queue.isEmpty) {
+      _activeMode = null;
       _currentIndex = -1;
       _currentMediaItem = null;
       _position = Duration.zero;
@@ -332,7 +375,7 @@ class PlayerService {
     }
 
     if (removingCurrent) {
-      final nextIndex = index >= playlist.length ? playlist.length - 1 : index;
+      final nextIndex = index >= queue.length ? queue.length - 1 : index;
       await playAt(nextIndex, play: wasPlaying);
     } else if (index < _currentIndex) {
       _currentIndex--;
@@ -350,7 +393,7 @@ class PlayerService {
   Future<void> play() async {
     if (_failedGeneration == _playGeneration &&
         _currentIndex >= 0 &&
-        _currentIndex < playlist.length) {
+        _currentIndex < queue.length) {
       await playAt(_currentIndex);
       return;
     }
@@ -394,8 +437,19 @@ class PlayerService {
     });
   }
 
+  Future<void> seekRelative(Duration delta) async {
+    final target = position + delta;
+    final maximum = liveDuration;
+    final bounded = target < Duration.zero
+        ? Duration.zero
+        : maximum > Duration.zero && target > maximum
+            ? maximum
+            : target;
+    await seek(bounded);
+  }
+
   Future<void> playAt(int index, {bool play = true}) async {
-    if (index < 0 || index >= playlist.length) return;
+    if (index < 0 || index >= queue.length) return;
     if (_player == null) {
       try {
         await PlayerService.init();
@@ -410,7 +464,7 @@ class PlayerService {
       return;
     }
     _currentIndex = index;
-    final song = playlist[index];
+    final song = queue[index];
     final currentGen = ++_playGeneration;
     _openedGeneration = null;
     _failedGeneration = null;
@@ -428,11 +482,9 @@ class PlayerService {
           ? Uri.tryParse(song.cover)
           : null,
     );
-    if (!isTvApp) {
-      try {
-        await _audioHandler?.updateMediaItem(_currentMediaItem!);
-      } catch (_) {}
-    }
+    try {
+      await _audioHandler?.updateMediaItem(_currentMediaItem!);
+    } catch (_) {}
 
     _suppressCompletion = true;
     try {
@@ -469,37 +521,25 @@ class PlayerService {
 
   Future<void> _hydrateSongDetails(Song song, int generation) async {
     final playId = song.lyricId.isNotEmpty ? song.lyricId : song.id;
-
-    String? lyric;
-    if (isTvApp) {
-      lyric = await MusicApi.getLyric(playId);
-    } else {
-      final lyricCache = LyricCacheService();
-      lyric = await lyricCache.load(playId);
-      if (lyric == null || lyric.isEmpty) {
-        lyric = await MusicApi.getLyric(playId);
-        if (lyric.isNotEmpty) {
-          await lyricCache.save(playId, lyric);
-        }
-      }
-    }
+    final details = await MusicApi.getTrackDetails(playId);
     if (generation != _playGeneration) return;
-    final lyricText = lyric;
+    final lyricText = details.lyric;
     if (lyricText.isNotEmpty) {
-      for (final s in playlist) {
+      for (final s in queue) {
         final sid = s.lyricId.isNotEmpty ? s.lyricId : s.id;
         if (sid == playId) s.lyric = lyricText;
       }
       song.lyric = lyricText;
       _notifySongChange(song);
+      if (!isTvApp) {
+        await LyricCacheService().save(playId, lyricText);
+      }
     }
 
     if (!isTvApp && !song.cover.startsWith('file:')) {
       final picId = song.picId.isNotEmpty ? song.picId : song.id;
-      var coverUrl = song.cover;
-      if (coverUrl.isEmpty) {
-        coverUrl = await MusicApi.getCover(picId);
-      }
+      final coverUrl =
+          details.song.cover.isNotEmpty ? details.song.cover : song.cover;
       if (generation != _playGeneration) return;
       if (coverUrl.isNotEmpty) {
         await CoverCacheService().download(picId, coverUrl);
@@ -528,7 +568,14 @@ class PlayerService {
   }) async {
     final player = _player;
     if (player == null) return;
-    final quality = requestedBr ?? SettingsService().quality.br;
+    var quality = requestedBr ?? SettingsService().quality.br;
+    StreamSelection? selection;
+    try {
+      selection =
+          await MusicApi.resolveStream(song.id, SettingsService().quality);
+      if (selection.bitrateKbps > 0) quality = selection.bitrateKbps;
+    } catch (_) {}
+    if (generation != _playGeneration) return;
     if (!isTvApp) {
       final audioCache = AudioCacheService();
       final localPath =
@@ -548,7 +595,7 @@ class PlayerService {
       }
     }
 
-    final url = await _fetchPlayUrl(song);
+    final url = selection?.url ?? await _fetchPlayUrl(song);
     if (generation != _playGeneration) return;
     if (url == null || url.isEmpty) {
       await _handlePlaybackFailure(generation, '无法获取播放地址，请重试');
@@ -654,7 +701,6 @@ class PlayerService {
   /// Restarts the current song at the selected quality using the same
   /// progressive single-stream path as normal playback.
   Future<void> redownloadCurrentAtNewQuality() async {
-    if (isTvApp) return;
     final song = currentSong;
     if (song == null) return;
     final currentGen = ++_playGeneration;
@@ -672,7 +718,7 @@ class PlayerService {
     } finally {
       _suppressCompletion = false;
     }
-    await ProgressiveAudioCacheService().cancelActive();
+    if (!isTvApp) await ProgressiveAudioCacheService().cancelActive();
     if (currentGen != _playGeneration) return;
     _notifyDownloadProgress(-1.0);
     await _prepareAndPlayAudio(
@@ -687,7 +733,7 @@ class PlayerService {
   Future<String?> _fetchPlayUrl(Song song) async {
     try {
       if (song.id.isEmpty) return null;
-      return await MusicApi.getPlayUrl(song.id);
+      return MusicApi.streamUrl(song.id);
     } catch (_) {
       return null;
     }
@@ -827,6 +873,14 @@ class _AudioPlayerTask extends BaseAudioHandler {
 
   @override
   Future<void> seek(Duration position) async => PlayerService().seek(position);
+
+  @override
+  Future<void> fastForward() async =>
+      PlayerService().seekRelative(const Duration(seconds: 10));
+
+  @override
+  Future<void> rewind() async =>
+      PlayerService().seekRelative(const Duration(seconds: -10));
 
   @override
   Future<void> skipToNext() async => PlayerService().next();
