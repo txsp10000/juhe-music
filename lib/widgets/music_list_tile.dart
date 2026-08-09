@@ -1,9 +1,15 @@
+import 'dart:typed_data';
+
+// The nullable index is narrowed by the conditional expression below.
+// ignore_for_file: unnecessary_non_null_assertion
+
 import 'package:flutter/material.dart';
 import '../models/song.dart';
+import '../services/cover_cache_service.dart';
 import '../theme/app_design_tokens.dart';
 import 'sound_halo.dart';
 
-class MusicListTile extends StatelessWidget {
+class MusicListTile extends StatefulWidget {
   final Song song;
   final int? index;
   final bool isCurrent;
@@ -32,27 +38,65 @@ class MusicListTile extends StatelessWidget {
   });
 
   @override
+  State<MusicListTile> createState() => _MusicListTileState();
+}
+
+class _MusicListTileState extends State<MusicListTile> {
+  Uint8List? _coverBytes;
+  String? _cacheKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCachedCover();
+  }
+
+  @override
+  void didUpdateWidget(covariant MusicListTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.song.id != widget.song.id ||
+        oldWidget.song.picId != widget.song.picId ||
+        oldWidget.showCover != widget.showCover) {
+      _coverBytes = null;
+      _cacheKey = null;
+      _loadCachedCover();
+    }
+  }
+
+  Future<void> _loadCachedCover() async {
+    final song = widget.song;
+    if (!widget.showCover) return;
+    final key = song.picId.isNotEmpty ? song.picId : song.id;
+    _cacheKey = key;
+    final bytes = await CoverCacheService().load(key);
+    if (mounted && _cacheKey == key && bytes != null) {
+      setState(() => _coverBytes = bytes);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final active = isCurrent || selected;
+    final song = widget.song;
+    final active = widget.isCurrent || widget.selected;
     final row = AnimatedContainer(
       duration: const Duration(milliseconds: 180),
-      margin: margin,
+      margin: widget.margin,
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
         color: active
             ? Colors.white.withValues(alpha: 0.16)
             : Colors.white.withValues(alpha: 0.075),
-        borderRadius: borderRadius,
+        borderRadius: widget.borderRadius,
       ),
       child: Row(
         children: [
-          leadingOverride ?? _buildLeading(),
+          widget.leadingOverride ?? _buildLeading(),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(song.name,
+                Text(widget.song.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppDesignTokens.body(
@@ -88,35 +132,43 @@ class MusicListTile extends StatelessWidget {
               ],
             ),
           ),
-          if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+          if (widget.trailing != null) ...[
+            const SizedBox(width: 8),
+            widget.trailing!
+          ],
         ],
       ),
     );
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: borderRadius,
-        onTap: onTap,
+        borderRadius: widget.borderRadius,
+        onTap: widget.onTap,
         child: row,
       ),
     );
   }
 
   Widget _buildLeading() {
-    if (showCover && song.cover.isNotEmpty) {
+    if (widget.showCover &&
+        (_coverBytes != null || widget.song.cover.isNotEmpty)) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Image.network(song.cover,
-            width: 48,
-            height: 48,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => _fallbackLeading()),
+        child: _coverBytes != null
+            ? Image.memory(_coverBytes!,
+                width: 48, height: 48, fit: BoxFit.cover)
+            : Image.network(widget.song.cover,
+                width: 48,
+                height: 48,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _fallbackLeading()),
       );
     }
     return _fallbackLeading();
   }
 
   Widget _fallbackLeading() {
+    final index = widget.index;
     return Container(
       width: 48,
       height: 48,
@@ -124,7 +176,7 @@ class MusicListTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           color: Colors.white.withValues(alpha: 0.10)),
       child: Center(
-        child: isCurrent
+        child: widget.isCurrent
             ? MiniWave(
                 playing: true, color: AppDesignTokens.lyricWhite, size: 22)
             : Text(index == null ? '♪' : '${index! + 1}',
