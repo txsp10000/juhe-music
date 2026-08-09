@@ -76,58 +76,63 @@ class _MainPageState extends State<MainPage> {
     final panelWidth =
         (MediaQuery.of(context).size.width * 0.84).clamp(0.0, 380.0);
 
-    return Stack(
-      children: [
-        Scaffold(
-          backgroundColor: AppDesignTokens.inkBlack,
-          // Keep page content above the persistent bottom navigation. The
-          // embedded pages already reserve their own control spacing, so
-          // extending the body here makes iOS render content underneath the
-          // navigation bar and causes the visible overlap in screenshots.
-          extendBody: false,
-          body: MusicScaffoldBackground(
-            bgHint: _bgHint,
-            accent: _accent,
-            child: IndexedStack(
-              index: _tab,
-              children: [
-                PlayerPage(onOpenDrawer: () => _openDrawer(0)),
-                SearchPage(
-                  embedded: true,
-                  onShowPlayer: _showPlayer,
-                  onOpenDrawer: () => _openDrawer(1),
-                ),
-                FavoritesPage(embedded: true, onShowPlayer: _showPlayer),
-              ],
+    return MusicScaffoldBackground(
+      bgHint: _bgHint,
+      accent: _accent,
+      child: Stack(
+        children: [
+          Scaffold(
+            // The themed wrapper paints the area reserved for the bottom nav
+            // as well, so Android does not fall back to a black strip.
+            backgroundColor: Colors.transparent,
+            // Let the player controls sit naturally above the persistent nav.
+            // Embedded pages reserve their own bottom scroll space so this is
+            // safe on both iOS and Android.
+            extendBody: true,
+            body: MusicScaffoldBackground(
+              bgHint: _bgHint,
+              accent: _accent,
+              child: IndexedStack(
+                index: _tab,
+                children: [
+                  PlayerPage(onOpenDrawer: () => _openDrawer(0)),
+                  SearchPage(
+                    embedded: true,
+                    onShowPlayer: _showPlayer,
+                    onOpenDrawer: () => _openDrawer(1),
+                  ),
+                  FavoritesPage(embedded: true, onShowPlayer: _showPlayer),
+                ],
+              ),
+            ),
+            bottomNavigationBar: SafeArea(top: false, child: _buildBottomNav()),
+          ),
+          if (_drawerOpen)
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => setState(() => _drawerOpen = false),
+                child: Container(color: Colors.black.withValues(alpha: 0.40)),
+              ),
+            ),
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            left: _drawerOpen ? 0 : -panelWidth,
+            top: 0,
+            bottom: 0,
+            width: panelWidth,
+            child: ModeDrawer(
+              onSelectMode: _loadAndPlay,
+              onOpenFavorites: _openFavorites,
+              onRandomPlay: _randomPlay,
+              onClose: _closeDrawer,
+              currentMode: _player.activeMode,
+              queueSource: _player.queueSource,
             ),
           ),
-          bottomNavigationBar: SafeArea(top: false, child: _buildBottomNav()),
-        ),
-        if (_drawerOpen)
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => setState(() => _drawerOpen = false),
-              child: Container(color: Colors.black.withValues(alpha: 0.40)),
-            ),
-          ),
-        AnimatedPositioned(
-          duration: const Duration(milliseconds: 260),
-          curve: Curves.easeOutCubic,
-          left: _drawerOpen ? 0 : -panelWidth,
-          top: 0,
-          bottom: 0,
-          width: panelWidth,
-          child: ModeDrawer(
-            onSelectMode: _loadAndPlay,
-            onOpenFavorites: _openFavorites,
-            onRandomPlay: _randomPlay,
-            onClose: _closeDrawer,
-            currentMode: _player.activeMode,
-            queueSource: _player.queueSource,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

@@ -264,41 +264,12 @@ class _PlayerPageState extends State<PlayerPage> {
       isScrollControlled: true,
       constraints:
           BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.62),
-      builder: (ctx) {
-        final songs = _player.queue;
-        final currentIdx = _player.currentIndex;
-        return _MusicSheet(
-          accent: _accent,
-          title: '播放队列 · ${songs.length} 首',
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height * 0.46,
-            child: songs.isEmpty
-                ? MusicEmptyState(
-                    accent: _accent,
-                    icon: Icons.queue_music_rounded,
-                    title: '队列是空的',
-                    message: '去搜索或播放收藏里的歌曲。')
-                : ListView.builder(
-                    itemCount: songs.length,
-                    itemBuilder: (_, i) => MusicListTile(
-                      song: songs[i],
-                      index: i,
-                      isCurrent: i == currentIdx,
-                      accent: _accent,
-                      margin: const EdgeInsets.only(bottom: 8),
-                      onTap: () {
-                        if (i == _player.currentIndex) {
-                          if (!_player.isPlaying) unawaited(_player.play());
-                        } else {
-                          unawaited(_player.playAt(i));
-                        }
-                        Navigator.pop(ctx);
-                      },
-                    ),
-                  ),
-          ),
-        );
-      },
+      builder: (ctx) => _PlaylistSheetContent(
+        accent: _accent,
+        player: _player,
+        height: MediaQuery.of(context).size.height * 0.46,
+        onClose: () => Navigator.pop(ctx),
+      ),
     );
   }
 
@@ -901,6 +872,117 @@ class _SmoothKaraokeText extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _PlaylistSheetContent extends StatefulWidget {
+  final Color accent;
+  final PlayerService player;
+  final double height;
+  final VoidCallback onClose;
+
+  const _PlaylistSheetContent({
+    required this.accent,
+    required this.player,
+    required this.height,
+    required this.onClose,
+  });
+
+  @override
+  State<_PlaylistSheetContent> createState() => _PlaylistSheetContentState();
+}
+
+class _PlaylistSheetContentState extends State<_PlaylistSheetContent> {
+  final _scrollController = ScrollController();
+  bool _loadingMore = false;
+
+  PlayerService get _player => widget.player;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients || _loadingMore) return;
+    if (_player.activeMode == null ||
+        _player.queueSource != PlaybackQueueSource.listeningMode) {
+      return;
+    }
+    final position = _scrollController.position;
+    if (position.pixels < position.maxScrollExtent - 160) return;
+    _loadMore();
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || _player.activeMode == null) return;
+    setState(() => _loadingMore = true);
+    try {
+      await _player.loadMoreModeSongs();
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final songs = _player.queue;
+    final currentIdx = _player.currentIndex;
+    final loading = _loadingMore;
+    return _MusicSheet(
+      accent: widget.accent,
+      title: '播放队列 · ${songs.length} 首',
+      child: SizedBox(
+        height: widget.height,
+        child: songs.isEmpty
+            ? MusicEmptyState(
+                accent: widget.accent,
+                icon: Icons.queue_music_rounded,
+                title: '队列是空的',
+                message: '去搜索或播放收藏里的歌曲。')
+            : ListView.builder(
+                controller: _scrollController,
+                itemCount: songs.length + (loading ? 1 : 0),
+                itemBuilder: (_, i) {
+                  if (i >= songs.length) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    );
+                  }
+                  final song = songs[i];
+                  return MusicListTile(
+                    song: song,
+                    index: i,
+                    isCurrent: i == currentIdx,
+                    accent: widget.accent,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    onTap: () {
+                      if (i == _player.currentIndex) {
+                        if (!_player.isPlaying) unawaited(_player.play());
+                      } else {
+                        unawaited(_player.playAt(i));
+                      }
+                      widget.onClose();
+                    },
+                  );
+                },
+              ),
+      ),
     );
   }
 }

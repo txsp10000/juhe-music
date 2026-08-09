@@ -348,7 +348,10 @@ class PlayerService {
     try {
       final songs = await MusicApi.getModeTracks(mode.sceneModeId);
       if (!identical(_activeMode, mode) || songs.isEmpty) return;
-      queue.addAll(songs);
+      // Radio endpoints may repeat items across requests. Keep the queue
+      // stable while still allowing each scroll to contribute new songs.
+      final existingIds = queue.map((song) => song.id).toSet();
+      queue.addAll(songs.where((song) => existingIds.add(song.id)));
       if (playNext &&
           _currentIndex >= previousLength - 1 &&
           _currentIndex < queue.length - 1) {

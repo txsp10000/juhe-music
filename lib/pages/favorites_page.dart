@@ -255,7 +255,13 @@ class _FavoritesPageState extends State<FavoritesPage> {
         message: '在播放页点亮爱心，歌曲会出现在这里。',
       );
     }
-    final bottomPadding = widget.embedded ? (_editMode ? 10.0 : 60.0) : 86.0;
+    // The parent keeps the body extended behind the persistent nav so the
+    // player controls stay close to the progress bar. Reserve that nav
+    // height in the scroll view instead, including the platform safe inset,
+    // so the final favorite can still scroll clear of the overlay.
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final bottomPadding =
+        widget.embedded ? (_editMode ? 10.0 : 72.0 + bottomInset) : 86.0;
     return ListView.builder(
       controller: _scrollController,
       padding: EdgeInsets.only(top: 4, bottom: bottomPadding),
