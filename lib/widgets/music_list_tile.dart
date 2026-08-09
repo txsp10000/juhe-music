@@ -14,6 +14,7 @@ class MusicListTile extends StatelessWidget {
   final Widget? leadingOverride;
   final bool showCover;
   final EdgeInsetsGeometry margin;
+  final BorderRadius borderRadius;
 
   const MusicListTile({
     super.key,
@@ -27,6 +28,7 @@ class MusicListTile extends StatelessWidget {
     this.leadingOverride,
     this.showCover = true,
     this.margin = const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+    this.borderRadius = const BorderRadius.all(Radius.circular(18)),
   });
 
   @override
@@ -40,7 +42,7 @@ class MusicListTile extends StatelessWidget {
         color: active
             ? Colors.white.withValues(alpha: 0.16)
             : Colors.white.withValues(alpha: 0.075),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: borderRadius,
       ),
       child: Row(
         children: [
@@ -93,7 +95,7 @@ class MusicListTile extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: borderRadius,
         onTap: onTap,
         child: row,
       ),

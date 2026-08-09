@@ -12,5 +12,9 @@ void main() {
     expect(lyricTextAt(lines.single, 7140), '你');
     expect(lyricTextAt(lines.single, 7340), '你好');
     expect(lyricTextAt(lines.single, 7640), '你好啊');
+    expect(lyricProgressAt(lines.single, 7240), closeTo(1 / 6, 0.001));
+    expect(lyricProgressAt(lines.single, 7490), closeTo(0.5, 0.001));
+    expect(lyricProgressAt(lines.single, 8140), 1);
+    expect(lyricLineEndMs(lines.single), 8140);
   });
 }

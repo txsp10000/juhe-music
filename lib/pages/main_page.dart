@@ -116,11 +116,11 @@ class _MainPageState extends State<MainPage> {
           width: panelWidth,
           child: ModeDrawer(
             onSelectMode: _loadAndPlay,
-            onOpenCurrentMode: _openCurrentMode,
             onOpenFavorites: _openFavorites,
             onRandomPlay: _randomPlay,
             onClose: _closeDrawer,
             currentMode: _player.activeMode,
+            queueSource: _player.queueSource,
           ),
         ),
       ],
@@ -135,10 +135,6 @@ class _MainPageState extends State<MainPage> {
     if (mounted) setState(() => _drawerOpen = false);
   }
 
-  void _openCurrentMode() {
-    if (mounted) setState(() => _tab = 0);
-  }
-
   void _loadAndPlay(ListeningMode mode) {
     unawaited(_loadAndPlayAsync(mode));
   }
@@ -146,6 +142,7 @@ class _MainPageState extends State<MainPage> {
   Future<void> _loadAndPlayAsync(ListeningMode mode) async {
     final generation = ++_modeLoadGeneration;
     _closeDrawer();
+    if (mounted) setState(() => _tab = 0);
     Toast.show(context, '正在加载「${mode.name}」...');
     try {
       final songs = await MusicApi.getModeTracks(mode.sceneModeId);
@@ -171,7 +168,7 @@ class _MainPageState extends State<MainPage> {
       Toast.show(context, '收藏里还没有歌曲');
       return;
     }
-    _player.replaceQueue(songs);
+    _player.replaceQueue(songs, source: PlaybackQueueSource.favorites);
     await _player.playAt(0);
     if (mounted) setState(() => _tab = 0);
   }
@@ -196,11 +193,10 @@ class _MainPageState extends State<MainPage> {
               right: 0,
               bottom: 8,
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _navLabel('搜索', 1),
-                  const SizedBox(width: 82),
-                  _navLabel('收藏', 2),
+                  Expanded(child: _navLabel('搜索', 1)),
+                  const SizedBox(width: 78),
+                  Expanded(child: _navLabel('收藏', 2)),
                 ],
               ),
             ),
@@ -270,9 +266,10 @@ class _MainPageState extends State<MainPage> {
   Widget _navLabel(String label, int tabIndex) {
     final active = _tab == tabIndex;
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => setState(() => _tab = tabIndex),
       child: SizedBox(
-        width: 112,
+        width: double.infinity,
         height: 64,
         child: Center(
           child: Text(

@@ -28,6 +28,7 @@ class PlaylistDetailPage extends StatefulWidget {
 
 class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
   final _player = PlayerService();
+  Color _bgHint = AppDesignTokens.queueBackground;
   List<Song> _songs = const [];
   bool _loading = true;
   String? _error;
@@ -36,6 +37,18 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
   void initState() {
     super.initState();
     _load();
+    _onThemeChange();
+    ThemeService.bgHint.addListener(_onThemeChange);
+  }
+
+  void _onThemeChange() {
+    if (mounted) setState(() => _bgHint = ThemeService.bgHint.value);
+  }
+
+  @override
+  void dispose() {
+    ThemeService.bgHint.removeListener(_onThemeChange);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -66,12 +79,11 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final accent =
-        AppDesignTokens.readableAccent(ThemeService.accentColor.value);
+    const accent = AppDesignTokens.lyricWhite;
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: MusicScaffoldBackground(
-        bgHint: ThemeService.bgHint.value,
+        bgHint: _bgHint,
         accent: accent,
         child: SafeArea(
           child: Column(children: [
@@ -95,7 +107,9 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
                           style: AppDesignTokens.title(size: 22)),
                       const SizedBox(height: 4),
                       Text(_loading ? '正在加载歌曲' : '${_songs.length} 首歌曲',
-                          style: AppDesignTokens.caption(color: accent)),
+                          style: AppDesignTokens.caption(
+                              color: AppDesignTokens.lyricWhite
+                                  .withValues(alpha: 0.74))),
                     ],
                   ),
                 ),

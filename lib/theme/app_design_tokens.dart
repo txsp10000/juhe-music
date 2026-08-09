@@ -6,11 +6,12 @@ class AppDesignTokens {
   static const inkBlack = Color(0xFF08090D);
   static const stageBlack = Color(0xFF101218);
   static const glassBlack = Color(0xFF171A22);
+  static const queueBackground = Color(0xFF241A14);
   static const mistLine = Color(0x1FFFFFFF);
   static const lyricWhite = Color(0xFFF8F2EC);
-  static const warmWhite = Color(0xFFE9D8CA);
-  static const quietGrey = Color(0xFFB9ACA2);
-  static const dimGrey = Color(0xFF7B7069);
+  static const warmWhite = Color(0xFFF5F5F5);
+  static const quietGrey = Color(0xFFD1D1D1);
+  static const dimGrey = Color(0xFFA8A8A8);
   static const danger = Color(0xFFFF5E6C);
   static const selectedPill = Color(0xFFFBF6EF);
 
@@ -22,6 +23,7 @@ class AppDesignTokens {
 
   static Color readableAccent(Color color) {
     final hsl = HSLColor.fromColor(color);
+    if (hsl.saturation < 0.08) return lyricWhite;
     final lightness = hsl.lightness.clamp(0.48, 0.72).toDouble();
     final saturation = hsl.saturation.clamp(0.30, 0.86).toDouble();
     return hsl.withLightness(lightness).withSaturation(saturation).toColor();
@@ -29,30 +31,27 @@ class AppDesignTokens {
 
   static Color surfaceFor(Color bgHint, {double opacity = 0.58}) {
     return Color.alphaBlend(
-        bgHint.withValues(alpha: opacity), const Color(0xFF17100C));
+        bgHint.withValues(alpha: opacity), const Color(0xFF111114));
   }
 
   static Color softPill(Color bgHint) {
     return Color.alphaBlend(
-        bgHint.withValues(alpha: 0.46), const Color(0xFF2B211B));
+        bgHint.withValues(alpha: 0.46), const Color(0xFF1C1C20));
   }
 
   static LinearGradient albumWashGradient(Color bgHint) {
     final hsl = HSLColor.fromColor(bgHint);
     final top = hsl
-        .withLightness((hsl.lightness + 0.10).clamp(0.16, 0.34).toDouble())
-        .toColor();
-    final mid = hsl
-        .withLightness((hsl.lightness + 0.02).clamp(0.12, 0.28).toDouble())
+        .withLightness((hsl.lightness + 0.06).clamp(0.42, 0.62).toDouble())
         .toColor();
     final bottom = hsl
-        .withLightness((hsl.lightness - 0.08).clamp(0.06, 0.18).toDouble())
+        .withLightness((hsl.lightness - 0.07).clamp(0.34, 0.50).toDouble())
         .toColor();
     return LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
-      colors: [top, mid, bottom],
-      stops: const [0.0, 0.48, 1.0],
+      colors: [top, bgHint, bottom],
+      stops: const [0.0, 0.52, 1.0],
     );
   }
 
@@ -143,11 +142,18 @@ class MusicScaffoldBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     final backgroundColor = neutralize
         ? Color.alphaBlend(
-            bgHint.withValues(alpha: 0.18), AppDesignTokens.inkBlack)
+            bgHint.withValues(alpha: 0.28), AppDesignTokens.queueBackground)
         : bgHint;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-          gradient: AppDesignTokens.albumWashGradient(backgroundColor)),
+    return TweenAnimationBuilder<Color?>(
+      duration: const Duration(milliseconds: 420),
+      curve: Curves.easeOutCubic,
+      tween: ColorTween(end: backgroundColor),
+      builder: (context, color, child) => DecoratedBox(
+        decoration: BoxDecoration(
+            gradient:
+                AppDesignTokens.albumWashGradient(color ?? backgroundColor)),
+        child: child,
+      ),
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -159,20 +165,6 @@ class MusicScaffoldBackground extends StatelessWidget {
                 child: Image.memory(coverBytes!, fit: BoxFit.cover),
               ),
             ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0.12),
-                  Colors.black.withValues(alpha: 0.18),
-                  Colors.black.withValues(alpha: 0.46),
-                ],
-                stops: const [0.0, 0.48, 1.0],
-              ),
-            ),
-          ),
           child,
         ],
       ),

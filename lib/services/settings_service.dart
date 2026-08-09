@@ -21,8 +21,7 @@ class SettingsService {
   factory SettingsService() => _instance;
   SettingsService._();
 
-  AudioQuality _quality = AudioQuality.highest;
-  AudioQuality get quality => _quality;
+  AudioQuality get quality => AudioQuality.highest;
 
   File? _file;
 
@@ -36,19 +35,12 @@ class SettingsService {
   Future<void> load() async {
     try {
       final file = await _getFile();
-      if (await file.exists()) {
-        final json = jsonDecode(await file.readAsString());
-        final quality = json['quality']?.toString();
-        _quality = AudioQuality.values.firstWhere(
-          (item) => item.name == quality,
-          orElse: () => AudioQuality.highest,
-        );
-      }
+      if (await file.exists()) await file.readAsString();
     } catch (_) {}
   }
 
   Future<void> setQuality(AudioQuality q) async {
-    _quality = q;
+    if (q != AudioQuality.highest) return;
     try {
       final file = await _getFile();
       await file.writeAsString(jsonEncode({'quality': q.name}));

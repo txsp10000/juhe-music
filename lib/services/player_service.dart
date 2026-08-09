@@ -13,6 +13,9 @@ import 'cover_cache_service.dart';
 import 'settings_service.dart';
 import 'app_environment.dart';
 import 'progressive_audio_cache_service.dart';
+import 'theme_service.dart';
+
+enum PlaybackQueueSource { regular, favorites, listeningMode }
 
 class PlayerService {
   static final PlayerService _instance = PlayerService._();
@@ -25,8 +28,10 @@ class PlayerService {
   Future<void>? _initializing;
   final List<Song> queue = [];
   ListeningMode? _activeMode;
+  PlaybackQueueSource _queueSource = PlaybackQueueSource.regular;
   bool _loadingModeSongs = false;
   ListeningMode? get activeMode => _activeMode;
+  PlaybackQueueSource get queueSource => _queueSource;
   bool get loadingModeSongs => _loadingModeSongs;
   int _currentIndex = -1;
   int _currentPlayingBr = 999;
@@ -317,8 +322,13 @@ class PlayerService {
     }
   }
 
-  void replaceQueue(List<Song> songs, {ListeningMode? mode}) {
+  void replaceQueue(
+    List<Song> songs, {
+    ListeningMode? mode,
+    PlaybackQueueSource source = PlaybackQueueSource.regular,
+  }) {
     _activeMode = mode;
+    _queueSource = mode == null ? source : PlaybackQueueSource.listeningMode;
     queue
       ..clear()
       ..addAll(songs);
@@ -356,6 +366,7 @@ class PlayerService {
 
     if (queue.isEmpty) {
       _activeMode = null;
+      _queueSource = PlaybackQueueSource.regular;
       _currentIndex = -1;
       _currentMediaItem = null;
       _position = Duration.zero;
@@ -494,7 +505,9 @@ class PlayerService {
       _suppressCompletion = false;
     }
     if (!isTvApp) {
-      await ProgressiveAudioCacheService().cancelActive();
+      // Do not hold the next local-file playback behind cleanup of a previous
+      // progressive download. The new stream start still serializes itself.
+      unawaited(ProgressiveAudioCacheService().cancelActive());
     }
 
     if (!isTvApp) {
@@ -514,7 +527,6 @@ class PlayerService {
     _notifyProgress(Duration.zero, Duration.zero);
     _notifySongChange(song);
 
-    _notifyDownloadProgress(-1.0);
     unawaited(_hydrateSongDetails(song, currentGen));
     unawaited(_prepareAndPlayAudio(song, currentGen, play: play));
   }
@@ -536,14 +548,18 @@ class PlayerService {
       }
     }
 
-    if (!isTvApp && !song.cover.startsWith('file:')) {
+    if (!song.cover.startsWith('file:')) {
       final picId = song.picId.isNotEmpty ? song.picId : song.id;
       final coverUrl =
           details.song.cover.isNotEmpty ? details.song.cover : song.cover;
       if (generation != _playGeneration) return;
       if (coverUrl.isNotEmpty) {
-        await CoverCacheService().download(picId, coverUrl);
+        final coverBytes = await CoverCacheService().download(picId, coverUrl);
         if (generation != _playGeneration) return;
+        if (coverBytes != null) {
+          unawaited(ThemeService.updateFromCover(coverBytes));
+        }
+        if (isTvApp) return;
         final localCover = await CoverCacheService().getLocalPath(picId);
         if (generation != _playGeneration) return;
         final artUri = localCover == null ? null : Uri.file(localCover);
@@ -568,33 +584,27 @@ class PlayerService {
   }) async {
     final player = _player;
     if (player == null) return;
-    var quality = requestedBr ?? SettingsService().quality.br;
-    StreamSelection? selection;
-    try {
-      selection =
-          await MusicApi.resolveStream(song.id, SettingsService().quality);
-      if (selection.bitrateKbps > 0) quality = selection.bitrateKbps;
-    } catch (_) {}
-    if (generation != _playGeneration) return;
+    var quality = requestedBr ?? AudioQuality.highest.br;
     if (!isTvApp) {
-      final audioCache = AudioCacheService();
-      final localPath =
-          await audioCache.findCachedFile(song.id, requestedBr: quality);
+      final cachedPath = await AudioCacheService().findBestCachedFile(song.id);
       if (generation != _playGeneration) return;
-
-      if (localPath != null && localPath.isNotEmpty) {
-        _currentPlayingBr = _extractBrFromPath(localPath);
+      if (cachedPath != null) {
+        _currentPlayingBr = _extractBrFromPath(cachedPath);
         await _openMedia(
-          Media(Uri.file(localPath).toString()),
+          Media(Uri.file(cachedPath).toString()),
           generation,
           play: play,
           resumePosition: resumePosition,
         );
-        if (generation == _playGeneration) _notifyDownloadProgress(null);
         return;
       }
     }
-
+    StreamSelection? selection;
+    try {
+      selection = await MusicApi.resolveStream(song.id, AudioQuality.highest);
+      if (selection.bitrateKbps > 0) quality = selection.bitrateKbps;
+    } catch (_) {}
+    if (generation != _playGeneration) return;
     final url = selection?.url ?? await _fetchPlayUrl(song);
     if (generation != _playGeneration) return;
     if (url == null || url.isEmpty) {

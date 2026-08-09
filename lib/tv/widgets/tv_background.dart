@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../services/theme_service.dart';
+import '../../theme/app_design_tokens.dart';
 
-/// Lightweight static background for low-memory TVs.
-///
-/// Cover palette extraction is intentionally disabled here: quantizing an
-/// image on the Dart UI isolate can delay remote-control input for seconds on
-/// older 32-bit TV hardware.
+/// A lightweight color-only background which follows the active cover palette.
 class TvBackground extends StatelessWidget {
   final Widget child;
 
@@ -14,19 +11,20 @@ class TvBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            ThemeService.bgHint.value.withValues(alpha: 0.92),
-            ThemeService.bgHint.value.withValues(alpha: 0.58),
-            const Color(0xFF080D15),
-          ],
+    return ValueListenableBuilder<Color>(
+      valueListenable: ThemeService.bgHint,
+      builder: (context, bgHint, _) => TweenAnimationBuilder<Color?>(
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+        tween: ColorTween(end: bgHint),
+        builder: (context, color, child) => DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: AppDesignTokens.albumWashGradient(color ?? bgHint),
+          ),
+          child: child,
         ),
+        child: child,
       ),
-      child: child,
     );
   }
 }

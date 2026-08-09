@@ -80,7 +80,10 @@ class _TvFavoritesPageState extends State<TvFavoritesPage> {
   }
 
   Future<void> _playAt(int index) async {
-    _player.replaceQueue(_favorites);
+    _player.replaceQueue(
+      _favorites,
+      source: PlaybackQueueSource.favorites,
+    );
     await _player.playAt(index);
     if (!mounted) return;
     TvRoutes.returnHome(context);

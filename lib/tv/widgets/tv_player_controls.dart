@@ -11,13 +11,10 @@ class TvPlayerControls extends StatelessWidget {
   final VoidCallback onNext;
   final VoidCallback onFavorite;
   final VoidCallback onQueue;
-  final VoidCallback onQuality;
   final VoidCallback onRelatedSearch;
   final bool isPlaying;
   final bool isFavorite;
-  final String qualityLabel;
   final FocusNode? queueFocusNode;
-  final FocusNode? qualityFocusNode;
   final FocusNode? relatedSearchFocusNode;
 
   const TvPlayerControls({
@@ -29,13 +26,10 @@ class TvPlayerControls extends StatelessWidget {
     required this.onNext,
     required this.onFavorite,
     required this.onQueue,
-    required this.onQuality,
     required this.onRelatedSearch,
     required this.isPlaying,
     required this.isFavorite,
-    required this.qualityLabel,
     this.queueFocusNode,
-    this.qualityFocusNode,
     this.relatedSearchFocusNode,
   });
 
@@ -56,13 +50,6 @@ class TvPlayerControls extends StatelessWidget {
     final actionItems = [
       (favoriteIcon, isFavorite ? '取消收藏' : '收藏', onFavorite, isFavorite, null),
       (Icons.list_alt_rounded, '队列', onQueue, false, queueFocusNode),
-      (
-        Icons.high_quality_rounded,
-        qualityLabel,
-        onQuality,
-        true,
-        qualityFocusNode
-      ),
       (
         Icons.manage_search_rounded,
         '同名或歌手',

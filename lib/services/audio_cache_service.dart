@@ -94,6 +94,32 @@ class AudioCacheService {
     return null;
   }
 
+  /// Returns the best complete local copy without waiting for any network API.
+  Future<String?> findBestCachedFile(String songId) async {
+    final dir = await _getCacheDir();
+    if (!await dir.exists()) return null;
+    final prefix = '${songId}_';
+    String? bestPath;
+    var bestBitrate = -1;
+    try {
+      await for (final entity in dir.list()) {
+        if (entity is! File) continue;
+        final name = entity.path.split('/').last.split('\\').last;
+        if (name.endsWith('.tmp') || !name.startsWith(prefix)) continue;
+        if (await entity.length() <= 0) continue;
+        final suffix = name.substring(prefix.length);
+        final dotIndex = suffix.indexOf('.');
+        if (dotIndex <= 0) continue;
+        final bitrate = int.tryParse(suffix.substring(0, dotIndex)) ?? 0;
+        if (bitrate > bestBitrate) {
+          bestBitrate = bitrate;
+          bestPath = entity.path;
+        }
+      }
+    } catch (_) {}
+    return bestPath;
+  }
+
   Future<void> _deleteAllForSong(String songId, {String? exceptPath}) async {
     final dir = await _getCacheDir();
     if (!await dir.exists()) return;

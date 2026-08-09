@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import '../theme/app_design_tokens.dart';
 
 class SwipeActionCell extends StatefulWidget {
-  final Widget child;
+  final Widget Function(bool revealed) childBuilder;
   final String actionLabel;
   final Color actionColor;
   final VoidCallback onAction;
 
   const SwipeActionCell(
       {super.key,
-      required this.child,
+      required this.childBuilder,
       required this.actionLabel,
       required this.actionColor,
       required this.onAction});
@@ -65,8 +65,7 @@ class _SwipeActionCellState extends State<SwipeActionCell>
               if (details.primaryVelocity! < -300) _open();
               if (details.primaryVelocity! > 300) _close();
             },
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(18),
+            child: ClipRect(
               child: Stack(
                 children: [
                   Positioned(
@@ -80,8 +79,14 @@ class _SwipeActionCellState extends State<SwipeActionCell>
                           offset:
                               Offset(buttonWidth * (1 - _controller.value), 0),
                           child: child),
-                      child: ColoredBox(
-                        color: widget.actionColor.withValues(alpha: 0.82),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: widget.actionColor.withValues(alpha: 0.82),
+                          borderRadius: const BorderRadius.only(
+                            topRight: Radius.circular(18),
+                            bottomRight: Radius.circular(18),
+                          ),
+                        ),
                         child: GestureDetector(
                           onTap: () {
                             if (_isOpen) {
@@ -99,10 +104,9 @@ class _SwipeActionCellState extends State<SwipeActionCell>
                   ),
                   AnimatedBuilder(
                     animation: _controller,
-                    builder: (context, child) => Transform.translate(
+                    builder: (context, _) => Transform.translate(
                         offset: Offset(-buttonWidth * _controller.value, 0),
-                        child: child),
-                    child: widget.child,
+                        child: widget.childBuilder(_controller.value > 0.01)),
                   ),
                 ],
               ),

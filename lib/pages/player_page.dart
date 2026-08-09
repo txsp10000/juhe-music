@@ -2,12 +2,10 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import '../api/music_api.dart';
 import '../models/song.dart';
 import '../services/cover_cache_service.dart';
 import '../services/favorites_service.dart';
 import '../services/player_service.dart';
-import '../services/settings_service.dart';
 import '../services/theme_service.dart';
 import '../theme/app_design_tokens.dart';
 import '../utils/toast.dart';
@@ -90,6 +88,7 @@ class _PlayerPageState extends State<PlayerPage> {
     _displayedSongId = s.id;
     _parsedLrc = _parseLrc(s.lyric);
     if (s.cover.isEmpty || s.cover != _coverUrl) {
+      ThemeService.invalidateCover();
       _coverBytes = null;
       _coverUrl = '';
     }
@@ -150,14 +149,14 @@ class _PlayerPageState extends State<PlayerPage> {
     final cached = await coverCache.load(picId);
     if (cached != null && mounted && _coverUrl == url) {
       setState(() => _coverBytes = cached);
-      ThemeService.updateFromCover(cached);
+      unawaited(ThemeService.updateFromCover(cached));
       return;
     }
     if (url.startsWith('file://')) return;
     final downloaded = await coverCache.download(picId, url);
     if (downloaded != null && mounted && _coverUrl == url) {
       setState(() => _coverBytes = downloaded);
-      ThemeService.updateFromCover(downloaded);
+      unawaited(ThemeService.updateFromCover(downloaded));
     } else if (_coverUrl == url) {
       _coverUrl = '';
     }
@@ -195,24 +194,6 @@ class _PlayerPageState extends State<PlayerPage> {
 
   List<LyricLine> _parseLrc(String? lyric) => parseLyrics(lyric);
 
-  int _currentLrcIndex() {
-    if (_parsedLrc.isEmpty) return -1;
-    final posMs = _position.inMilliseconds;
-    var left = 0;
-    var right = _parsedLrc.length - 1;
-    var idx = -1;
-    while (left <= right) {
-      final mid = (left + right) ~/ 2;
-      if (_parsedLrc[mid].startMs <= posMs) {
-        idx = mid;
-        left = mid + 1;
-      } else {
-        right = mid - 1;
-      }
-    }
-    return idx;
-  }
-
   void _showSearchSameSheet() {
     final song = _player.currentSong;
     if (song == null) return;
@@ -248,90 +229,6 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  Future<void> _showQualityPicker() async {
-    List<StreamQuality> available = const [];
-    final song = _player.currentSong;
-    if (song != null) {
-      try {
-        available = (await MusicApi.getStreamInfo(song.id)).qualities;
-      } catch (_) {}
-    }
-    if (!mounted) return;
-    final options = available.isEmpty
-        ? AudioQuality.values.toList()
-        : AudioQuality.values
-            .where((q) => available.any((item) => item.quality == q.apiValue))
-            .toList();
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _MusicSheet(
-        accent: _accent,
-        title: '音质选择',
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: options.map((q) {
-            final selected = SettingsService().quality == q;
-            final matching =
-                available.where((item) => item.quality == q.apiValue).toList();
-            final actual = matching.isEmpty ? null : matching.first;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: GestureDetector(
-                onTap: () async {
-                  final oldBr = SettingsService().quality.br;
-                  await SettingsService().setQuality(q);
-                  if (!mounted) return;
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  setState(() {});
-                  if (q.br != oldBr) {
-                    unawaited(
-                      PlayerService().redownloadCurrentAtNewQuality(),
-                    );
-                  }
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? AppDesignTokens.selectedPill
-                        : Colors.white.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                          selected
-                              ? Icons.check_circle_rounded
-                              : Icons.circle_outlined,
-                          color: selected
-                              ? Colors.black87
-                              : AppDesignTokens.warmWhite,
-                          size: 20),
-                      const SizedBox(width: 12),
-                      Expanded(
-                          child: Text(
-                              actual == null
-                                  ? q.label
-                                  : '${_qualityName(q)} · ${actual.bitrateKbps}kbps',
-                              style: AppDesignTokens.body(
-                                  color: selected
-                                      ? Colors.black87
-                                      : AppDesignTokens.lyricWhite,
-                                  weight: FontWeight.w800))),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
   Widget _sheetAction(
       IconData icon, String label, String value, VoidCallback onTap) {
     return GestureDetector(
@@ -359,31 +256,6 @@ class _PlayerPageState extends State<PlayerPage> {
       ),
     );
   }
-
-  String _qualityLabel() {
-    final actual = _player.currentPlayingBr;
-    if (actual > 0 && actual < 999) return '${actual}K';
-    switch (SettingsService().quality) {
-      case AudioQuality.medium:
-        return '68K';
-      case AudioQuality.higher:
-        return '132K';
-      case AudioQuality.highest:
-        return '260K';
-      case AudioQuality.hiRes:
-        return '320K';
-      case AudioQuality.spatial:
-        return '空间音频';
-    }
-  }
-
-  String _qualityName(AudioQuality quality) => switch (quality) {
-        AudioQuality.medium => '标准',
-        AudioQuality.higher => '高品质',
-        AudioQuality.highest => '最高',
-        AudioQuality.hiRes => 'Hi-Res',
-        AudioQuality.spatial => '空间音频',
-      };
 
   void _showPlaylistSheet() {
     showModalBottomSheet(
@@ -438,8 +310,6 @@ class _PlayerPageState extends State<PlayerPage> {
       body: MusicScaffoldBackground(
         bgHint: _bgHint,
         accent: _accent,
-        coverBytes: _coverBytes,
-        useCoverBlur: true,
         child: SafeArea(
           bottom: false,
           child: Column(
@@ -599,7 +469,7 @@ class _PlayerPageState extends State<PlayerPage> {
         final coverWidth = min(width * 0.92, compact ? 340.0 : 380.0);
         final coverHeight = min(coverWidth * 0.92, availableHeight * 0.34)
             .clamp(compact ? 188.0 : 220.0, compact ? 258.0 : 300.0);
-        final lyricLines = _visibleLyricTexts(song, compact ? 4 : 5);
+        final lyricWindow = _visibleLyricTexts(song);
         final titleSize = compact ? 22.0 : 25.0;
         final singerSize = compact ? 17.0 : 18.0;
         final lyricSize = compact ? 22.0 : 25.0;
@@ -676,7 +546,7 @@ class _PlayerPageState extends State<PlayerPage> {
                         child: SingleChildScrollView(
                           physics: const BouncingScrollPhysics(),
                           child: _buildLyricPreview(
-                              lyricLines, lyricSize, nextLyricSize),
+                              lyricWindow, lyricSize, nextLyricSize),
                         ),
                       ),
                     ),
@@ -700,48 +570,74 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   Widget _buildLyricPreview(
-      List<LyricLine> lines, double currentSize, double nextSize) {
-    if (lines.isEmpty) return const SizedBox.shrink();
+      _LyricWindow window, double currentSize, double nextSize) {
+    final upcomingColor = AppDesignTokens.readableAccent(_bgHint);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        _buildKaraokeText(lines.first, currentSize),
-        for (final line in lines.skip(1)) ...[
-          const SizedBox(height: 8),
-          Text(line.text,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppDesignTokens.title(
-                  size: nextSize,
-                  color: AppDesignTokens.warmWhite.withValues(alpha: 0.58))),
-        ],
+        SizedBox(
+          height: nextSize * 1.15,
+          child: window.previous == null
+              ? null
+              : Center(
+                  child: Text(
+                    window.previous!.text,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppDesignTokens.title(
+                      size: nextSize,
+                      color: AppDesignTokens.lyricWhite,
+                    ),
+                  ),
+                ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: currentSize * 2.16,
+          child: Center(
+            child: _buildKaraokeText(window.current, currentSize),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: nextSize * 1.15,
+          child: window.next == null
+              ? null
+              : Center(
+                  child: Text(
+                    window.next!.text,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppDesignTokens.title(
+                      size: nextSize,
+                      color: upcomingColor,
+                    ),
+                  ),
+                ),
+        ),
       ],
     );
   }
 
   Widget _buildKaraokeText(LyricLine line, double size) {
-    final elapsed = _position.inMilliseconds;
-    final completed = lyricTextAt(line, elapsed);
     final style = AppDesignTokens.display(size: size);
-    if (completed.isEmpty || completed.length >= line.text.length) {
+    final upcomingColor = AppDesignTokens.readableAccent(_bgHint);
+    final progress = lyricProgressAt(line, _position.inMilliseconds);
+    if (progress <= 0) {
       return Text(line.text,
           textAlign: TextAlign.center,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: style);
+          style: style.copyWith(color: upcomingColor));
     }
-    return RichText(
-        textAlign: TextAlign.center,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        text: TextSpan(children: [
-          TextSpan(text: completed, style: style.copyWith(color: _accent)),
-          TextSpan(
-              text: line.text.substring(completed.length),
-              style: style.copyWith(
-                  color: AppDesignTokens.warmWhite.withValues(alpha: 0.4))),
-        ]));
+    return _SmoothKaraokeText(
+      text: line.text,
+      progress: progress,
+      activeStyle: style.copyWith(color: AppDesignTokens.lyricWhite),
+      inactiveStyle: style.copyWith(color: upcomingColor),
+    );
   }
 
   Widget _buildSocialActions() {
@@ -762,12 +658,6 @@ class _PlayerPageState extends State<PlayerPage> {
             icon: Icons.queue_music_rounded,
             label: '列表',
             onTap: _showPlaylistSheet,
-          ),
-          _buildActionItem(
-            icon: Icons.high_quality_rounded,
-            label: _qualityLabel(),
-            onTap: _showQualityPicker,
-            active: true,
           ),
           _buildActionItem(
             icon: Icons.search_rounded,
@@ -859,22 +749,28 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  List<LyricLine> _visibleLyricTexts(Song song, int count) {
-    final idx = _currentLrcIndex();
-    if (idx >= 0 && idx < _parsedLrc.length) {
-      final lines = _parsedLrc
-          .skip(idx)
-          .take(count)
-          .where((l) => l.text.isNotEmpty)
-          .toList();
-      if (lines.isNotEmpty) return lines;
+  _LyricWindow _visibleLyricTexts(Song song) {
+    if (_parsedLrc.isNotEmpty) {
+      final positionMs = _position.inMilliseconds;
+      var currentIndex = 0;
+      for (var index = 1; index < _parsedLrc.length; index++) {
+        if (_parsedLrc[index].startMs > positionMs) break;
+        currentIndex = index;
+      }
+      return _LyricWindow(
+        previous: currentIndex > 0 ? _parsedLrc[currentIndex - 1] : null,
+        current: _parsedLrc[currentIndex],
+        next: currentIndex + 1 < _parsedLrc.length
+            ? _parsedLrc[currentIndex + 1]
+            : null,
+      );
     }
     final first = _firstLyric(song.lyric);
     final fallback = song.album.isNotEmpty ? song.album : '何必沾惹愁滋味';
-    return [
-      LyricLine(0, 0, [LyricSyllable(0, 0, first)]),
-      LyricLine(0, 0, [LyricSyllable(0, 0, fallback)])
-    ];
+    return _LyricWindow(
+      current: LyricLine(0, 0, [LyricSyllable(0, 0, first)]),
+      next: LyricLine(0, 0, [LyricSyllable(0, 0, fallback)]),
+    );
   }
 
   String _firstLyric(String? lyric) {
@@ -889,6 +785,88 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 }
 
+class _LyricWindow {
+  final LyricLine? previous;
+  final LyricLine current;
+  final LyricLine? next;
+
+  const _LyricWindow({
+    this.previous,
+    required this.current,
+    this.next,
+  });
+}
+
+class _SmoothKaraokeText extends StatelessWidget {
+  final String text;
+  final double progress;
+  final TextStyle activeStyle;
+  final TextStyle inactiveStyle;
+
+  const _SmoothKaraokeText({
+    required this.text,
+    required this.progress,
+    required this.activeStyle,
+    required this.inactiveStyle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final painter = TextPainter(
+          text: TextSpan(text: text, style: inactiveStyle),
+          textAlign: TextAlign.center,
+          textDirection: Directionality.of(context),
+          maxLines: 2,
+          ellipsis: '...',
+        )..layout(maxWidth: constraints.maxWidth);
+        final width = painter.width;
+        final height = painter.height;
+        return TweenAnimationBuilder<double>(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.linear,
+          tween: Tween(end: progress.clamp(0.0, 1.0)),
+          builder: (context, animatedProgress, _) {
+            final revealWidth = width * animatedProgress;
+            return Center(
+              child: SizedBox(
+                width: width,
+                height: height,
+                child: Stack(
+                  children: [
+                    Text(text,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: inactiveStyle),
+                    ClipRect(
+                      child: SizedBox(
+                        width: revealWidth,
+                        height: height,
+                        child: OverflowBox(
+                          alignment: Alignment.centerLeft,
+                          minWidth: width,
+                          maxWidth: width,
+                          child: Text(text,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: activeStyle),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
 class _MusicSheet extends StatelessWidget {
   final Color accent;
   final String title;
@@ -899,28 +877,38 @@ class _MusicSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
-        decoration: BoxDecoration(
-            color: const Color(0xFF241A14).withValues(alpha: 0.96),
-            borderRadius: BorderRadius.circular(AppDesignTokens.sheetRadius)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-                width: 42,
-                height: 4,
-                decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.32),
-                    borderRadius: BorderRadius.circular(999))),
-            const SizedBox(height: 16),
-            Text(title, style: AppDesignTokens.title(size: 18)),
-            const SizedBox(height: 16),
-            child,
-          ],
+    return ValueListenableBuilder<Color>(
+      valueListenable: ThemeService.bgHint,
+      builder: (context, bgHint, _) => SafeArea(
+        top: false,
+        child: TweenAnimationBuilder<Color?>(
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+          tween: ColorTween(end: bgHint),
+          builder: (context, color, child) => Container(
+            margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+            decoration: BoxDecoration(
+              color: AppDesignTokens.surfaceFor(color ?? bgHint, opacity: 0.86),
+              borderRadius: BorderRadius.circular(AppDesignTokens.sheetRadius),
+            ),
+            child: child,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.32),
+                      borderRadius: BorderRadius.circular(999))),
+              const SizedBox(height: 16),
+              Text(title, style: AppDesignTokens.title(size: 18)),
+              const SizedBox(height: 16),
+              child,
+            ],
+          ),
         ),
       ),
     );

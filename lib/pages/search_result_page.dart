@@ -32,6 +32,7 @@ class SearchResultPage extends StatefulWidget {
 
 class _SearchResultPageState extends State<SearchResultPage> {
   final _player = PlayerService();
+  Color _bgHint = AppDesignTokens.queueBackground;
   _SearchType _type = _SearchType.tracks;
   List<Song> _songs = [];
   List<PlaylistInfo> _playlists = [];
@@ -49,6 +50,18 @@ class _SearchResultPageState extends State<SearchResultPage> {
     super.initState();
     _loadInitial();
     _loadFavorites();
+    _onThemeChange();
+    ThemeService.bgHint.addListener(_onThemeChange);
+  }
+
+  void _onThemeChange() {
+    if (mounted) setState(() => _bgHint = ThemeService.bgHint.value);
+  }
+
+  @override
+  void dispose() {
+    ThemeService.bgHint.removeListener(_onThemeChange);
+    super.dispose();
   }
 
   Future<void> _loadFavorites() async {
@@ -146,12 +159,11 @@ class _SearchResultPageState extends State<SearchResultPage> {
 
   @override
   Widget build(BuildContext context) {
-    final accent =
-        AppDesignTokens.readableAccent(ThemeService.accentColor.value);
+    const accent = AppDesignTokens.lyricWhite;
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: MusicScaffoldBackground(
-        bgHint: ThemeService.bgHint.value,
+        bgHint: _bgHint,
         accent: accent,
         child: SafeArea(
             child: Column(children: [
@@ -185,38 +197,58 @@ class _SearchResultPageState extends State<SearchResultPage> {
                     _type == _SearchType.tracks
                         ? '${_songs.length} 首歌曲'
                         : '${_playlists.length} 个歌单',
-                    style: AppDesignTokens.caption(color: accent)),
+                    style: AppDesignTokens.caption(
+                        color: AppDesignTokens.lyricWhite
+                            .withValues(alpha: 0.74))),
               ])),
         ]),
       );
 
   Widget _tabs(Color accent) => Padding(
-        padding: const EdgeInsets.fromLTRB(18, 2, 18, 12),
+        padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
         child: Row(children: [
           _tab('歌曲', _SearchType.tracks, accent),
-          const SizedBox(width: 10),
+          const SizedBox(width: 14),
           _tab('歌单', _SearchType.playlists, accent),
         ]),
       );
 
   Widget _tab(String label, _SearchType type, Color accent) {
     final selected = _type == type;
-    return Expanded(
-        child: GestureDetector(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => setState(() => _type = type),
-      child: Container(
-        height: 42,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-            color: selected
-                ? accent.withValues(alpha: 0.18)
-                : Colors.white.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: selected ? accent : Colors.white12)),
-        child: Text(label,
-            style: AppDesignTokens.body(size: 15, weight: FontWeight.w800)),
+      child: SizedBox(
+        width: 56,
+        height: 44,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              label,
+              style: AppDesignTokens.body(
+                size: 17,
+                color: selected
+                    ? AppDesignTokens.warmWhite
+                    : AppDesignTokens.warmWhite.withValues(alpha: 0.42),
+                weight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              width: selected ? 16 : 0,
+              height: 3,
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ],
+        ),
       ),
-    ));
+    );
   }
 
   Widget _body(Color accent) {

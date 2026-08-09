@@ -7,7 +7,6 @@ import '../../models/song.dart';
 import '../../models/listening_mode.dart';
 import '../../services/favorites_service.dart';
 import '../../services/player_service.dart';
-import '../../services/settings_service.dart';
 import '../../services/theme_service.dart';
 import '../tv_layout_metrics.dart';
 import '../tv_routes.dart';
@@ -27,13 +26,12 @@ class TvNowPlayingPage extends StatefulWidget {
   State<TvNowPlayingPage> createState() => _TvNowPlayingPageState();
 }
 
-enum _TvPlayerMenu { quality, relatedSearch }
+enum _TvPlayerMenu { relatedSearch }
 
 class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
   final _player = PlayerService();
   final _queueFocusNode = FocusNode();
   final _queueButtonFocusNode = FocusNode();
-  final _qualityButtonFocusNode = FocusNode();
   final _relatedSearchFocusNode = FocusNode();
   final _searchFocusNode = FocusNode();
   final Map<String, FocusNode> _modeFocusNodes = {};
@@ -46,8 +44,6 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
   String? _errorMessage;
   _TvPlayerMenu? _activeMenu;
   List<LyricLine> _parsedLrc = [];
-  List<StreamQuality> _availableQualities = const [];
-  bool _qualitiesLoading = false;
   int _modeLoadGeneration = 0;
 
   @override
@@ -89,7 +85,6 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
     FavoritesService.version.removeListener(_refreshFavoriteState);
     _queueFocusNode.dispose();
     _queueButtonFocusNode.dispose();
-    _qualityButtonFocusNode.dispose();
     _relatedSearchFocusNode.dispose();
     _searchFocusNode.dispose();
     for (final node in _modeFocusNodes.values) {
@@ -106,7 +101,6 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
 
   void _onSongChange(Song song) {
     _parsedLrc = _parseLrc(song.lyric);
-    _availableQualities = const [];
     _refreshFavoriteState();
     if (mounted) setState(() {});
   }
@@ -214,25 +208,6 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
       return;
     }
     setState(() => _activeMenu = menu);
-    if (menu == _TvPlayerMenu.quality) {
-      unawaited(_loadAvailableQualities());
-    }
-  }
-
-  Future<void> _loadAvailableQualities() async {
-    final song = _player.currentSong;
-    if (song == null) return;
-    setState(() => _qualitiesLoading = true);
-    try {
-      final info = await MusicApi.getStreamInfo(song.id);
-      if (mounted && identical(song, _player.currentSong)) {
-        setState(() => _availableQualities = info.qualities);
-      }
-    } catch (_) {
-      if (mounted) setState(() => _availableQualities = const []);
-    } finally {
-      if (mounted) setState(() => _qualitiesLoading = false);
-    }
   }
 
   void _closeMenu() {
@@ -240,23 +215,10 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
     setState(() => _activeMenu = null);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (menu == _TvPlayerMenu.quality) {
-        _qualityButtonFocusNode.requestFocus();
-      } else if (menu == _TvPlayerMenu.relatedSearch) {
+      if (menu == _TvPlayerMenu.relatedSearch) {
         _relatedSearchFocusNode.requestFocus();
       }
     });
-  }
-
-  Future<void> _selectQuality(AudioQuality quality) async {
-    final oldBr = SettingsService().quality.br;
-    await SettingsService().setQuality(quality);
-    if (!mounted) return;
-    _closeMenu();
-    setState(() {});
-    if (oldBr != quality.br && _player.currentSong != null) {
-      await _player.redownloadCurrentAtNewQuality();
-    }
   }
 
   void _searchRelated(String keyword) {
@@ -272,23 +234,6 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
 
   void _seekBy(int seconds) {
     _player.seekRelative(Duration(seconds: seconds));
-  }
-
-  String _qualityLabel() {
-    final actual = _player.currentPlayingBr;
-    if (actual > 0 && actual < 999) return '${actual}K';
-    switch (SettingsService().quality) {
-      case AudioQuality.medium:
-        return '68K';
-      case AudioQuality.higher:
-        return '132K';
-      case AudioQuality.highest:
-        return '260K';
-      case AudioQuality.hiRes:
-        return '320K';
-      case AudioQuality.spatial:
-        return '空间音频';
-    }
   }
 
   @override
@@ -439,13 +384,10 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
                 onNext: _player.next,
                 onFavorite: _toggleFavorite,
                 onQueue: _openQueue,
-                onQuality: () => _openMenu(_TvPlayerMenu.quality),
                 onRelatedSearch: () => _openMenu(_TvPlayerMenu.relatedSearch),
                 isPlaying: _player.isPlaying,
                 isFavorite: _isFavorite,
-                qualityLabel: _qualityLabel(),
                 queueFocusNode: _queueButtonFocusNode,
-                qualityFocusNode: _qualityButtonFocusNode,
                 relatedSearchFocusNode: _relatedSearchFocusNode,
               ),
             ),
@@ -660,7 +602,6 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
 
   Widget _menuOverlay(BuildContext context) {
     final metrics = TvLayoutMetrics.of(context);
-    final menu = _activeMenu!;
     final song = _player.currentSong;
     return Positioned.fill(
       child: Material(
@@ -679,69 +620,12 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
                     BorderRadius.circular(metrics.value(30, minimum: 18)),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
               ),
-              child: menu == _TvPlayerMenu.quality
-                  ? _qualityMenu(metrics)
-                  : _relatedSearchMenu(metrics, song!),
+              child: _relatedSearchMenu(metrics, song!),
             ),
           ),
         ),
       ),
     );
-  }
-
-  Widget _qualityMenu(TvLayoutMetrics metrics) {
-    final options = _availableQualities.isEmpty
-        ? AudioQuality.values.toList()
-        : AudioQuality.values
-            .where((quality) => _availableQualities
-                .any((item) => item.quality == quality.apiValue))
-            .toList();
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('音质选择', style: TvTokens.title(size: metrics.font(36))),
-        SizedBox(height: metrics.value(8, minimum: 5)),
-        Text(
-          '切换后会保持当前进度重新播放，TV 端不会写入音乐缓存。',
-          style: TvTokens.body(size: metrics.font(20), color: TvTokens.muted),
-        ),
-        SizedBox(height: metrics.value(20, minimum: 12)),
-        if (_qualitiesLoading) ...[
-          const Center(child: CircularProgressIndicator(color: TvTokens.focus)),
-          SizedBox(height: metrics.value(16, minimum: 10)),
-        ],
-        for (var index = 0; index < options.length; index++) ...[
-          TvPillButton(
-            label: _qualityOptionLabel(options[index]),
-            icon: SettingsService().quality == options[index]
-                ? Icons.check_circle_rounded
-                : Icons.circle_outlined,
-            selected: SettingsService().quality == options[index],
-            fullWidth: true,
-            autofocus: index == 0,
-            onTap: () => _selectQuality(options[index]),
-          ),
-          if (index < options.length - 1)
-            SizedBox(height: metrics.value(10, minimum: 6)),
-        ],
-      ],
-    );
-  }
-
-  String _qualityOptionLabel(AudioQuality quality) {
-    final matches = _availableQualities
-        .where((item) => item.quality == quality.apiValue)
-        .toList();
-    if (matches.isEmpty) return quality.label;
-    final name = switch (quality) {
-      AudioQuality.medium => '标准',
-      AudioQuality.higher => '高品质',
-      AudioQuality.highest => '最高',
-      AudioQuality.hiRes => 'Hi-Res',
-      AudioQuality.spatial => '空间音频',
-    };
-    return '$name · ${matches.first.bitrateKbps}kbps';
   }
 
   Widget _relatedSearchMenu(TvLayoutMetrics metrics, Song song) {

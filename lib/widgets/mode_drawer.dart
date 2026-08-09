@@ -3,24 +3,25 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../models/listening_mode.dart';
+import '../services/player_service.dart';
 import '../services/theme_service.dart';
 import '../theme/app_design_tokens.dart';
 
 class ModeDrawer extends StatefulWidget {
   final ValueChanged<ListeningMode> onSelectMode;
-  final VoidCallback onOpenCurrentMode;
   final VoidCallback onOpenFavorites;
   final VoidCallback onRandomPlay;
   final VoidCallback onClose;
   final ListeningMode? currentMode;
+  final PlaybackQueueSource queueSource;
 
   const ModeDrawer({
     super.key,
     required this.onSelectMode,
-    required this.onOpenCurrentMode,
     required this.onOpenFavorites,
     required this.onRandomPlay,
     required this.onClose,
+    required this.queueSource,
     this.currentMode,
   });
 
@@ -78,24 +79,25 @@ class _ModeDrawerState extends State<ModeDrawer> {
                     )),
                 const SizedBox(height: 28),
                 _modeButton(
-                  widget.currentMode?.icon ?? Icons.graphic_eq_rounded,
-                  '当前模式',
-                  widget.currentMode?.name ?? '返回播放页面',
+                  Icons.favorite_rounded,
+                  '收藏模式',
+                  '播放收藏里的歌曲',
                   () {
                     widget.onClose();
-                    widget.onOpenCurrentMode();
+                    widget.onOpenFavorites();
                   },
+                  selected: widget.queueSource == PlaybackQueueSource.favorites,
                 ),
                 const SizedBox(height: 12),
-                _modeButton(Icons.favorite_rounded, '收藏模式', '播放收藏里的歌曲', () {
-                  widget.onClose();
-                  widget.onOpenFavorites();
-                }),
-                const SizedBox(height: 12),
-                _modeButton(Icons.shuffle_rounded, '随机场景', '从当前场景中随机开始', () {
-                  widget.onClose();
-                  widget.onRandomPlay();
-                }),
+                _modeButton(
+                  Icons.shuffle_rounded,
+                  '随机场景',
+                  '从常用模式中随机开始',
+                  () {
+                    widget.onClose();
+                    widget.onRandomPlay();
+                  },
+                ),
                 const SizedBox(height: 28),
                 Text('常用模式', style: AppDesignTokens.title(size: 20)),
                 const SizedBox(height: 14),
@@ -124,7 +126,10 @@ class _ModeDrawerState extends State<ModeDrawer> {
   }
 
   Widget _modeTile(ListeningMode mode) {
+    final selected = widget.queueSource == PlaybackQueueSource.listeningMode &&
+        widget.currentMode?.sceneModeId == mode.sceneModeId;
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () {
         widget.onClose();
         widget.onSelectMode(mode);
@@ -132,35 +137,53 @@ class _ModeDrawerState extends State<ModeDrawer> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.09),
-              borderRadius: BorderRadius.circular(8),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: 94,
+            height: 82,
+            decoration: selected
+                ? BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.92),
+                    borderRadius: BorderRadius.circular(14),
+                  )
+                : null,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(mode.icon,
+                    color: selected ? _bgHint : AppDesignTokens.lyricWhite,
+                    size: 28),
+                const SizedBox(height: 7),
+                Text(mode.name,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppDesignTokens.caption(
+                        color: AppDesignTokens.warmWhite, size: 14)),
+              ],
             ),
-            child: Icon(mode.icon, color: _accent, size: 26),
           ),
-          const SizedBox(height: 8),
-          Text(mode.name,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: AppDesignTokens.caption(color: AppDesignTokens.warmWhite)),
         ],
       ),
     );
   }
 
   Widget _modeButton(
-      IconData icon, String title, String subtitle, VoidCallback onTap) {
+    IconData icon,
+    String title,
+    String subtitle,
+    VoidCallback onTap, {
+    bool selected = false,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
+          color: selected
+              ? Colors.white.withValues(alpha: 0.20)
+              : Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(

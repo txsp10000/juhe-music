@@ -102,8 +102,12 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   void _playAt(int index) {
-    if (_player.currentSong?.id != _songs[index].id) {
-      _player.replaceQueue(_songs);
+    if (_player.currentSong?.id != _songs[index].id ||
+        _player.queueSource != PlaybackQueueSource.favorites) {
+      _player.replaceQueue(
+        _songs,
+        source: PlaybackQueueSource.favorites,
+      );
       unawaited(_player.playAt(index));
     } else if (!_player.isPlaying) {
       unawaited(_player.play());
@@ -165,7 +169,6 @@ class _FavoritesPageState extends State<FavoritesPage> {
       body: MusicScaffoldBackground(
         bgHint: _bgHint,
         accent: _accent,
-        neutralize: true,
         child: SafeArea(
           bottom: false,
           child: Column(
@@ -223,7 +226,9 @@ class _FavoritesPageState extends State<FavoritesPage> {
                     style: AppDesignTokens.display(size: 28)),
                 const SizedBox(height: 4),
                 Text(_editMode ? '选择要移出的歌曲' : '${_songs.length} 首被点亮的歌',
-                    style: AppDesignTokens.caption(color: _accent)),
+                    style: AppDesignTokens.caption(
+                        color: AppDesignTokens.lyricWhite
+                            .withValues(alpha: 0.72))),
               ],
             ),
           ),
@@ -277,13 +282,19 @@ class _FavoritesPageState extends State<FavoritesPage> {
           actionLabel: '删除',
           actionColor: AppDesignTokens.danger,
           onAction: () => _removeSong(i),
-          child: MusicListTile(
+          childBuilder: (revealed) => MusicListTile(
               song: s,
               index: i,
               isCurrent: isCurrent,
               accent: _accent,
               onTap: () => _playAt(i),
-              margin: EdgeInsets.zero),
+              margin: EdgeInsets.zero,
+              borderRadius: revealed
+                  ? const BorderRadius.only(
+                      topLeft: Radius.circular(18),
+                      bottomLeft: Radius.circular(18),
+                    )
+                  : const BorderRadius.all(Radius.circular(18))),
         );
       },
     );
@@ -296,6 +307,8 @@ class _FavoritesPageState extends State<FavoritesPage> {
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
         child: GlassPanel(
           accent: _accent,
+          color: AppDesignTokens.surfaceFor(_bgHint, opacity: 0.40),
+          opacity: 0.88,
           radius: 28,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           child: Row(

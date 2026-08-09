@@ -200,30 +200,26 @@ class MusicApi {
 
   static Future<StreamSelection> resolveStream(
       String trackId, AudioQuality requested) async {
-    final requestedName = requested.apiValue;
     try {
       final info = await getStreamInfo(trackId);
       if (info.qualities.isNotEmpty) {
         final ranked = [...info.qualities]
           ..sort((a, b) => b.rank.compareTo(a.rank));
-        final exact = ranked.where((q) => q.quality == requestedName).toList();
-        final targetRank = _qualityRank(requestedName);
-        final eligible = ranked.where((q) => q.rank <= targetRank).toList();
-        final chosen = exact.isNotEmpty
-            ? exact.first
-            : (eligible.isNotEmpty ? eligible.first : ranked.last);
+        final chosen = ranked.first;
         return StreamSelection(
             chosen.url.startsWith('http') ? chosen.url : '$_base${chosen.url}',
             chosen.bitrateKbps,
             chosen.quality);
       }
     } catch (_) {}
-    return StreamSelection(streamUrl(trackId, quality: requestedName),
-        requested.br, requestedName);
+    return StreamSelection(
+        streamUrl(trackId, quality: AudioQuality.highest.apiValue),
+        AudioQuality.highest.br,
+        AudioQuality.highest.apiValue);
   }
 
   static String streamUrl(String trackId, {String? quality}) {
-    final selectedQuality = quality ?? SettingsService().quality.apiValue;
+    final selectedQuality = quality ?? AudioQuality.highest.apiValue;
     return Uri.parse('$_base/stream/${Uri.encodeComponent(trackId)}')
         .replace(queryParameters: {'quality': selectedQuality}).toString();
   }
