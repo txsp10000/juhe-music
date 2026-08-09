@@ -100,7 +100,10 @@ class _PlayerPageState extends State<PlayerPage> {
     setState(() {
       if (changedSong) {
         _dragOffset = 0.0;
-        _isSwitchingSong = false;
+        // Keep the compact transition card active until the incoming slide
+        // has completed; switching straight to the full player here causes a
+        // one-frame flash of lyrics and controls.
+        _isSwitchingSong = animateFromOppositeSide;
         _awaitingSongTransition = false;
         _incomingSong = animateFromOppositeSide;
       }
@@ -111,7 +114,12 @@ class _PlayerPageState extends State<PlayerPage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         Future.delayed(const Duration(milliseconds: 430), () {
-          if (mounted) setState(() => _incomingSong = false);
+          if (mounted) {
+            setState(() {
+              _incomingSong = false;
+              _isSwitchingSong = false;
+            });
+          }
         });
       });
     }
@@ -425,7 +433,7 @@ class _PlayerPageState extends State<PlayerPage> {
                         _dragOffset < 0
                             ? height + _dragOffset
                             : -height + _dragOffset),
-                    child: _buildPlayerContent(adjacentSong,
+                    child: _buildSongTransitionCard(adjacentSong,
                         coverBytes: _adjacentCovers[adjacentSong.id]),
                   ),
                 Transform.translate(
@@ -452,7 +460,9 @@ class _PlayerPageState extends State<PlayerPage> {
                       },
                       child: KeyedSubtree(
                         key: ValueKey(song.id),
-                        child: _buildPlayerContent(song),
+                        child: (_incomingSong || _isSwitchingSong)
+                            ? _buildSongTransitionCard(song)
+                            : _buildPlayerContent(song),
                       ),
                     ),
                   ),
@@ -618,6 +628,51 @@ class _PlayerPageState extends State<PlayerPage> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSongTransitionCard(Song song, {Uint8List? coverBytes}) {
+    final bytes =
+        coverBytes ?? (song.id == _player.currentSong?.id ? _coverBytes : null);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: SizedBox(
+                width: double.infinity,
+                height: 250,
+                child: bytes != null
+                    ? Image.memory(bytes, fit: BoxFit.cover)
+                    : song.cover.isNotEmpty
+                        ? Image.network(song.cover, fit: BoxFit.cover)
+                        : Container(
+                            color: Colors.white.withValues(alpha: 0.08),
+                            child: const Icon(Icons.music_note_rounded,
+                                color: Colors.white, size: 72),
+                          ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(song.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: AppDesignTokens.display(size: 24)),
+            const SizedBox(height: 7),
+            Text(song.singer,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: AppDesignTokens.title(
+                    size: 17,
+                    color: AppDesignTokens.warmWhite.withValues(alpha: 0.74))),
+          ],
+        ),
+      ),
     );
   }
 
