@@ -594,7 +594,8 @@ class _PlayerPageState extends State<PlayerPage> {
               _buildSocialActions(),
               SizedBox(height: actionsToProgressGap),
               _buildProgressBar(),
-              SizedBox(height: tiny ? 4 : 6),
+              // Keep the slider thumb clear of the compact bottom controls.
+              SizedBox(height: tiny ? 10 : 14),
             ],
           ),
         );

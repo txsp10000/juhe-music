@@ -75,7 +75,7 @@ class _MainPageState extends State<MainPage> {
   Widget build(BuildContext context) {
     final panelWidth =
         (MediaQuery.of(context).size.width * 0.84).clamp(0.0, 380.0);
-    final bottomControlHeight = 64.0 + MediaQuery.of(context).padding.bottom;
+    final bottomControlHeight = 56.0 + MediaQuery.of(context).padding.bottom;
 
     return MusicScaffoldBackground(
       bgHint: _bgHint,
@@ -204,7 +204,7 @@ class _MainPageState extends State<MainPage> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
       child: SizedBox(
-        height: 60,
+        height: 52,
         child: Stack(
           alignment: Alignment.center,
           children: [
@@ -215,7 +215,7 @@ class _MainPageState extends State<MainPage> {
               child: Row(
                 children: [
                   Expanded(child: _navLabel('搜索', 1)),
-                  const SizedBox(width: 64),
+                  const SizedBox(width: 58),
                   Expanded(child: _navLabel('收藏', 2)),
                 ],
               ),
@@ -231,12 +231,12 @@ class _MainPageState extends State<MainPage> {
                   }
                 },
                 child: SizedBox(
-                  width: 80,
-                  height: 60,
+                  width: 72,
+                  height: 52,
                   child: Center(
                     child: Container(
-                      width: 48,
-                      height: 48,
+                      width: 44,
+                      height: 44,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 2.6),
@@ -250,12 +250,12 @@ class _MainPageState extends State<MainPage> {
                                         ? Icons.pause_rounded
                                         : Icons.play_arrow_rounded,
                                     color: Colors.white,
-                                    size: 26,
+                                    size: 24,
                                   )
                                 : MiniWave(
                                     playing: false,
                                     color: Colors.white,
-                                    size: 22,
+                                    size: 20,
                                   )
                             : hasSong
                                 ? Opacity(
@@ -263,13 +263,13 @@ class _MainPageState extends State<MainPage> {
                                     child: MiniWave(
                                       playing: _player.isPlaying,
                                       color: Colors.white,
-                                      size: 22,
+                                      size: 20,
                                     ),
                                   )
                                 : const MiniWave(
                                     playing: false,
                                     color: Color(0x61FFFFFF),
-                                    size: 22,
+                                    size: 20,
                                   ),
                       ),
                     ),
@@ -290,7 +290,7 @@ class _MainPageState extends State<MainPage> {
       onTap: () => setState(() => _tab = tabIndex),
       child: SizedBox(
         width: double.infinity,
-        height: 60,
+        height: 52,
         child: Center(
           child: Text(
             label,
