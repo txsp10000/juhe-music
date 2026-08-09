@@ -725,29 +725,34 @@ class _PlayerPageState extends State<PlayerPage> {
 
   Widget _buildSocialActions() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          _buildActionItem(
-            icon: _isFavorite
-                ? Icons.favorite_rounded
-                : Icons.favorite_border_rounded,
-            label: '收藏',
-            onTap: _toggleFavorite,
-            active: _isFavorite,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 300),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildActionItem(
+                icon: _isFavorite
+                    ? Icons.favorite_rounded
+                    : Icons.favorite_border_rounded,
+                label: '收藏',
+                onTap: _toggleFavorite,
+                active: _isFavorite,
+              ),
+              _buildActionItem(
+                icon: Icons.queue_music_rounded,
+                label: '列表',
+                onTap: _showPlaylistSheet,
+              ),
+              _buildActionItem(
+                icon: Icons.search_rounded,
+                label: '搜索',
+                onTap: _showSearchSameSheet,
+              ),
+            ],
           ),
-          _buildActionItem(
-            icon: Icons.queue_music_rounded,
-            label: '列表',
-            onTap: _showPlaylistSheet,
-          ),
-          _buildActionItem(
-            icon: Icons.search_rounded,
-            label: '搜索',
-            onTap: _showSearchSameSheet,
-          ),
-        ],
+        ),
       ),
     );
   }
