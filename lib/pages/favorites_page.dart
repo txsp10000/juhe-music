@@ -191,7 +191,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
                   ],
                 ),
               ),
-              if (widget.embedded) SizedBox(height: _editMode ? 76 : 60),
+              if (widget.embedded) SizedBox(height: _editMode ? 8 : 8),
             ],
           ),
         ),
@@ -261,7 +261,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
     // so the final favorite can still scroll clear of the overlay.
     final bottomInset = MediaQuery.of(context).padding.bottom;
     final bottomPadding =
-        widget.embedded ? (_editMode ? 10.0 : 72.0 + bottomInset) : 86.0;
+        widget.embedded ? (_editMode ? 10.0 : 12.0 + bottomInset) : 86.0;
     return ListView.builder(
       controller: _scrollController,
       padding: EdgeInsets.only(top: 4, bottom: bottomPadding),

@@ -85,17 +85,17 @@ class _MainPageState extends State<MainPage> {
             // The themed wrapper paints the area reserved for the bottom nav
             // as well, so Android does not fall back to a black strip.
             backgroundColor: Colors.transparent,
-            // Let the player controls sit naturally above the persistent nav.
-            // Embedded pages reserve their own bottom scroll space so this is
-            // safe on both iOS and Android.
-            extendBody: true,
+            // Keep the page viewport above the persistent nav. This avoids
+            // platform-specific safe-area overlap on both iOS and Android.
+            extendBody: false,
             body: MusicScaffoldBackground(
               bgHint: _bgHint,
               accent: _accent,
               child: IndexedStack(
                 index: _tab,
                 children: [
-                  PlayerPage(onOpenDrawer: () => _openDrawer(0)),
+                  PlayerPage(
+                      embedded: true, onOpenDrawer: () => _openDrawer(0)),
                   SearchPage(
                     embedded: true,
                     onShowPlayer: _showPlayer,

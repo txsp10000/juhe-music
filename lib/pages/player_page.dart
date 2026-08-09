@@ -15,8 +15,9 @@ import 'search_result_page.dart';
 
 class PlayerPage extends StatefulWidget {
   final VoidCallback? onOpenDrawer;
+  final bool embedded;
 
-  const PlayerPage({super.key, this.onOpenDrawer});
+  const PlayerPage({super.key, this.onOpenDrawer, this.embedded = false});
 
   @override
   State<PlayerPage> createState() => _PlayerPageState();
@@ -36,6 +37,8 @@ class _PlayerPageState extends State<PlayerPage> {
   int _swipeDirection = 0;
   double _dragOffset = 0.0;
   bool _isSwitchingSong = false;
+  bool _awaitingSongTransition = false;
+  bool _incomingSong = false;
   bool _favoriteOperationInProgress = false;
   String? _displayedSongId;
 
@@ -92,14 +95,23 @@ class _PlayerPageState extends State<PlayerPage> {
       _coverBytes = null;
       _coverUrl = '';
     }
+    final animateFromOppositeSide = _awaitingSongTransition;
     setState(() {
       if (changedSong) {
         _dragOffset = 0.0;
-        _isSwitchingSong = false;
+        _isSwitchingSong = true;
+        _awaitingSongTransition = false;
+        _incomingSong = animateFromOppositeSide;
       }
     });
     _checkFavorite();
     _loadCover(s);
+    if (animateFromOppositeSide) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() => _incomingSong = false);
+      });
+    }
   }
 
   void _onDownloadProgress(double? progress) {
@@ -136,6 +148,15 @@ class _PlayerPageState extends State<PlayerPage> {
     if (song != null) {
       _loadCover(song);
     }
+  }
+
+  void _prefetchAdjacentCover({required bool next}) {
+    final index = _player.currentIndex + (next ? 1 : -1);
+    if (index < 0 || index >= _player.queue.length) return;
+    final song = _player.queue[index];
+    if (song.cover.isEmpty) return;
+    final picId = song.picId.isNotEmpty ? song.picId : song.id;
+    unawaited(CoverCacheService().download(picId, song.cover));
   }
 
   Future<void> _loadCover(Song song) async {
@@ -290,7 +311,7 @@ class _PlayerPageState extends State<PlayerPage> {
                   child: song != null
                       ? _buildSwipeableContent(song)
                       : _buildEmptyState()),
-              const SizedBox(height: 65),
+              SizedBox(height: widget.embedded ? 8 : 65),
             ],
           ),
         ),
@@ -364,16 +385,16 @@ class _PlayerPageState extends State<PlayerPage> {
             : constraints.maxHeight;
         final dragProgress =
             (_dragOffset.abs() / max(height * 0.46, 1.0)).clamp(0.0, 1.0);
-        final slideOffset = _isSwitchingSong
-            ? Offset(0, _swipeDirection < 0 ? -1.05 : 1.05)
-            : Offset(0, _dragOffset / max(height, 1.0));
         final opacity = _isSwitchingSong
-            ? 0.0
+            ? 1.0
             : (1.0 - dragProgress * 0.72).clamp(0.28, 1.0);
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onVerticalDragUpdate: (details) {
             if (_isSwitchingSong) return;
+            if (_dragOffset == 0.0) {
+              _prefetchAdjacentCover(next: details.delta.dy < 0);
+            }
             setState(() => _dragOffset = (_dragOffset + details.delta.dy)
                 .clamp(-height * 0.58, height * 0.58));
           },
@@ -383,14 +404,30 @@ class _PlayerPageState extends State<PlayerPage> {
             if (!_isSwitchingSong) setState(() => _dragOffset = 0.0);
           },
           child: ClipRect(
-            child: AnimatedSlide(
-              offset: slideOffset,
-              duration: Duration(milliseconds: _isSwitchingSong ? 260 : 80),
-              curve: Curves.easeOutCubic,
+            child: Transform.translate(
+              offset: Offset(0, _incomingSong ? 0 : _dragOffset),
               child: AnimatedOpacity(
                 opacity: opacity,
-                duration: Duration(milliseconds: _isSwitchingSong ? 240 : 80),
-                child: _buildPlayerContent(song),
+                duration: const Duration(milliseconds: 80),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 420),
+                  reverseDuration: const Duration(milliseconds: 360),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) {
+                    final begin = Offset(0, _swipeDirection < 0 ? 1.0 : -1.0);
+                    return SlideTransition(
+                      position: animation.drive(
+                        Tween(begin: begin, end: Offset.zero),
+                      ),
+                      child: child,
+                    );
+                  },
+                  child: KeyedSubtree(
+                    key: ValueKey(song.id),
+                    child: _buildPlayerContent(song),
+                  ),
+                ),
               ),
             ),
           ),
@@ -411,6 +448,7 @@ class _PlayerPageState extends State<PlayerPage> {
     setState(() {
       _swipeDirection = shouldNext ? -1 : 1;
       _isSwitchingSong = true;
+      _awaitingSongTransition = true;
       _dragOffset = shouldNext ? -height : height;
     });
     Future.delayed(const Duration(milliseconds: 180), () {

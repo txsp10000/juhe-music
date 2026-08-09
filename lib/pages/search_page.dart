@@ -100,8 +100,13 @@ class _SearchPageState extends State<SearchPage> {
         child: SafeArea(
           bottom: false,
           child: ListView(
-            padding:
-                EdgeInsets.fromLTRB(20, 18, 20, widget.embedded ? 106 : 24),
+            padding: EdgeInsets.fromLTRB(
+                20,
+                18,
+                20,
+                widget.embedded
+                    ? 16 + MediaQuery.of(context).padding.bottom
+                    : 24),
             children: [
               _buildHeader(),
               const SizedBox(height: 22),
