@@ -319,7 +319,7 @@ class _PlayerPageState extends State<PlayerPage> {
                   child: song != null
                       ? _buildSwipeableContent(song)
                       : _buildEmptyState()),
-              const SizedBox(height: 106),
+              const SizedBox(height: 65),
             ],
           ),
         ),
@@ -465,104 +465,114 @@ class _PlayerPageState extends State<PlayerPage> {
       builder: (context, constraints) {
         final availableHeight = constraints.maxHeight;
         final width = constraints.maxWidth;
-        final compact = availableHeight < 640;
-        final coverWidth = min(width * 0.92, compact ? 340.0 : 380.0);
-        final coverHeight = min(coverWidth * 0.92, availableHeight * 0.34)
-            .clamp(compact ? 188.0 : 220.0, compact ? 258.0 : 300.0);
+        final compact = availableHeight < 620;
+        final tiny = availableHeight < 480;
+        final contentWidth = width * 0.90;
+        final coverHeight = min(
+          contentWidth * 0.92,
+          availableHeight * (tiny ? 0.30 : 0.44),
+        ).clamp(108.0, 360.0);
+        final coverWidth = contentWidth;
         final lyricWindow = _visibleLyricTexts(song);
-        final titleSize = compact ? 22.0 : 25.0;
-        final singerSize = compact ? 17.0 : 18.0;
-        final lyricSize = compact ? 22.0 : 25.0;
-        final nextLyricSize = compact ? 17.0 : 19.0;
-        final topGap = compact ? 0.0 : 6.0;
-        final coverToInfoGap = compact ? 12.0 : 20.0;
-        final infoToLyricGap = compact ? 14.0 : 22.0;
-        final lyricToActionsGap = compact ? 18.0 : 30.0;
-        final actionsToProgressGap = compact ? 18.0 : 24.0;
+        final titleSize = tiny ? 20.0 : (compact ? 22.0 : 25.0);
+        final singerSize = tiny ? 15.0 : (compact ? 17.0 : 18.0);
+        final lyricSize = tiny ? 20.0 : (compact ? 22.0 : 25.0);
+        final nextLyricSize = tiny ? 15.0 : (compact ? 17.0 : 19.0);
+        final coverToInfoGap = tiny ? 8.0 : (compact ? 12.0 : 20.0);
+        final infoToLyricGap = tiny ? 8.0 : (compact ? 14.0 : 22.0);
+        final lyricToActionsGap = tiny ? 8.0 : (compact ? 12.0 : 18.0);
+        final actionsToProgressGap = tiny ? 4.0 : (compact ? 8.0 : 12.0);
+        final lyricHeight = nextLyricSize * 2.3 + lyricSize * 2.16 + 16;
         return Padding(
-          padding: const EdgeInsets.fromLTRB(26, 0, 26, 0),
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: availableHeight),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(height: topGap),
-                  Center(
-                    child: Container(
-                      width: coverWidth,
-                      height: coverHeight,
-                      decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(30),
-                          color: Colors.white.withValues(alpha: 0.08),
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.30),
-                                blurRadius: 34,
-                                offset: const Offset(0, 18))
-                          ]),
-                      clipBehavior: Clip.antiAlias,
-                      child: _coverBytes != null
-                          ? Image.memory(_coverBytes!, fit: BoxFit.cover)
-                          : Icon(Icons.music_note_rounded,
-                              color: AppDesignTokens.lyricWhite
-                                  .withValues(alpha: 0.72),
-                              size: coverHeight * 0.26),
-                    ),
-                  ),
-                  SizedBox(height: coverToInfoGap),
-                  Center(
-                    child: SizedBox(
-                      width: coverWidth,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Text(song.name,
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppDesignTokens.display(size: titleSize)),
-                          const SizedBox(height: 8),
-                          Text(song.singer,
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppDesignTokens.title(
-                                  size: singerSize,
-                                  color: AppDesignTokens.warmWhite
-                                      .withValues(alpha: 0.76))),
-                        ],
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: infoToLyricGap),
-                  Center(
-                    child: SizedBox(
-                      width: coverWidth,
-                      child: ConstrainedBox(
-                        constraints:
-                            BoxConstraints(minHeight: compact ? 128.0 : 156.0),
-                        child: SingleChildScrollView(
-                          physics: const BouncingScrollPhysics(),
-                          child: _buildLyricPreview(
-                              lyricWindow, lyricSize, nextLyricSize),
+          padding: EdgeInsets.zero,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: coverWidth,
+                  height: coverHeight,
+                  decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(30),
+                      color: Colors.white.withValues(alpha: 0.08),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.30),
+                            blurRadius: 34,
+                            offset: const Offset(0, 18))
+                      ]),
+                  clipBehavior: Clip.antiAlias,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (_coverBytes != null)
+                        Image.memory(_coverBytes!, fit: BoxFit.cover)
+                      else
+                        Icon(Icons.music_note_rounded,
+                            color: AppDesignTokens.lyricWhite
+                                .withValues(alpha: 0.72),
+                            size: coverHeight * 0.26),
+                      IgnorePointer(
+                        child: Center(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 220),
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            child: _downloadProgress == null
+                                ? const SizedBox.shrink()
+                                : _CoverCacheProgress(
+                                    key: const ValueKey('cover-cache-progress'),
+                                    progress: _downloadProgress!,
+                                    size: min(coverWidth, coverHeight) * 0.28,
+                                  ),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
-                  SizedBox(height: lyricToActionsGap),
-                  _buildSocialActions(),
-                  if (_downloadProgress != null) ...[
-                    const SizedBox(height: 8),
-                    _buildDownloadProgress()
-                  ],
-                  SizedBox(height: actionsToProgressGap),
-                  _buildProgressBar(),
-                  SizedBox(height: compact ? 10 : 20),
-                ],
+                ),
               ),
-            ),
+              SizedBox(height: coverToInfoGap),
+              Center(
+                child: SizedBox(
+                  width: coverWidth,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(song.name,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppDesignTokens.display(size: titleSize)),
+                      SizedBox(height: tiny ? 5 : 8),
+                      Text(song.singer,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppDesignTokens.title(
+                              size: singerSize,
+                              color: AppDesignTokens.warmWhite
+                                  .withValues(alpha: 0.76))),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(height: infoToLyricGap),
+              Center(
+                child: SizedBox(
+                  width: coverWidth,
+                  height: lyricHeight,
+                  child:
+                      _buildLyricPreview(lyricWindow, lyricSize, nextLyricSize),
+                ),
+              ),
+              const Spacer(),
+              SizedBox(height: lyricToActionsGap),
+              _buildSocialActions(),
+              SizedBox(height: actionsToProgressGap),
+              _buildProgressBar(),
+              SizedBox(height: tiny ? 4 : 6),
+            ],
           ),
         );
       },
@@ -651,7 +661,7 @@ class _PlayerPageState extends State<PlayerPage> {
 
   Widget _buildSocialActions() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -699,26 +709,6 @@ class _PlayerPageState extends State<PlayerPage> {
             style: AppDesignTokens.caption(
                 size: 10,
                 color: AppDesignTokens.warmWhite.withValues(alpha: 0.65))),
-      ],
-    );
-  }
-
-  Widget _buildDownloadProgress() {
-    final preparing = _downloadProgress != null && _downloadProgress! < 0;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        SizedBox(
-            width: 15,
-            height: 15,
-            child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: _accent,
-                value: preparing ? null : _downloadProgress)),
-        const SizedBox(width: 9),
-        Text(preparing ? '正在准备播放' : '缓存中',
-            style: AppDesignTokens.caption(
-                color: AppDesignTokens.warmWhite.withValues(alpha: 0.72))),
       ],
     );
   }
@@ -791,6 +781,44 @@ class _PlayerPageState extends State<PlayerPage> {
         .replaceAll(RegExp(r'<\d+,\d+,\d+>'), '')
         .trim();
     return line.isEmpty ? '纵此生也不过百岁' : line;
+  }
+}
+
+class _CoverCacheProgress extends StatelessWidget {
+  final double progress;
+  final double size;
+
+  const _CoverCacheProgress({
+    super.key,
+    required this.progress,
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final indeterminate = progress < 0;
+    return Container(
+      width: size,
+      height: size,
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.black.withValues(alpha: 0.28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.22),
+            blurRadius: 14,
+          ),
+        ],
+      ),
+      child: CircularProgressIndicator(
+        value: indeterminate ? null : progress.clamp(0.0, 1.0),
+        strokeWidth: 5,
+        strokeCap: StrokeCap.round,
+        backgroundColor: Colors.white.withValues(alpha: 0.22),
+        valueColor: const AlwaysStoppedAnimation(AppDesignTokens.lyricWhite),
+      ),
+    );
   }
 }
 

@@ -11,7 +11,6 @@ import 'lyric_cache_service.dart';
 import 'audio_cache_service.dart';
 import 'cover_cache_service.dart';
 import 'settings_service.dart';
-import 'app_environment.dart';
 import 'progressive_audio_cache_service.dart';
 import 'theme_service.dart';
 
@@ -176,7 +175,7 @@ class PlayerService {
     MediaKit.ensureInitialized();
     final createdPlayer = Player(
       configuration: PlayerConfiguration(
-        bufferSize: isTvApp ? 4 * 1024 * 1024 : 32 * 1024 * 1024,
+        bufferSize: 32 * 1024 * 1024,
       ),
     );
     _player = createdPlayer;
@@ -372,7 +371,7 @@ class PlayerService {
       _position = Duration.zero;
       _duration = Duration.zero;
       _openedGeneration = null;
-      if (!isTvApp) await ProgressiveAudioCacheService().cancelActive();
+      await ProgressiveAudioCacheService().cancelActive();
       _suppressCompletion = true;
       try {
         await _player?.stop();
@@ -423,7 +422,7 @@ class PlayerService {
     _resumeAfterAndroidInterruption = false;
     _openedGeneration = null;
     _playGeneration++;
-    if (!isTvApp) await ProgressiveAudioCacheService().cancelActive();
+    await ProgressiveAudioCacheService().cancelActive();
     _suppressCompletion = true;
     try {
       await _player?.stop();
@@ -489,7 +488,7 @@ class PlayerService {
       title: song.name,
       artist: song.singer,
       album: song.album.isNotEmpty ? song.album : '汽水音乐',
-      artUri: !isTvApp && song.cover.startsWith('file:')
+      artUri: song.cover.startsWith('file:')
           ? Uri.tryParse(song.cover)
           : null,
     );
@@ -504,24 +503,20 @@ class PlayerService {
     } finally {
       _suppressCompletion = false;
     }
-    if (!isTvApp) {
-      // Do not hold the next local-file playback behind cleanup of a previous
-      // progressive download. The new stream start still serializes itself.
-      unawaited(ProgressiveAudioCacheService().cancelActive());
-    }
+    // Do not hold the next local-file playback behind cleanup of a previous
+    // progressive download. The new stream start still serializes itself.
+    unawaited(ProgressiveAudioCacheService().cancelActive());
 
-    if (!isTvApp) {
-      final coverCache = CoverCacheService();
-      final localCover = await coverCache.getLocalPath(picId);
-      if (currentGen != _playGeneration) return;
-      if (localCover != null) {
-        song.cover = Uri.file(localCover).toString();
-        _currentMediaItem =
-            _currentMediaItem!.copyWith(artUri: Uri.file(localCover));
-        try {
-          await _audioHandler?.updateMediaItem(_currentMediaItem!);
-        } catch (_) {}
-      }
+    final coverCache = CoverCacheService();
+    final localCover = await coverCache.getLocalPath(picId);
+    if (currentGen != _playGeneration) return;
+    if (localCover != null) {
+      song.cover = Uri.file(localCover).toString();
+      _currentMediaItem =
+          _currentMediaItem!.copyWith(artUri: Uri.file(localCover));
+      try {
+        await _audioHandler?.updateMediaItem(_currentMediaItem!);
+      } catch (_) {}
     }
 
     _notifyProgress(Duration.zero, Duration.zero);
@@ -533,46 +528,56 @@ class PlayerService {
 
   Future<void> _hydrateSongDetails(Song song, int generation) async {
     final playId = song.lyricId.isNotEmpty ? song.lyricId : song.id;
-    final details = await MusicApi.getTrackDetails(playId);
+    final cachedLyric = await LyricCacheService().load(playId);
     if (generation != _playGeneration) return;
-    final lyricText = details.lyric;
-    if (lyricText.isNotEmpty) {
-      for (final s in queue) {
-        final sid = s.lyricId.isNotEmpty ? s.lyricId : s.id;
-        if (sid == playId) s.lyric = lyricText;
-      }
-      song.lyric = lyricText;
-      _notifySongChange(song);
-      if (!isTvApp) {
-        await LyricCacheService().save(playId, lyricText);
-      }
+    if (cachedLyric != null && cachedLyric.isNotEmpty) {
+      _applyLyric(song, playId, cachedLyric);
     }
 
-    if (!song.cover.startsWith('file:')) {
-      final picId = song.picId.isNotEmpty ? song.picId : song.id;
-      final coverUrl =
-          details.song.cover.isNotEmpty ? details.song.cover : song.cover;
+    try {
+      final details = await MusicApi.getTrackDetails(playId);
       if (generation != _playGeneration) return;
-      if (coverUrl.isNotEmpty) {
-        final coverBytes = await CoverCacheService().download(picId, coverUrl);
-        if (generation != _playGeneration) return;
-        if (coverBytes != null) {
-          unawaited(ThemeService.updateFromCover(coverBytes));
-        }
-        if (isTvApp) return;
-        final localCover = await CoverCacheService().getLocalPath(picId);
-        if (generation != _playGeneration) return;
-        final artUri = localCover == null ? null : Uri.file(localCover);
-        if (artUri != null) song.cover = artUri.toString();
-        _currentMediaItem = _currentMediaItem?.copyWith(artUri: artUri);
-        try {
-          if (_currentMediaItem != null) {
-            await _audioHandler?.updateMediaItem(_currentMediaItem!);
-          }
-        } catch (_) {}
-        _notifySongChange(song);
+      final lyricText = details.lyric;
+      if (lyricText.isNotEmpty) {
+        _applyLyric(song, playId, lyricText);
+        await LyricCacheService().save(playId, lyricText);
       }
+
+      if (!song.cover.startsWith('file:')) {
+        final picId = song.picId.isNotEmpty ? song.picId : song.id;
+        final coverUrl =
+            details.song.cover.isNotEmpty ? details.song.cover : song.cover;
+        if (generation != _playGeneration) return;
+        if (coverUrl.isNotEmpty) {
+          final coverBytes =
+              await CoverCacheService().download(picId, coverUrl);
+          if (generation != _playGeneration) return;
+          if (coverBytes != null) {
+            unawaited(ThemeService.updateFromCover(coverBytes));
+          }
+          final localCover = await CoverCacheService().getLocalPath(picId);
+          if (generation != _playGeneration) return;
+          final artUri = localCover == null ? null : Uri.file(localCover);
+          if (artUri != null) song.cover = artUri.toString();
+          _currentMediaItem = _currentMediaItem?.copyWith(artUri: artUri);
+          try {
+            if (_currentMediaItem != null) {
+              await _audioHandler?.updateMediaItem(_currentMediaItem!);
+            }
+          } catch (_) {}
+          _notifySongChange(song);
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _applyLyric(Song song, String playId, String lyric) {
+    for (final item in queue) {
+      final lyricId = item.lyricId.isNotEmpty ? item.lyricId : item.id;
+      if (lyricId == playId) item.lyric = lyric;
     }
+    song.lyric = lyric;
+    _notifySongChange(song);
   }
 
   Future<void> _prepareAndPlayAudio(
@@ -585,19 +590,17 @@ class PlayerService {
     final player = _player;
     if (player == null) return;
     var quality = requestedBr ?? AudioQuality.highest.br;
-    if (!isTvApp) {
-      final cachedPath = await AudioCacheService().findBestCachedFile(song.id);
-      if (generation != _playGeneration) return;
-      if (cachedPath != null) {
-        _currentPlayingBr = _extractBrFromPath(cachedPath);
-        await _openMedia(
-          Media(Uri.file(cachedPath).toString()),
-          generation,
-          play: play,
-          resumePosition: resumePosition,
-        );
-        return;
-      }
+    final cachedPath = await AudioCacheService().findBestCachedFile(song.id);
+    if (generation != _playGeneration) return;
+    if (cachedPath != null) {
+      _currentPlayingBr = _extractBrFromPath(cachedPath);
+      await _openMedia(
+        Media(Uri.file(cachedPath).toString()),
+        generation,
+        play: play,
+        resumePosition: resumePosition,
+      );
+      return;
     }
     StreamSelection? selection;
     try {
@@ -613,9 +616,8 @@ class PlayerService {
     }
 
     _currentPlayingBr = quality;
-    if (!isTvApp) {
-      _notifyDownloadProgress(0.0);
-      final localStreamUrl = await ProgressiveAudioCacheService().start(
+    _notifyDownloadProgress(0.0);
+    final localStreamUrl = await ProgressiveAudioCacheService().start(
         songId: song.id,
         sourceUrl: url,
         quality: quality,
@@ -635,20 +637,19 @@ class PlayerService {
             _handlePlaybackFailure(generation, '网络中断，播放未能继续，请重试'),
           );
         },
+    );
+    if (generation != _playGeneration) return;
+    if (_failedGeneration == generation) return;
+    if (localStreamUrl != null) {
+      await _openMedia(
+        Media(localStreamUrl),
+        generation,
+        play: play,
+        resumePosition: resumePosition,
       );
-      if (generation != _playGeneration) return;
-      if (_failedGeneration == generation) return;
-      if (localStreamUrl != null) {
-        await _openMedia(
-          Media(localStreamUrl),
-          generation,
-          play: play,
-          resumePosition: resumePosition,
-        );
-        return;
-      }
-      _notifyDownloadProgress(null);
+      return;
     }
+    _notifyDownloadProgress(null);
     await _openMedia(
       Media(url),
       generation,
@@ -689,7 +690,7 @@ class PlayerService {
     _failedGeneration = generation;
     _openedGeneration = null;
     _notifyDownloadProgress(null);
-    if (!isTvApp) await ProgressiveAudioCacheService().cancelActive();
+    await ProgressiveAudioCacheService().cancelActive();
     try {
       await _player?.pause();
     } catch (_) {}
@@ -728,7 +729,7 @@ class PlayerService {
     } finally {
       _suppressCompletion = false;
     }
-    if (!isTvApp) await ProgressiveAudioCacheService().cancelActive();
+    await ProgressiveAudioCacheService().cancelActive();
     if (currentGen != _playGeneration) return;
     _notifyDownloadProgress(-1.0);
     await _prepareAndPlayAudio(

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../api/music_api.dart';
@@ -36,7 +34,6 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
   final _searchFocusNode = FocusNode();
   final Map<String, FocusNode> _modeFocusNodes = {};
   FocusNode? _queueReturnFocusNode;
-  Timer? _timer;
   bool _queueOpen = false;
   bool _isFavorite = false;
   double? _downloadProgress;
@@ -65,18 +62,10 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
         _searchFocusNode.requestFocus();
       }
     });
-    // Keep TV rendering deliberately light. The player emits position events
-    // much more frequently than a low-memory TV can repaint the full page.
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      _syncLyrics();
-      setState(() {});
-    });
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
     _player.removeProgressListener(_onProgress);
     _player.removeSongChangeListener(_onSongChange);
     _player.removePlayStateListener(_onPlayState);
@@ -94,9 +83,9 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
   }
 
   void _onProgress(Duration _, Duration? __) {
-    // The 1-second UI timer above is the sole repaint clock for progress and
-    // lyrics; rebuilding on every media-kit position event can starve remote
-    // control input and trigger an Android input ANR on low-end TVs.
+    if (!mounted) return;
+    _syncLyrics();
+    setState(() {});
   }
 
   void _onSongChange(Song song) {

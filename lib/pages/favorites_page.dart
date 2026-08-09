@@ -177,18 +177,21 @@ class _FavoritesPageState extends State<FavoritesPage> {
               Expanded(
                 child: Stack(
                   children: [
-                    _buildBody(),
+                    Positioned.fill(
+                      bottom: _editMode ? 74 : 0,
+                      child: _buildBody(),
+                    ),
                     if (_editMode)
                       Positioned(
                         left: 0,
                         right: 0,
-                        bottom: widget.embedded ? 84 : 0,
+                        bottom: 0,
                         child: _buildEditActions(),
                       ),
                   ],
                 ),
               ),
-              if (widget.embedded && !_editMode) const SizedBox(height: 122),
+              if (widget.embedded) SizedBox(height: _editMode ? 76 : 60),
             ],
           ),
         ),
@@ -252,7 +255,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
         message: '在播放页点亮爱心，歌曲会出现在这里。',
       );
     }
-    final bottomPadding = widget.embedded ? (_editMode ? 184.0 : 136.0) : 86.0;
+    final bottomPadding = widget.embedded ? (_editMode ? 10.0 : 60.0) : 86.0;
     return ListView.builder(
       controller: _scrollController,
       padding: EdgeInsets.only(top: 4, bottom: bottomPadding),
@@ -301,26 +304,23 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   Widget _buildEditActions() {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-        child: Row(
-          children: [
-            Expanded(
-                child: _editTrayButton(
-                    label: _selected.length == _songs.length ? '取消全选' : '全选',
-                    icon: Icons.select_all_rounded,
-                    onTap: _toggleSelectAll)),
-            const SizedBox(width: 12),
-            Expanded(
-                child: _editTrayButton(
-                    label: '删除',
-                    icon: Icons.delete_rounded,
-                    onTap: _selected.isEmpty ? null : _deleteSelected,
-                    danger: _selected.isNotEmpty)),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+      child: Row(
+        children: [
+          Expanded(
+              child: _editTrayButton(
+                  label: _selected.length == _songs.length ? '取消全选' : '全选',
+                  icon: Icons.select_all_rounded,
+                  onTap: _toggleSelectAll)),
+          const SizedBox(width: 12),
+          Expanded(
+              child: _editTrayButton(
+                  label: '删除',
+                  icon: Icons.delete_rounded,
+                  onTap: _selected.isEmpty ? null : _deleteSelected,
+                  danger: _selected.isNotEmpty)),
+        ],
       ),
     );
   }

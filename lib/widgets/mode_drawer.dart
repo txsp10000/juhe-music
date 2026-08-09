@@ -61,7 +61,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
     return Material(
       type: MaterialType.transparency,
       child: SizedBox(
-        width: min(MediaQuery.of(context).size.width * 0.78, 330.0),
+        width: min(MediaQuery.of(context).size.width * 0.84, 380.0),
         child: MusicScaffoldBackground(
           bgHint: _bgHint,
           accent: _accent,
@@ -117,9 +117,9 @@ class _ModeDrawerState extends State<ModeDrawer> {
       itemCount: listeningModes.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.94,
+        mainAxisSpacing: 18,
+        crossAxisSpacing: 16,
+        childAspectRatio: 1,
       ),
       itemBuilder: (_, index) => _modeTile(listeningModes[index]),
     );
@@ -134,36 +134,29 @@ class _ModeDrawerState extends State<ModeDrawer> {
         widget.onClose();
         widget.onSelectMode(mode);
       },
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            width: 94,
-            height: 82,
-            decoration: selected
-                ? BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.28),
-                    borderRadius: BorderRadius.circular(14),
-                  )
-                : null,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(mode.icon,
-                    color: selected ? _bgHint : AppDesignTokens.lyricWhite,
-                    size: 28),
-                const SizedBox(height: 7),
-                Text(mode.name,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppDesignTokens.caption(
-                        color: AppDesignTokens.warmWhite, size: 14)),
-              ],
-            ),
-          ),
-        ],
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        decoration: selected
+            ? BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.28),
+                borderRadius: BorderRadius.circular(10),
+              )
+            : null,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(mode.icon,
+                color: selected ? _bgHint : AppDesignTokens.lyricWhite,
+                size: 28),
+            const SizedBox(height: 7),
+            Text(mode.name,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppDesignTokens.caption(
+                    color: AppDesignTokens.warmWhite, size: 14)),
+          ],
+        ),
       ),
     );
   }
