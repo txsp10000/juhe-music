@@ -143,7 +143,7 @@ class _ModeDrawerState extends State<ModeDrawer> {
             height: 82,
             decoration: selected
                 ? BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.92),
+                    color: Colors.black.withValues(alpha: 0.28),
                     borderRadius: BorderRadius.circular(14),
                   )
                 : null,

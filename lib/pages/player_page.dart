@@ -633,6 +633,7 @@ class _PlayerPageState extends State<PlayerPage> {
           style: style.copyWith(color: upcomingColor));
     }
     return _SmoothKaraokeText(
+      key: ValueKey(line.startMs),
       text: line.text,
       progress: progress,
       activeStyle: style.copyWith(color: AppDesignTokens.lyricWhite),
@@ -804,6 +805,7 @@ class _SmoothKaraokeText extends StatelessWidget {
   final TextStyle inactiveStyle;
 
   const _SmoothKaraokeText({
+    super.key,
     required this.text,
     required this.progress,
     required this.activeStyle,
