@@ -91,32 +91,27 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   Widget build(BuildContext context) {
+    final content = SafeArea(
+      bottom: false,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(20, 18, 20,
+            widget.embedded ? 16 + MediaQuery.of(context).padding.bottom : 24),
+        children: [
+          _buildHeader(),
+          const SizedBox(height: 22),
+          _buildSearchBar(),
+          const SizedBox(height: 30),
+          _buildHistory(),
+        ],
+      ),
+    );
     return Scaffold(
       resizeToAvoidBottomInset: true,
       backgroundColor: Colors.transparent,
-      body: MusicScaffoldBackground(
-        bgHint: _bgHint,
-        accent: _accent,
-        child: SafeArea(
-          bottom: false,
-          child: ListView(
-            padding: EdgeInsets.fromLTRB(
-                20,
-                18,
-                20,
-                widget.embedded
-                    ? 16 + MediaQuery.of(context).padding.bottom
-                    : 24),
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 22),
-              _buildSearchBar(),
-              const SizedBox(height: 30),
-              _buildHistory(),
-            ],
-          ),
-        ),
-      ),
+      body: widget.embedded
+          ? content
+          : MusicScaffoldBackground(
+              bgHint: _bgHint, accent: _accent, child: content),
     );
   }
 

@@ -303,25 +303,25 @@ class _PlayerPageState extends State<PlayerPage> {
   @override
   Widget build(BuildContext context) {
     final song = _player.currentSong;
+    final content = SafeArea(
+      bottom: false,
+      child: Column(
+        children: [
+          _buildHeader(song),
+          Expanded(
+              child: song != null
+                  ? _buildSwipeableContent(song)
+                  : _buildEmptyState()),
+          SizedBox(height: widget.embedded ? 8 : 65),
+        ],
+      ),
+    );
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: MusicScaffoldBackground(
-        bgHint: _bgHint,
-        accent: _accent,
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              _buildHeader(song),
-              Expanded(
-                  child: song != null
-                      ? _buildSwipeableContent(song)
-                      : _buildEmptyState()),
-              SizedBox(height: widget.embedded ? 8 : 65),
-            ],
-          ),
-        ),
-      ),
+      body: widget.embedded
+          ? content
+          : MusicScaffoldBackground(
+              bgHint: _bgHint, accent: _accent, child: content),
     );
   }
 
@@ -423,8 +423,8 @@ class _PlayerPageState extends State<PlayerPage> {
                     offset: Offset(
                         0,
                         _dragOffset < 0
-                            ? -height - _dragOffset
-                            : height - _dragOffset),
+                            ? height + _dragOffset
+                            : -height + _dragOffset),
                     child: _buildPlayerContent(adjacentSong,
                         coverBytes: _adjacentCovers[adjacentSong.id]),
                   ),
@@ -439,10 +439,10 @@ class _PlayerPageState extends State<PlayerPage> {
                       switchInCurve: Curves.easeOutCubic,
                       switchOutCurve: Curves.easeInCubic,
                       transitionBuilder: (child, animation) {
-                        // Next (upward swipe) enters from the top; previous
-                        // (downward swipe) enters from the bottom.
+                        // Next (upward swipe) enters from the bottom; previous
+                        // (downward swipe) enters from the top.
                         final begin =
-                            Offset(0, _swipeDirection < 0 ? -1.0 : 1.0);
+                            Offset(0, _swipeDirection < 0 ? 1.0 : -1.0);
                         return SlideTransition(
                           position: animation.drive(
                             Tween(begin: begin, end: Offset.zero),

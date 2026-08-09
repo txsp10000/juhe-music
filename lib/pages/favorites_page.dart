@@ -164,38 +164,38 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final content = SafeArea(
+      bottom: false,
+      child: Column(
+        children: [
+          _buildHeader(),
+          Expanded(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  bottom: _editMode ? 74 : 0,
+                  child: _buildBody(),
+                ),
+                if (_editMode)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: _buildEditActions(),
+                  ),
+              ],
+            ),
+          ),
+          if (widget.embedded) const SizedBox(height: 8),
+        ],
+      ),
+    );
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: MusicScaffoldBackground(
-        bgHint: _bgHint,
-        accent: _accent,
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      bottom: _editMode ? 74 : 0,
-                      child: _buildBody(),
-                    ),
-                    if (_editMode)
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        child: _buildEditActions(),
-                      ),
-                  ],
-                ),
-              ),
-              if (widget.embedded) SizedBox(height: _editMode ? 8 : 8),
-            ],
-          ),
-        ),
-      ),
+      body: widget.embedded
+          ? content
+          : MusicScaffoldBackground(
+              bgHint: _bgHint, accent: _accent, child: content),
     );
   }
 
