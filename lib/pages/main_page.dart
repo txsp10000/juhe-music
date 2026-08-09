@@ -88,24 +88,23 @@ class _MainPageState extends State<MainPage> {
             // Keep the page viewport above the persistent nav. This avoids
             // platform-specific safe-area overlap on both iOS and Android.
             extendBody: false,
-            body: MusicScaffoldBackground(
-              bgHint: _bgHint,
-              accent: _accent,
-              child: IndexedStack(
-                index: _tab,
-                children: [
-                  PlayerPage(
-                      embedded: true, onOpenDrawer: () => _openDrawer(0)),
-                  SearchPage(
-                    embedded: true,
-                    onShowPlayer: _showPlayer,
-                    onOpenDrawer: () => _openDrawer(1),
-                  ),
-                  FavoritesPage(embedded: true, onShowPlayer: _showPlayer),
-                ],
-              ),
+            body: IndexedStack(
+              index: _tab,
+              children: [
+                PlayerPage(embedded: true, onOpenDrawer: () => _openDrawer(0)),
+                SearchPage(
+                  embedded: true,
+                  onShowPlayer: _showPlayer,
+                  onOpenDrawer: () => _openDrawer(1),
+                ),
+                FavoritesPage(embedded: true, onShowPlayer: _showPlayer),
+              ],
             ),
-            bottomNavigationBar: SafeArea(top: false, child: _buildBottomNav()),
+            bottomNavigationBar: Material(
+              color: Colors.transparent,
+              type: MaterialType.transparency,
+              child: SafeArea(top: false, child: _buildBottomNav()),
+            ),
           ),
           if (_drawerOpen)
             Positioned.fill(

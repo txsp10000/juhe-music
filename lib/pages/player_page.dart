@@ -99,7 +99,7 @@ class _PlayerPageState extends State<PlayerPage> {
     setState(() {
       if (changedSong) {
         _dragOffset = 0.0;
-        _isSwitchingSong = true;
+        _isSwitchingSong = false;
         _awaitingSongTransition = false;
         _incomingSong = animateFromOppositeSide;
       }
@@ -109,7 +109,9 @@ class _PlayerPageState extends State<PlayerPage> {
     if (animateFromOppositeSide) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        setState(() => _incomingSong = false);
+        Future.delayed(const Duration(milliseconds: 430), () {
+          if (mounted) setState(() => _incomingSong = false);
+        });
       });
     }
   }
@@ -391,7 +393,7 @@ class _PlayerPageState extends State<PlayerPage> {
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onVerticalDragUpdate: (details) {
-            if (_isSwitchingSong) return;
+            if (_isSwitchingSong || _incomingSong) return;
             if (_dragOffset == 0.0) {
               _prefetchAdjacentCover(next: details.delta.dy < 0);
             }
