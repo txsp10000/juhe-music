@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:qishui_music/models/song.dart';
 import 'package:qishui_music/tv/tv_layout_metrics.dart';
 import 'package:qishui_music/tv/widgets/tv_button.dart';
+import 'package:qishui_music/tv/widgets/tv_focus_card.dart';
 import 'package:qishui_music/tv/widgets/tv_queue_panel.dart';
 
 void main() {
@@ -80,5 +82,37 @@ void main() {
 
     expect(currentFocusNode.hasFocus, isTrue);
     expect(find.text('歌曲 18'), findsOneWidget);
+  });
+  testWidgets('confirm key up from the previous route does not activate a card',
+      (tester) async {
+    var tapCount = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TvFocusCard(
+            autofocus: true,
+            onTap: () => tapCount++,
+            onLongPress: () {},
+            child: const Text('Favorite song'),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final focusNode = FocusManager.instance.primaryFocus!;
+    focusNode.onKeyEvent!(
+      focusNode,
+      const KeyUpEvent(
+        physicalKey: PhysicalKeyboardKey.select,
+        logicalKey: LogicalKeyboardKey.select,
+        timeStamp: Duration.zero,
+      ),
+    );
+    expect(tapCount, 0);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.select);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.select);
+    expect(tapCount, 1);
   });
 }

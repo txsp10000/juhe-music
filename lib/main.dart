@@ -6,7 +6,6 @@ import 'tv/tv_routes.dart';
 import 'services/settings_service.dart';
 import 'services/audio_cache_service.dart';
 import 'services/app_environment.dart';
-import 'services/tv_cache_cleanup_service.dart';
 import 'theme/app_design_tokens.dart';
 
 Future<void> _bootstrapBackgroundServices() async {
@@ -22,9 +21,6 @@ Future<void> _bootstrapBackgroundServices() async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SettingsService().load();
-  // TV uses the same media caches as mobile during a run, but starts every
-  // launch with a clean cache so the previous session never persists.
-  if (isTvApp) await TvCacheCleanupService.clearLegacyMediaCaches();
   runApp(const MusicApp());
 
   unawaited(_bootstrapBackgroundServices());

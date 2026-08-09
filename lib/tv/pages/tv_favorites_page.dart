@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../api/music_api.dart';
 import '../../models/song.dart';
 import '../../services/favorites_service.dart';
 import '../../services/player_service.dart';
@@ -80,13 +81,29 @@ class _TvFavoritesPageState extends State<TvFavoritesPage> {
   }
 
   Future<void> _playAt(int index) async {
+    final songs = List<Song>.of(_favorites);
+    var selected = songs[index];
+    // Favorites created before cover hydration may only contain song metadata.
+    // Resolve the cover before returning to the player so the TV art is ready.
+    if (selected.cover.isEmpty || selected.picId.isEmpty) {
+      try {
+        final details = await MusicApi.getTrackDetails(
+            selected.lyricId.isNotEmpty ? selected.lyricId : selected.id);
+        if (details.song.cover.isNotEmpty || details.song.picId.isNotEmpty) {
+          details.song.lyric = selected.lyric;
+          if (details.song.cover.isEmpty) details.song.cover = selected.cover;
+          songs[index] = details.song;
+          selected = details.song;
+        }
+      } catch (_) {}
+    }
     _player.replaceQueue(
-      _favorites,
+      songs,
       source: PlaybackQueueSource.favorites,
     );
     await _player.playAt(index);
     if (!mounted) return;
-    TvRoutes.returnHome(context);
+    TvRoutes.returnHome(context, openQueue: true);
   }
 
   @override

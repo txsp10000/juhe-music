@@ -41,6 +41,7 @@ class _TvFocusCardState extends State<TvFocusCard> {
   late FocusNode _focusNode;
   late bool _ownsFocusNode;
   Timer? _longPressTimer;
+  bool _confirmKeyHeld = false;
   bool _longPressTriggered = false;
   bool _focused = false;
 
@@ -76,6 +77,15 @@ class _TvFocusCardState extends State<TvFocusCard> {
     widget.onTap?.call();
   }
 
+  void _handleFocusChange(bool focused) {
+    if (!focused) {
+      _longPressTimer?.cancel();
+      _confirmKeyHeld = false;
+      _longPressTriggered = false;
+    }
+    setState(() => _focused = focused);
+  }
+
   KeyEventResult _handleConfirmKey(KeyEvent event) {
     final isConfirm = event.logicalKey == LogicalKeyboardKey.select ||
         event.logicalKey == LogicalKeyboardKey.enter ||
@@ -84,12 +94,15 @@ class _TvFocusCardState extends State<TvFocusCard> {
     if (event is KeyRepeatEvent) return KeyEventResult.handled;
     if (widget.onLongPress == null) {
       if (event is KeyDownEvent) {
+        _confirmKeyHeld = true;
         _activate();
         return KeyEventResult.handled;
       }
+      if (event is KeyUpEvent) _confirmKeyHeld = false;
       return KeyEventResult.ignored;
     }
     if (event is KeyDownEvent) {
+      _confirmKeyHeld = true;
       _longPressTriggered = false;
       _longPressTimer?.cancel();
       _longPressTimer = Timer(const Duration(milliseconds: 800), () async {
@@ -101,7 +114,8 @@ class _TvFocusCardState extends State<TvFocusCard> {
     }
     if (event is KeyUpEvent) {
       _longPressTimer?.cancel();
-      if (!_longPressTriggered) _activate();
+      if (_confirmKeyHeld && !_longPressTriggered) _activate();
+      _confirmKeyHeld = false;
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -114,7 +128,7 @@ class _TvFocusCardState extends State<TvFocusCard> {
       focusNode: _focusNode,
       canRequestFocus: enabled,
       autofocus: widget.autofocus,
-      onFocusChange: (value) => setState(() => _focused = value),
+      onFocusChange: _handleFocusChange,
       onKeyEvent: (node, event) {
         final result = widget.onKeyEvent?.call(node, event);
         if (result != null && result != KeyEventResult.ignored) return result;

@@ -7,7 +7,9 @@ import 'pages/tv_search_page.dart';
 import 'pages/tv_search_results_page.dart';
 
 abstract final class TvRoutes {
+  static final ValueNotifier<int> homeRouteVersion = ValueNotifier(0);
   static bool _focusHomeQueueOnNextBuild = false;
+  static bool _openHomeQueueOnNextBuild = false;
 
   static const home = '/tv/home';
   static const search = '/tv/search';
@@ -25,8 +27,20 @@ abstract final class TvRoutes {
     return requested;
   }
 
-  static void returnHome(BuildContext context, {bool focusQueue = true}) {
+  static bool consumeHomeQueueOpenRequest() {
+    final requested = _openHomeQueueOnNextBuild;
+    _openHomeQueueOnNextBuild = false;
+    return requested;
+  }
+
+  static void returnHome(
+    BuildContext context, {
+    bool focusQueue = true,
+    bool openQueue = false,
+  }) {
     if (focusQueue) requestHomeQueueFocus();
+    if (openQueue) _openHomeQueueOnNextBuild = true;
+    homeRouteVersion.value++;
     Navigator.of(context).popUntil(ModalRoute.withName(home));
   }
 

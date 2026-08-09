@@ -33,6 +33,28 @@ class AudioCacheService {
     } catch (_) {}
   }
 
+  Future<int> getCacheSizeBytes() async {
+    try {
+      final dir = await _getCacheDir();
+      if (!await dir.exists()) return 0;
+      var total = 0;
+      await for (final entity in dir.list()) {
+        if (entity is File) total += await entity.length();
+      }
+      return total;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  Future<void> clearCache() async {
+    try {
+      final dir = await _getCacheDir();
+      if (await dir.exists()) await dir.delete(recursive: true);
+      await dir.create(recursive: true);
+    } catch (_) {}
+  }
+
   Future<void> migrateOldFiles() async {
     try {
       final dir = await _getCacheDir();

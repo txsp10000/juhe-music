@@ -80,7 +80,11 @@ class _MainPageState extends State<MainPage> {
       children: [
         Scaffold(
           backgroundColor: AppDesignTokens.inkBlack,
-          extendBody: true,
+          // Keep page content above the persistent bottom navigation. The
+          // embedded pages already reserve their own control spacing, so
+          // extending the body here makes iOS render content underneath the
+          // navigation bar and causes the visible overlap in screenshots.
+          extendBody: false,
           body: MusicScaffoldBackground(
             bgHint: _bgHint,
             accent: _accent,

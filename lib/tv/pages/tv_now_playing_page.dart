@@ -4,11 +4,13 @@ import '../../api/music_api.dart';
 import '../../models/song.dart';
 import '../../models/listening_mode.dart';
 import '../../services/favorites_service.dart';
+import '../../services/audio_cache_service.dart';
 import '../../services/player_service.dart';
 import '../../services/theme_service.dart';
 import '../tv_layout_metrics.dart';
 import '../tv_routes.dart';
 import '../tv_tokens.dart';
+import '../widgets/tv_album_art.dart';
 import '../widgets/tv_focus_card.dart';
 import '../widgets/tv_page_scaffold.dart';
 import '../widgets/tv_pill_button.dart';
@@ -29,13 +31,19 @@ enum _TvPlayerMenu { relatedSearch }
 class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
   final _player = PlayerService();
   final _queueFocusNode = FocusNode();
+  final _previousFocusNode = FocusNode();
+  final _nextFocusNode = FocusNode();
   final _queueButtonFocusNode = FocusNode();
   final _relatedSearchFocusNode = FocusNode();
   final _searchFocusNode = FocusNode();
+  final _favoritesFocusNode = FocusNode();
+  final _cacheFocusNode = FocusNode();
   final Map<String, FocusNode> _modeFocusNodes = {};
   FocusNode? _queueReturnFocusNode;
   bool _queueOpen = false;
   bool _isFavorite = false;
+  int _audioCacheBytes = 0;
+  bool _cacheBusy = false;
   double? _downloadProgress;
   String? _loadingMessage;
   String? _errorMessage;
@@ -52,6 +60,7 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
     _player.addDownloadProgressListener(_onDownloadProgress);
     _player.addPlaybackErrorListener(_onPlaybackError);
     FavoritesService.version.addListener(_refreshFavoriteState);
+    TvRoutes.homeRouteVersion.addListener(_onHomeRouteRequest);
     _refreshFavoriteState();
     _syncLyrics();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -60,6 +69,9 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
         _queueButtonFocusNode.requestFocus();
       } else {
         _searchFocusNode.requestFocus();
+      }
+      if (TvRoutes.consumeHomeQueueOpenRequest()) {
+        _openQueue(returnFocusNode: _queueButtonFocusNode);
       }
     });
   }
@@ -72,10 +84,15 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
     _player.removeDownloadProgressListener(_onDownloadProgress);
     _player.removePlaybackErrorListener(_onPlaybackError);
     FavoritesService.version.removeListener(_refreshFavoriteState);
+    TvRoutes.homeRouteVersion.removeListener(_onHomeRouteRequest);
     _queueFocusNode.dispose();
+    _previousFocusNode.dispose();
+    _nextFocusNode.dispose();
     _queueButtonFocusNode.dispose();
     _relatedSearchFocusNode.dispose();
     _searchFocusNode.dispose();
+    _favoritesFocusNode.dispose();
+    _cacheFocusNode.dispose();
     for (final node in _modeFocusNodes.values) {
       node.dispose();
     }
@@ -91,11 +108,19 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
   void _onSongChange(Song song) {
     _parsedLrc = _parseLrc(song.lyric);
     _refreshFavoriteState();
+    _refreshCacheSize();
     if (mounted) setState(() {});
   }
 
   void _onPlayState(bool _) {
     if (mounted) setState(() {});
+  }
+
+  void _onHomeRouteRequest() {
+    if (!mounted || !TvRoutes.consumeHomeQueueOpenRequest()) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _openQueue(returnFocusNode: _queueButtonFocusNode);
+    });
   }
 
   void _onDownloadProgress(double? progress) {
@@ -124,8 +149,16 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
 
   Future<void> _playQueueAt(int index) async {
     await _player.playAt(index);
-    if (!mounted) return;
-    _closeQueue();
+  }
+
+  Future<void> _loadMoreQueue() async {
+    await _player.loadMoreModeSongs();
+    if (mounted) setState(() {});
+  }
+
+  void _changeTrack(VoidCallback action, FocusNode focusNode) {
+    focusNode.requestFocus();
+    action();
   }
 
   void _openQueue({FocusNode? returnFocusNode}) {
@@ -191,6 +224,57 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
     await _refreshFavoriteState();
   }
 
+  Future<void> _refreshCacheSize() async {
+    final bytes = await AudioCacheService().getCacheSizeBytes();
+    if (mounted) setState(() => _audioCacheBytes = bytes);
+  }
+
+  String _formatCacheSize(int bytes) {
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  Future<void> _confirmClearCache() async {
+    if (_cacheBusy) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        final metrics = TvLayoutMetrics.of(dialogContext);
+        return AlertDialog(
+          backgroundColor: TvTokens.panel,
+          title: Text('清理歌曲缓存', style: TvTokens.title(size: metrics.font(32))),
+          content: Text(
+            '将清理 ${_formatCacheSize(_audioCacheBytes)} 歌曲缓存，歌词和专辑图不会删除。确定继续吗？',
+            style: TvTokens.body(size: metrics.font(22)),
+          ),
+          actions: [
+            TvPillButton(
+              label: '取消',
+              autofocus: true,
+              onTap: () => Navigator.of(dialogContext).pop(false),
+            ),
+            TvPillButton(
+              label: '确认清理',
+              icon: Icons.delete_outline_rounded,
+              onTap: () => Navigator.of(dialogContext).pop(true),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _cacheBusy = true);
+    await AudioCacheService().clearCache();
+    if (!mounted) return;
+    setState(() {
+      _cacheBusy = false;
+      _audioCacheBytes = 0;
+    });
+  }
+
   void _openMenu(_TvPlayerMenu menu) {
     if (menu == _TvPlayerMenu.relatedSearch && _player.currentSong == null) {
       setState(() => _errorMessage = '请先播放一首歌曲，再搜索同名歌曲或歌手。');
@@ -230,7 +314,6 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
     final metrics = TvLayoutMetrics.of(context);
     final interactionBlocked = _queueOpen ||
         _loadingMessage != null ||
-        _downloadProgress != null ||
         _errorMessage != null ||
         _activeMenu != null;
     return PopScope(
@@ -306,6 +389,8 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
                         currentFocusNode: _queueFocusNode,
                         backgroundColor: ThemeService.bgHint.value,
                         onPlay: _playQueueAt,
+                        onReachEnd:
+                            _player.activeMode == null ? null : _loadMoreQueue,
                       ),
                     ],
                   ),
@@ -334,7 +419,19 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
             Expanded(
               child: SizedBox(
                 width: alignedWidth,
-                child: _lyricPanel(context),
+                child: Column(
+                  children: [
+                    TvAlbumArt(
+                      cover: song?.cover ?? '',
+                      size: alignedWidth,
+                      width: alignedWidth,
+                      height: metrics.value(150, minimum: 82),
+                      radius: 18,
+                    ),
+                    SizedBox(height: metrics.value(18, minimum: 10)),
+                    Expanded(child: _lyricPanel(context)),
+                  ],
+                ),
               ),
             ),
             SizedBox(height: metrics.value(18, minimum: 8)),
@@ -366,16 +463,19 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
             SizedBox(
               width: alignedWidth,
               child: TvPlayerControls(
-                onPrevious: _player.prev,
+                onPrevious: () =>
+                    _changeTrack(_player.prev, _previousFocusNode),
                 onRewind: () => _seekBy(-10),
                 onPlayPause: _player.togglePlayPause,
                 onForward: () => _seekBy(10),
-                onNext: _player.next,
+                onNext: () => _changeTrack(_player.next, _nextFocusNode),
                 onFavorite: _toggleFavorite,
                 onQueue: _openQueue,
                 onRelatedSearch: () => _openMenu(_TvPlayerMenu.relatedSearch),
                 isPlaying: _player.isPlaying,
                 isFavorite: _isFavorite,
+                previousFocusNode: _previousFocusNode,
+                nextFocusNode: _nextFocusNode,
                 queueFocusNode: _queueButtonFocusNode,
                 relatedSearchFocusNode: _relatedSearchFocusNode,
               ),
@@ -392,16 +492,21 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
     final lines = song == null
         ? <LyricLine>[]
         : _visibleLyricTexts(song, metrics.isCompact ? 4 : 6);
-    return TvSectionCard(
-      title: '歌词',
-      titleAlign: TextAlign.center,
-      padding: EdgeInsets.all(metrics.value(18, minimum: 10)),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        metrics.value(12, minimum: 7),
+        metrics.value(10, minimum: 6),
+        metrics.value(12, minimum: 7),
+        0,
+      ),
       child: Center(
         child: lines.isEmpty
             ? Text(song == null ? '播放歌曲后显示歌词' : '正在获取歌词',
                 style: TvTokens.body(
                     size: metrics.font(24), color: TvTokens.muted))
             : ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
                 padding: EdgeInsets.symmetric(
                   horizontal: metrics.value(18, minimum: 10),
                   vertical: metrics.value(8, minimum: 4),
@@ -409,18 +514,32 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
                 itemCount: lines.length,
                 separatorBuilder: (_, __) =>
                     SizedBox(height: metrics.value(12, minimum: 6)),
-                itemBuilder: (_, index) => Text(
-                  lines[index].text,
-                  textAlign: TextAlign.center,
-                  maxLines: index == 0 ? 2 : 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: index == 0
-                      ? TvTokens.hero(size: metrics.font(30))
-                      : TvTokens.title(
-                          size: metrics.font(22),
-                          color: index < 3 ? TvTokens.text : TvTokens.muted,
-                        ),
-                ),
+                itemBuilder: (_, index) {
+                  final line = lines[index];
+                  if (index == 0) {
+                    final nextLine =
+                        lines.length > 1 ? lines[1] : _nextLyricLine(line);
+                    return _TvKaraokeText(
+                      key: ValueKey(line.startMs),
+                      text: line.text,
+                      progress: _lineProgress(line, nextLine),
+                      activeStyle: TvTokens.hero(size: metrics.font(30)),
+                      inactiveStyle: TvTokens.hero(
+                        size: metrics.font(30),
+                      ).copyWith(color: TvTokens.muted),
+                    );
+                  }
+                  return Text(
+                    line.text,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TvTokens.title(
+                      size: metrics.font(22),
+                      color: index < 3 ? TvTokens.text : TvTokens.muted,
+                    ),
+                  );
+                },
               ),
       ),
     );
@@ -433,50 +552,121 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
       titleAlign: TextAlign.center,
       padding: EdgeInsets.all(metrics.value(24, minimum: 14)),
       child: LayoutBuilder(
-        builder: (context, constraints) => GridView.builder(
-          padding: EdgeInsets.all(metrics.value(14, minimum: 10)),
-          itemCount: listeningModes.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: metrics.gridColumnCount(constraints.maxWidth),
-            crossAxisSpacing: metrics.value(18, minimum: 10),
-            mainAxisSpacing: metrics.value(18, minimum: 10),
-            childAspectRatio: metrics.isCompact ? 1.25 : 1.18,
-          ),
-          itemBuilder: (_, index) {
-            final mode = listeningModes[index];
-            final modeFocusNode = _modeFocusNodes.putIfAbsent(
-              mode.subQueueType,
-              FocusNode.new,
-            );
-            return TvFocusCard(
-              autofocus: false,
-              focusNode: modeFocusNode,
-              onTap: () => _playMode(mode, modeFocusNode),
-              radius: metrics.value(22, minimum: 12),
-              padding: EdgeInsets.all(metrics.value(18, minimum: 10)),
-              color: Colors.black.withValues(alpha: 0.16),
-              borderColor: Colors.white.withValues(alpha: 0.08),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    mode.icon,
-                    size: metrics.value(50, minimum: 34),
-                    color: TvTokens.focus,
+        builder: (context, constraints) {
+          final spacing = metrics.value(12, minimum: 7);
+          final gridPadding = metrics.value(12, minimum: 7);
+          final availableRowsHeight =
+              constraints.maxHeight - gridPadding * 2 - spacing * 2;
+          final rowExtent = (availableRowsHeight / 3).clamp(68.0, 150.0);
+          return GridView.builder(
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.all(gridPadding),
+            itemCount: listeningModes.length + 2,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: spacing,
+              mainAxisSpacing: spacing,
+              mainAxisExtent: rowExtent,
+            ),
+            itemBuilder: (_, index) {
+              if (index == 0) {
+                return TvFocusCard(
+                  autofocus: false,
+                  focusNode: _favoritesFocusNode,
+                  onTap: () =>
+                      Navigator.of(context).pushNamed(TvRoutes.favorites),
+                  radius: metrics.value(22, minimum: 12),
+                  padding: EdgeInsets.all(metrics.value(10, minimum: 6)),
+                  color: Colors.black.withValues(alpha: 0.16),
+                  borderColor: Colors.white.withValues(alpha: 0.08),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.favorite_rounded,
+                        size: metrics.value(34, minimum: 24),
+                        color: TvTokens.focus,
+                      ),
+                      SizedBox(height: metrics.value(7, minimum: 4)),
+                      Text(
+                        '收藏',
+                        textAlign: TextAlign.center,
+                        style: TvTokens.title(size: metrics.font(18)),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: metrics.value(12, minimum: 6)),
-                  Text(
-                    mode.name,
-                    maxLines: 2,
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                    style: TvTokens.title(size: metrics.font(22)),
+                );
+              }
+              if (index == listeningModes.length + 1) {
+                return TvFocusCard(
+                  autofocus: false,
+                  focusNode: _cacheFocusNode,
+                  onTap: _confirmClearCache,
+                  radius: metrics.value(22, minimum: 12),
+                  padding: EdgeInsets.all(metrics.value(10, minimum: 6)),
+                  color: Colors.black.withValues(alpha: 0.16),
+                  borderColor: Colors.white.withValues(alpha: 0.08),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.cleaning_services_rounded,
+                        size: metrics.value(34, minimum: 24),
+                        color: TvTokens.focus,
+                      ),
+                      SizedBox(height: metrics.value(7, minimum: 4)),
+                      Text(
+                        '清理缓存',
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TvTokens.title(size: metrics.font(18)),
+                      ),
+                      SizedBox(height: metrics.value(3, minimum: 2)),
+                      Text(
+                        _formatCacheSize(_audioCacheBytes),
+                        textAlign: TextAlign.center,
+                        style: TvTokens.label(size: metrics.font(14)),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            );
-          },
-        ),
+                );
+              }
+              final mode = listeningModes[index - 1];
+              final modeFocusNode = _modeFocusNodes.putIfAbsent(
+                mode.subQueueType,
+                FocusNode.new,
+              );
+              return TvFocusCard(
+                autofocus: false,
+                focusNode: modeFocusNode,
+                onTap: () => _playMode(mode, modeFocusNode),
+                radius: metrics.value(22, minimum: 12),
+                padding: EdgeInsets.all(metrics.value(10, minimum: 6)),
+                color: Colors.black.withValues(alpha: 0.16),
+                borderColor: Colors.white.withValues(alpha: 0.08),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      mode.icon,
+                      size: metrics.value(34, minimum: 24),
+                      color: TvTokens.focus,
+                    ),
+                    SizedBox(height: metrics.value(7, minimum: 4)),
+                    Text(
+                      mode.name,
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      style: TvTokens.title(size: metrics.font(18)),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -693,6 +883,24 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
     return idx;
   }
 
+  LyricLine? _nextLyricLine(LyricLine line) {
+    final index = _parsedLrc.indexOf(line);
+    return index >= 0 && index + 1 < _parsedLrc.length
+        ? _parsedLrc[index + 1]
+        : null;
+  }
+
+  double _lineProgress(LyricLine line, LyricLine? nextLine) {
+    final positionMs = _player.livePosition.inMilliseconds;
+    if (line.syllables.length > 1 || line.durationMs > 0) {
+      return lyricProgressAt(line, positionMs);
+    }
+    if (positionMs <= line.startMs) return 0;
+    final endMs = nextLine?.startMs ?? line.startMs + 4000;
+    final durationMs = (endMs - line.startMs).clamp(1, 12000);
+    return ((positionMs - line.startMs) / durationMs).clamp(0.0, 1.0);
+  }
+
   List<LyricLine> _visibleLyricTexts(Song song, int count) {
     final idx = _currentLrcIndex();
     if (idx >= 0 && idx < _parsedLrc.length) {
@@ -727,5 +935,87 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
     final minutes = value.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = value.inSeconds.remainder(60).toString().padLeft(2, '0');
     return hours > 0 ? '$hours:$minutes:$seconds' : '$minutes:$seconds';
+  }
+}
+
+class _TvKaraokeText extends StatelessWidget {
+  final String text;
+  final double progress;
+  final TextStyle activeStyle;
+  final TextStyle inactiveStyle;
+
+  const _TvKaraokeText({
+    super.key,
+    required this.text,
+    required this.progress,
+    required this.activeStyle,
+    required this.inactiveStyle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final painter = TextPainter(
+          text: TextSpan(text: text, style: inactiveStyle),
+          textAlign: TextAlign.center,
+          textDirection: Directionality.of(context),
+          maxLines: 2,
+          ellipsis: '...',
+        )..layout(maxWidth: constraints.maxWidth);
+        final width =
+            (painter.width.ceilToDouble() + 6).clamp(0.0, constraints.maxWidth);
+        final height = painter.height;
+        return TweenAnimationBuilder<double>(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.linear,
+          tween: Tween(end: progress.clamp(0.0, 1.0)),
+          builder: (context, animatedProgress, _) {
+            final revealWidth = width * animatedProgress;
+            return Center(
+              child: SizedBox(
+                width: width,
+                height: height,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Text(
+                      text,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: inactiveStyle,
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: ClipRect(
+                        child: SizedBox(
+                          width: revealWidth,
+                          height: height,
+                          child: OverflowBox(
+                            alignment: Alignment.centerLeft,
+                            minWidth: width,
+                            maxWidth: width,
+                            minHeight: height,
+                            maxHeight: height,
+                            child: Text(
+                              text,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: activeStyle,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 }

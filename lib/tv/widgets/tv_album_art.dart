@@ -8,6 +8,8 @@ import '../tv_tokens.dart';
 class TvAlbumArt extends StatelessWidget {
   final String cover;
   final double size;
+  final double? width;
+  final double? height;
   final double radius;
   final bool border;
 
@@ -15,6 +17,8 @@ class TvAlbumArt extends StatelessWidget {
     super.key,
     required this.cover,
     required this.size,
+    this.width,
+    this.height,
     this.radius = 28,
     this.border = true,
   });
@@ -22,12 +26,18 @@ class TvAlbumArt extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final metrics = TvLayoutMetrics.of(context);
+    final resolvedWidth = width ?? size;
+    final resolvedHeight = height ?? size;
     final art = ClipRRect(
       borderRadius: BorderRadius.circular(metrics.value(radius, minimum: 12)),
       child: SizedBox(
-        width: size.isFinite ? size : double.infinity,
-        height: size.isFinite ? size : double.infinity,
-        child: _content(metrics, size.isFinite),
+        width: resolvedWidth.isFinite ? resolvedWidth : double.infinity,
+        height: resolvedHeight.isFinite ? resolvedHeight : double.infinity,
+        child: _content(
+          metrics,
+          resolvedWidth.isFinite && resolvedHeight.isFinite,
+          resolvedWidth < resolvedHeight ? resolvedWidth : resolvedHeight,
+        ),
       ),
     );
 
@@ -43,7 +53,11 @@ class TvAlbumArt extends StatelessWidget {
         : art;
   }
 
-  Widget _content(TvLayoutMetrics metrics, bool hasBoundedSize) {
+  Widget _content(
+    TvLayoutMetrics metrics,
+    bool hasBoundedSize,
+    double shortestSide,
+  ) {
     if (cover.isNotEmpty) {
       final uri = Uri.tryParse(cover);
       if (uri != null && uri.scheme == 'file') {
@@ -58,20 +72,25 @@ class TvAlbumArt extends StatelessWidget {
       return Image.network(
         cover,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _fallback(metrics, hasBoundedSize),
+        errorBuilder: (_, __, ___) =>
+            _fallback(metrics, hasBoundedSize, shortestSide),
       );
     }
-    return _fallback(metrics, hasBoundedSize);
+    return _fallback(metrics, hasBoundedSize, shortestSide);
   }
 
-  Widget _fallback(TvLayoutMetrics metrics, bool hasBoundedSize) {
+  Widget _fallback(
+    TvLayoutMetrics metrics,
+    bool hasBoundedSize,
+    double shortestSide,
+  ) {
     return Container(
       color: TvTokens.panelSoft,
       alignment: Alignment.center,
       child: Icon(
         Icons.music_note_rounded,
         size: hasBoundedSize
-            ? metrics.value(size * 0.24, minimum: 54)
+            ? metrics.value(shortestSide * 0.32, minimum: 34)
             : metrics.value(72, minimum: 42),
         color: TvTokens.focus,
       ),

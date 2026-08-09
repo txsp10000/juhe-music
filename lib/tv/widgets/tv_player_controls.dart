@@ -14,6 +14,8 @@ class TvPlayerControls extends StatelessWidget {
   final VoidCallback onRelatedSearch;
   final bool isPlaying;
   final bool isFavorite;
+  final FocusNode? previousFocusNode;
+  final FocusNode? nextFocusNode;
   final FocusNode? queueFocusNode;
   final FocusNode? relatedSearchFocusNode;
 
@@ -29,6 +31,8 @@ class TvPlayerControls extends StatelessWidget {
     required this.onRelatedSearch,
     required this.isPlaying,
     required this.isFavorite,
+    this.previousFocusNode,
+    this.nextFocusNode,
     this.queueFocusNode,
     this.relatedSearchFocusNode,
   });
@@ -41,11 +45,17 @@ class TvPlayerControls extends StatelessWidget {
     final favoriteIcon =
         isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded;
     final primaryItems = [
-      (Icons.skip_previous_rounded, '上一首', onPrevious, false, null),
+      (
+        Icons.skip_previous_rounded,
+        '上一首',
+        onPrevious,
+        false,
+        previousFocusNode
+      ),
       (Icons.replay_10_rounded, '快退10秒', onRewind, false, null),
       (playIcon, playLabel, onPlayPause, false, null),
       (Icons.forward_10_rounded, '快进10秒', onForward, false, null),
-      (Icons.skip_next_rounded, '下一首', onNext, false, null),
+      (Icons.skip_next_rounded, '下一首', onNext, false, nextFocusNode),
     ];
     final actionItems = [
       (favoriteIcon, isFavorite ? '取消收藏' : '收藏', onFavorite, isFavorite, null),

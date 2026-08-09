@@ -337,6 +337,10 @@ class PlayerService {
   void clearMode() => _activeMode = null;
 
   Future<void> _loadMoreModeSongsAndPlay() async {
+    await loadMoreModeSongs(playNext: true);
+  }
+
+  Future<void> loadMoreModeSongs({bool playNext = false}) async {
     final mode = _activeMode;
     if (mode == null || _loadingModeSongs) return;
     _loadingModeSongs = true;
@@ -345,7 +349,8 @@ class PlayerService {
       final songs = await MusicApi.getModeTracks(mode.sceneModeId);
       if (!identical(_activeMode, mode) || songs.isEmpty) return;
       queue.addAll(songs);
-      if (_currentIndex >= previousLength - 1 &&
+      if (playNext &&
+          _currentIndex >= previousLength - 1 &&
           _currentIndex < queue.length - 1) {
         await playAt(_currentIndex + 1);
       }
@@ -488,9 +493,7 @@ class PlayerService {
       title: song.name,
       artist: song.singer,
       album: song.album.isNotEmpty ? song.album : '汽水音乐',
-      artUri: song.cover.startsWith('file:')
-          ? Uri.tryParse(song.cover)
-          : null,
+      artUri: song.cover.startsWith('file:') ? Uri.tryParse(song.cover) : null,
     );
     try {
       await _audioHandler?.updateMediaItem(_currentMediaItem!);
@@ -618,25 +621,25 @@ class PlayerService {
     _currentPlayingBr = quality;
     _notifyDownloadProgress(0.0);
     final localStreamUrl = await ProgressiveAudioCacheService().start(
-        songId: song.id,
-        sourceUrl: url,
-        quality: quality,
-        onProgress: (progress) {
-          if (generation == _playGeneration) {
-            _notifyDownloadProgress(progress);
-          }
-        },
-        onComplete: (path) {
-          if (generation == _playGeneration) {
-            _currentPlayingBr = _extractBrFromPath(path);
-            _notifyDownloadProgress(null);
-          }
-        },
-        onError: (_) {
-          unawaited(
-            _handlePlaybackFailure(generation, '网络中断，播放未能继续，请重试'),
-          );
-        },
+      songId: song.id,
+      sourceUrl: url,
+      quality: quality,
+      onProgress: (progress) {
+        if (generation == _playGeneration) {
+          _notifyDownloadProgress(progress);
+        }
+      },
+      onComplete: (path) {
+        if (generation == _playGeneration) {
+          _currentPlayingBr = _extractBrFromPath(path);
+          _notifyDownloadProgress(null);
+        }
+      },
+      onError: (_) {
+        unawaited(
+          _handlePlaybackFailure(generation, '网络中断，播放未能继续，请重试'),
+        );
+      },
     );
     if (generation != _playGeneration) return;
     if (_failedGeneration == generation) return;

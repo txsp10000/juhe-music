@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../models/song.dart';
 import '../../services/player_service.dart';
@@ -10,6 +11,7 @@ class TvQueuePanel extends StatefulWidget {
   final List<Song> songs;
   final int currentIndex;
   final Future<void> Function(int index) onPlay;
+  final Future<void> Function()? onReachEnd;
   final FocusNode? currentFocusNode;
   final Color backgroundColor;
 
@@ -18,6 +20,7 @@ class TvQueuePanel extends StatefulWidget {
     required this.songs,
     required this.currentIndex,
     required this.onPlay,
+    this.onReachEnd,
     this.currentFocusNode,
     this.backgroundColor = TvTokens.background,
   });
@@ -28,18 +31,46 @@ class TvQueuePanel extends StatefulWidget {
 
 class _TvQueuePanelState extends State<TvQueuePanel> {
   final ScrollController _scrollController = ScrollController();
+  late final int _initialFocusIndex;
   double _itemExtent = 0;
+  bool _loadingMore = false;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_handleScroll);
+    _initialFocusIndex = widget.songs.isEmpty
+        ? -1
+        : widget.currentIndex.clamp(0, widget.songs.length - 1);
     WidgetsBinding.instance.addPostFrameCallback((_) => _revealCurrent());
   }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _handleScroll() {
+    if (widget.onReachEnd == null ||
+        _loadingMore ||
+        !_scrollController.hasClients ||
+        !_scrollController.position.atEdge ||
+        _scrollController.position.pixels <= 0) {
+      return;
+    }
+    _requestMore();
+  }
+
+  Future<void> _requestMore() async {
+    if (_loadingMore || widget.onReachEnd == null) return;
+    _loadingMore = true;
+    try {
+      await widget.onReachEnd!();
+    } finally {
+      _loadingMore = false;
+    }
   }
 
   void _revealCurrent() {
@@ -62,9 +93,6 @@ class _TvQueuePanelState extends State<TvQueuePanel> {
   Widget build(BuildContext context) {
     final metrics = TvLayoutMetrics.of(context);
     _itemExtent = metrics.value(84, minimum: 54);
-    final targetIndex = widget.songs.isEmpty
-        ? -1
-        : widget.currentIndex.clamp(0, widget.songs.length - 1);
     return Container(
       width: metrics.value(720, minimum: 360),
       margin: EdgeInsets.fromLTRB(
@@ -109,10 +137,22 @@ class _TvQueuePanelState extends State<TvQueuePanel> {
                           padding: EdgeInsets.only(
                               bottom: metrics.value(8, minimum: 5)),
                           child: TvFocusCard(
-                            focusNode: index == targetIndex
+                            focusNode: index == _initialFocusIndex
                                 ? widget.currentFocusNode
                                 : null,
                             onTap: () => widget.onPlay(index),
+                            onKeyEvent: index == widget.songs.length - 1 &&
+                                    widget.onReachEnd != null
+                                ? (_, event) {
+                                    if (event.logicalKey ==
+                                            LogicalKeyboardKey.arrowDown &&
+                                        event is KeyDownEvent) {
+                                      _requestMore();
+                                      return KeyEventResult.handled;
+                                    }
+                                    return KeyEventResult.ignored;
+                                  }
+                                : null,
                             radius: metrics.value(18, minimum: 10),
                             padding: EdgeInsets.symmetric(
                               horizontal: metrics.value(18, minimum: 10),
