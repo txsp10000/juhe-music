@@ -75,6 +75,7 @@ class _MainPageState extends State<MainPage> {
   Widget build(BuildContext context) {
     final panelWidth =
         (MediaQuery.of(context).size.width * 0.84).clamp(0.0, 380.0);
+    final bottomControlHeight = 64.0 + MediaQuery.of(context).padding.bottom;
 
     return MusicScaffoldBackground(
       bgHint: _bgHint,
@@ -88,17 +89,21 @@ class _MainPageState extends State<MainPage> {
             // Keep the page viewport above the persistent nav. This avoids
             // platform-specific safe-area overlap on both iOS and Android.
             extendBody: false,
-            body: IndexedStack(
-              index: _tab,
-              children: [
-                PlayerPage(embedded: true, onOpenDrawer: () => _openDrawer(0)),
-                SearchPage(
-                  embedded: true,
-                  onShowPlayer: _showPlayer,
-                  onOpenDrawer: () => _openDrawer(1),
-                ),
-                FavoritesPage(embedded: true, onShowPlayer: _showPlayer),
-              ],
+            body: Padding(
+              padding: EdgeInsets.only(bottom: bottomControlHeight),
+              child: IndexedStack(
+                index: _tab,
+                children: [
+                  PlayerPage(
+                      embedded: true, onOpenDrawer: () => _openDrawer(0)),
+                  SearchPage(
+                    embedded: true,
+                    onShowPlayer: _showPlayer,
+                    onOpenDrawer: () => _openDrawer(1),
+                  ),
+                  FavoritesPage(embedded: true, onShowPlayer: _showPlayer),
+                ],
+              ),
             ),
           ),
           // Render the controls directly in the shared background stack.
@@ -295,6 +300,10 @@ class _MainPageState extends State<MainPage> {
                   ? AppDesignTokens.lyricWhite
                   : AppDesignTokens.warmWhite.withValues(alpha: 0.46),
               weight: FontWeight.w800,
+            ).copyWith(
+              decoration: TextDecoration.none,
+              decorationColor: Colors.transparent,
+              decorationThickness: 0,
             ),
           ),
         ),

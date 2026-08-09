@@ -25,6 +25,7 @@ class TvTokens {
       fontSize: size,
       height: 1.08,
       fontWeight: FontWeight.w800,
+      decoration: TextDecoration.none,
     );
   }
 
@@ -34,6 +35,7 @@ class TvTokens {
       fontSize: size,
       height: 1.1,
       fontWeight: FontWeight.w700,
+      decoration: TextDecoration.none,
     );
   }
 
@@ -46,6 +48,7 @@ class TvTokens {
       fontSize: size,
       height: 1.25,
       fontWeight: weight,
+      decoration: TextDecoration.none,
     );
   }
 
@@ -55,6 +58,7 @@ class TvTokens {
       fontSize: size,
       height: 1.15,
       fontWeight: FontWeight.w700,
+      decoration: TextDecoration.none,
     );
   }
 }

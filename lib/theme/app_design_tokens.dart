@@ -90,7 +90,8 @@ class AppDesignTokens {
         fontSize: size,
         height: 1.08,
         fontWeight: FontWeight.w800,
-        letterSpacing: -0.7);
+        letterSpacing: -0.7,
+        decoration: TextDecoration.none);
   }
 
   static TextStyle title({double size = 20, Color color = lyricWhite}) {
@@ -99,7 +100,8 @@ class AppDesignTokens {
         fontSize: size,
         height: 1.15,
         fontWeight: FontWeight.w800,
-        letterSpacing: -0.25);
+        letterSpacing: -0.25,
+        decoration: TextDecoration.none);
   }
 
   static TextStyle body(
@@ -107,7 +109,11 @@ class AppDesignTokens {
       Color color = lyricWhite,
       FontWeight weight = FontWeight.w500}) {
     return TextStyle(
-        color: color, fontSize: size, height: 1.35, fontWeight: weight);
+        color: color,
+        fontSize: size,
+        height: 1.35,
+        fontWeight: weight,
+        decoration: TextDecoration.none);
   }
 
   static TextStyle caption({double size = 12, Color color = quietGrey}) {
@@ -116,7 +122,8 @@ class AppDesignTokens {
         fontSize: size,
         height: 1.25,
         fontWeight: FontWeight.w700,
-        letterSpacing: 0.2);
+        letterSpacing: 0.2,
+        decoration: TextDecoration.none);
   }
 }
 

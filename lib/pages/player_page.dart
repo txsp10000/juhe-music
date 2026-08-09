@@ -423,7 +423,7 @@ class _PlayerPageState extends State<PlayerPage> {
                     offset: Offset(
                         0,
                         _dragOffset < 0
-                            ? height + _dragOffset
+                            ? -height - _dragOffset
                             : height - _dragOffset),
                     child: _buildPlayerContent(adjacentSong,
                         coverBytes: _adjacentCovers[adjacentSong.id]),
@@ -439,8 +439,10 @@ class _PlayerPageState extends State<PlayerPage> {
                       switchInCurve: Curves.easeOutCubic,
                       switchOutCurve: Curves.easeInCubic,
                       transitionBuilder: (child, animation) {
+                        // Next (upward swipe) enters from the top; previous
+                        // (downward swipe) enters from the bottom.
                         final begin =
-                            Offset(0, _swipeDirection < 0 ? 1.0 : -1.0);
+                            Offset(0, _swipeDirection < 0 ? -1.0 : 1.0);
                         return SlideTransition(
                           position: animation.drive(
                             Tween(begin: begin, end: Offset.zero),

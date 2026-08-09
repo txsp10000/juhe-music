@@ -59,11 +59,17 @@ class MusicApp extends StatelessWidget {
       fontFamily: 'sans-serif',
       textTheme: const TextTheme(
         titleLarge: TextStyle(
-            color: AppDesignTokens.lyricWhite, fontWeight: FontWeight.w800),
+            color: AppDesignTokens.lyricWhite,
+            fontWeight: FontWeight.w800,
+            decoration: TextDecoration.none),
         titleMedium: TextStyle(
-            color: AppDesignTokens.lyricWhite, fontWeight: FontWeight.w700),
-        bodyMedium: TextStyle(color: AppDesignTokens.lyricWhite),
-        bodySmall: TextStyle(color: AppDesignTokens.quietGrey),
+            color: AppDesignTokens.lyricWhite,
+            fontWeight: FontWeight.w700,
+            decoration: TextDecoration.none),
+        bodyMedium: TextStyle(
+            color: AppDesignTokens.lyricWhite, decoration: TextDecoration.none),
+        bodySmall: TextStyle(
+            color: AppDesignTokens.quietGrey, decoration: TextDecoration.none),
       ),
       iconTheme: const IconThemeData(color: AppDesignTokens.lyricWhite),
       appBarTheme: const AppBarTheme(
