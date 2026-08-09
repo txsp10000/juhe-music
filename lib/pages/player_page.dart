@@ -591,7 +591,7 @@ class _PlayerPageState extends State<PlayerPage> {
               ),
               const Spacer(),
               SizedBox(height: lyricToActionsGap),
-              _buildSocialActions(),
+              _buildSocialActions(coverWidth),
               SizedBox(height: actionsToProgressGap),
               _buildProgressBar(),
               // Keep the slider thumb clear of the compact bottom controls.
@@ -723,16 +723,14 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  Widget _buildSocialActions() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 300),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildActionItem(
+  Widget _buildSocialActions(double coverWidth) {
+    return Center(
+      child: SizedBox(
+        width: coverWidth * 0.72,
+        child: Row(
+          children: [
+            Expanded(
+              child: _buildActionItem(
                 icon: _isFavorite
                     ? Icons.favorite_rounded
                     : Icons.favorite_border_rounded,
@@ -740,18 +738,22 @@ class _PlayerPageState extends State<PlayerPage> {
                 onTap: _toggleFavorite,
                 active: _isFavorite,
               ),
-              _buildActionItem(
+            ),
+            Expanded(
+              child: _buildActionItem(
                 icon: Icons.queue_music_rounded,
                 label: '列表',
                 onTap: _showPlaylistSheet,
               ),
-              _buildActionItem(
+            ),
+            Expanded(
+              child: _buildActionItem(
                 icon: Icons.search_rounded,
                 label: '搜索',
                 onTap: _showSearchSameSheet,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -768,6 +770,7 @@ class _PlayerPageState extends State<PlayerPage> {
         : AppDesignTokens.warmWhite.withValues(alpha: 0.85);
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         GestureDetector(
           onTap: onTap,
