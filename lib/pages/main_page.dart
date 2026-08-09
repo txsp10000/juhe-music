@@ -100,10 +100,17 @@ class _MainPageState extends State<MainPage> {
                 FavoritesPage(embedded: true, onShowPlayer: _showPlayer),
               ],
             ),
-            bottomNavigationBar: Material(
-              color: Colors.transparent,
-              type: MaterialType.transparency,
-              child: SafeArea(top: false, child: _buildBottomNav()),
+          ),
+          // Render the controls directly in the shared background stack.
+          // Keeping them outside Scaffold's bottomNavigationBar slot removes
+          // the platform Material surface that was still tinting this area.
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: SafeArea(
+              top: false,
+              child: _buildBottomNav(),
             ),
           ),
           if (_drawerOpen)

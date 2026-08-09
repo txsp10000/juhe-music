@@ -39,6 +39,7 @@ class _PlayerPageState extends State<PlayerPage> {
   bool _isSwitchingSong = false;
   bool _awaitingSongTransition = false;
   bool _incomingSong = false;
+  final Map<String, Uint8List> _adjacentCovers = {};
   bool _favoriteOperationInProgress = false;
   String? _displayedSongId;
 
@@ -158,7 +159,10 @@ class _PlayerPageState extends State<PlayerPage> {
     final song = _player.queue[index];
     if (song.cover.isEmpty) return;
     final picId = song.picId.isNotEmpty ? song.picId : song.id;
-    unawaited(CoverCacheService().download(picId, song.cover));
+    unawaited(CoverCacheService().download(picId, song.cover).then((bytes) {
+      if (!mounted || bytes == null) return;
+      setState(() => _adjacentCovers[song.id] = bytes);
+    }));
   }
 
   Future<void> _loadCover(Song song) async {
@@ -390,6 +394,11 @@ class _PlayerPageState extends State<PlayerPage> {
         final opacity = _isSwitchingSong
             ? 1.0
             : (1.0 - dragProgress * 0.72).clamp(0.28, 1.0);
+        final adjacentIndex = _player.currentIndex + (_dragOffset < 0 ? 1 : -1);
+        final adjacentSong =
+            adjacentIndex >= 0 && adjacentIndex < _player.queue.length
+                ? _player.queue[adjacentIndex]
+                : null;
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onVerticalDragUpdate: (details) {
@@ -406,31 +415,47 @@ class _PlayerPageState extends State<PlayerPage> {
             if (!_isSwitchingSong) setState(() => _dragOffset = 0.0);
           },
           child: ClipRect(
-            child: Transform.translate(
-              offset: Offset(0, _incomingSong ? 0 : _dragOffset),
-              child: AnimatedOpacity(
-                opacity: opacity,
-                duration: const Duration(milliseconds: 80),
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 420),
-                  reverseDuration: const Duration(milliseconds: 360),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  transitionBuilder: (child, animation) {
-                    final begin = Offset(0, _swipeDirection < 0 ? 1.0 : -1.0);
-                    return SlideTransition(
-                      position: animation.drive(
-                        Tween(begin: begin, end: Offset.zero),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (adjacentSong != null && _dragOffset != 0)
+                  Transform.translate(
+                    offset: Offset(
+                        0,
+                        _dragOffset < 0
+                            ? height + _dragOffset
+                            : height - _dragOffset),
+                    child: _buildPlayerContent(adjacentSong,
+                        coverBytes: _adjacentCovers[adjacentSong.id]),
+                  ),
+                Transform.translate(
+                  offset: Offset(0, _incomingSong ? 0 : _dragOffset),
+                  child: AnimatedOpacity(
+                    opacity: opacity,
+                    duration: const Duration(milliseconds: 80),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 420),
+                      reverseDuration: const Duration(milliseconds: 360),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (child, animation) {
+                        final begin =
+                            Offset(0, _swipeDirection < 0 ? 1.0 : -1.0);
+                        return SlideTransition(
+                          position: animation.drive(
+                            Tween(begin: begin, end: Offset.zero),
+                          ),
+                          child: child,
+                        );
+                      },
+                      child: KeyedSubtree(
+                        key: ValueKey(song.id),
+                        child: _buildPlayerContent(song),
                       ),
-                      child: child,
-                    );
-                  },
-                  child: KeyedSubtree(
-                    key: ValueKey(song.id),
-                    child: _buildPlayerContent(song),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
         );
@@ -470,12 +495,14 @@ class _PlayerPageState extends State<PlayerPage> {
     });
   }
 
-  Widget _buildPlayerContent(Song song) {
+  Widget _buildPlayerContent(Song song, {Uint8List? coverBytes}) {
     return LayoutBuilder(
       key: ValueKey(song.id),
       builder: (context, constraints) {
         final availableHeight = constraints.maxHeight;
         final width = constraints.maxWidth;
+        final effectiveCoverBytes = coverBytes ??
+            (song.id == _player.currentSong?.id ? _coverBytes : null);
         final compact = availableHeight < 620;
         final tiny = availableHeight < 480;
         final contentWidth = width * 0.90;
@@ -516,8 +543,10 @@ class _PlayerPageState extends State<PlayerPage> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      if (_coverBytes != null)
-                        Image.memory(_coverBytes!, fit: BoxFit.cover)
+                      if (effectiveCoverBytes != null)
+                        Image.memory(effectiveCoverBytes, fit: BoxFit.cover)
+                      else if (song.cover.isNotEmpty)
+                        Image.network(song.cover, fit: BoxFit.cover)
                       else
                         Icon(Icons.music_note_rounded,
                             color: AppDesignTokens.lyricWhite
