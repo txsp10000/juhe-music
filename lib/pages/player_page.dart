@@ -39,7 +39,6 @@ class _PlayerPageState extends State<PlayerPage> {
   bool _isSwitchingSong = false;
   bool _awaitingSongTransition = false;
   bool _incomingSong = false;
-  final Map<String, Uint8List> _adjacentCovers = {};
   bool _favoriteOperationInProgress = false;
   String? _displayedSongId;
 
@@ -113,7 +112,7 @@ class _PlayerPageState extends State<PlayerPage> {
     if (animateFromOppositeSide) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        Future.delayed(const Duration(milliseconds: 430), () {
+        Future.delayed(const Duration(milliseconds: 280), () {
           if (mounted) {
             setState(() {
               _incomingSong = false;
@@ -167,10 +166,7 @@ class _PlayerPageState extends State<PlayerPage> {
     final song = _player.queue[index];
     if (song.cover.isEmpty) return;
     final picId = song.picId.isNotEmpty ? song.picId : song.id;
-    unawaited(CoverCacheService().download(picId, song.cover).then((bytes) {
-      if (!mounted || bytes == null) return;
-      setState(() => _adjacentCovers[song.id] = bytes);
-    }));
+    unawaited(CoverCacheService().download(picId, song.cover));
   }
 
   Future<void> _loadCover(Song song) async {
@@ -433,8 +429,7 @@ class _PlayerPageState extends State<PlayerPage> {
                         _dragOffset < 0
                             ? height + _dragOffset
                             : -height + _dragOffset),
-                    child: _buildSongTransitionCard(adjacentSong,
-                        coverBytes: _adjacentCovers[adjacentSong.id]),
+                    child: _buildSongTransitionCard(adjacentSong),
                   ),
                 Transform.translate(
                   offset: Offset(0, _incomingSong ? 0 : _dragOffset),
@@ -442,8 +437,8 @@ class _PlayerPageState extends State<PlayerPage> {
                     opacity: opacity,
                     duration: const Duration(milliseconds: 80),
                     child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 420),
-                      reverseDuration: const Duration(milliseconds: 360),
+                      duration: const Duration(milliseconds: 280),
+                      reverseDuration: const Duration(milliseconds: 240),
                       switchInCurve: Curves.easeOutCubic,
                       switchOutCurve: Curves.easeInCubic,
                       transitionBuilder: (child, animation) {
@@ -631,48 +626,35 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  Widget _buildSongTransitionCard(Song song, {Uint8List? coverBytes}) {
-    final bytes =
-        coverBytes ?? (song.id == _player.currentSong?.id ? _coverBytes : null);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(28),
-              child: SizedBox(
-                width: double.infinity,
-                height: 250,
-                child: bytes != null
-                    ? Image.memory(bytes, fit: BoxFit.cover)
-                    : song.cover.isNotEmpty
-                        ? Image.network(song.cover, fit: BoxFit.cover)
-                        : Container(
-                            color: Colors.white.withValues(alpha: 0.08),
-                            child: const Icon(Icons.music_note_rounded,
-                                color: Colors.white, size: 72),
-                          ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Text(song.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: AppDesignTokens.display(size: 24)),
-            const SizedBox(height: 7),
-            Text(song.singer,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: AppDesignTokens.title(
-                    size: 17,
-                    color: AppDesignTokens.warmWhite.withValues(alpha: 0.74))),
-          ],
-        ),
-      ),
+  Widget _buildSongTransitionCard(Song song) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxHeight < 620;
+        final tiny = constraints.maxHeight < 480;
+        final topSpace = constraints.maxHeight * (tiny ? 0.28 : 0.42);
+        return Padding(
+          padding: EdgeInsets.fromLTRB(24, topSpace, 24, 0),
+          child: Column(
+            children: [
+              Text(song.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: AppDesignTokens.display(
+                      size: tiny ? 20 : (compact ? 22 : 25))),
+              SizedBox(height: tiny ? 5 : 8),
+              Text(song.singer,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: AppDesignTokens.title(
+                      size: tiny ? 15 : (compact ? 17 : 18),
+                      color:
+                          AppDesignTokens.warmWhite.withValues(alpha: 0.76))),
+            ],
+          ),
+        );
+      },
     );
   }
 
