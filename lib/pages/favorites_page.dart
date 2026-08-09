@@ -182,7 +182,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
                       Positioned(
                         left: 0,
                         right: 0,
-                        bottom: widget.embedded ? 8 : 0,
+                        bottom: widget.embedded ? 84 : 0,
                         child: _buildEditActions(),
                       ),
                   ],
@@ -252,7 +252,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
         message: '在播放页点亮爱心，歌曲会出现在这里。',
       );
     }
-    final bottomPadding = widget.embedded ? (_editMode ? 98.0 : 136.0) : 86.0;
+    final bottomPadding = widget.embedded ? (_editMode ? 184.0 : 136.0) : 86.0;
     return ListView.builder(
       controller: _scrollController,
       padding: EdgeInsets.only(top: 4, bottom: bottomPadding),
@@ -304,7 +304,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
         child: Row(
           children: [
             Expanded(
@@ -336,7 +336,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
         : AppDesignTokens.warmWhite.withValues(alpha: enabled ? 0.92 : 0.42);
     final bg = danger
         ? AppDesignTokens.danger.withValues(alpha: 0.72)
-        : Colors.white.withValues(alpha: enabled ? 0.12 : 0.06);
+        : Colors.white.withValues(alpha: enabled ? 0.20 : 0.12);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,

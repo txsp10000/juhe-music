@@ -571,7 +571,7 @@ class _PlayerPageState extends State<PlayerPage> {
 
   Widget _buildLyricPreview(
       _LyricWindow window, double currentSize, double nextSize) {
-    final upcomingColor = AppDesignTokens.readableAccent(_bgHint);
+    final upcomingColor = _upcomingLyricColor();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -623,7 +623,7 @@ class _PlayerPageState extends State<PlayerPage> {
 
   Widget _buildKaraokeText(LyricLine line, double size) {
     final style = AppDesignTokens.display(size: size);
-    final upcomingColor = AppDesignTokens.readableAccent(_bgHint);
+    final upcomingColor = _upcomingLyricColor();
     final progress = lyricProgressAt(line, _position.inMilliseconds);
     if (progress <= 0) {
       return Text(line.text,
@@ -638,6 +638,14 @@ class _PlayerPageState extends State<PlayerPage> {
       progress: progress,
       activeStyle: style.copyWith(color: AppDesignTokens.lyricWhite),
       inactiveStyle: style.copyWith(color: upcomingColor),
+    );
+  }
+
+  Color _upcomingLyricColor() {
+    final themeColor = AppDesignTokens.readableAccent(_bgHint);
+    return Color.alphaBlend(
+      AppDesignTokens.lyricWhite.withValues(alpha: 0.38),
+      themeColor,
     );
   }
 
