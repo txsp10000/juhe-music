@@ -34,11 +34,10 @@ class _PlayerPageState extends State<PlayerPage> {
   double? _downloadProgress;
   String _coverUrl = '';
   Uint8List? _coverBytes;
-  int _swipeDirection = 0;
   double _dragOffset = 0.0;
   bool _isSwitchingSong = false;
   bool _awaitingSongTransition = false;
-  bool _incomingSong = false;
+  bool _hidePlaybackContent = false;
   bool _favoriteOperationInProgress = false;
   String? _displayedSongId;
 
@@ -95,30 +94,27 @@ class _PlayerPageState extends State<PlayerPage> {
       _coverBytes = null;
       _coverUrl = '';
     }
-    final animateFromOppositeSide = _awaitingSongTransition;
+    final shouldRevealAfterLayout = _awaitingSongTransition;
     setState(() {
       if (changedSong) {
         _dragOffset = 0.0;
-        // Keep the compact transition card active until the incoming slide
-        // has completed; switching straight to the full player here causes a
-        // one-frame flash of lyrics and controls.
-        _isSwitchingSong = animateFromOppositeSide;
+        _isSwitchingSong = shouldRevealAfterLayout;
         _awaitingSongTransition = false;
-        _incomingSong = animateFromOppositeSide;
       }
     });
     _checkFavorite();
     _loadCover(s);
-    if (animateFromOppositeSide) {
+    if (shouldRevealAfterLayout) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        Future.delayed(const Duration(milliseconds: 280), () {
-          if (mounted) {
-            setState(() {
-              _incomingSong = false;
-              _isSwitchingSong = false;
-            });
-          }
+        // Let the new full player layout settle while transparent, then
+        // reveal it as a complete frame rather than exposing a reflow.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          setState(() {
+            _hidePlaybackContent = false;
+            _isSwitchingSong = false;
+          });
         });
       });
     }
@@ -406,7 +402,7 @@ class _PlayerPageState extends State<PlayerPage> {
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onVerticalDragUpdate: (details) {
-            if (_isSwitchingSong || _incomingSong) return;
+            if (_isSwitchingSong) return;
             if (_dragOffset == 0.0) {
               _prefetchAdjacentCover(next: details.delta.dy < 0);
             }
@@ -429,37 +425,16 @@ class _PlayerPageState extends State<PlayerPage> {
                         _dragOffset < 0
                             ? height + _dragOffset
                             : -height + _dragOffset),
-                    child: _buildSongTransitionCard(adjacentSong),
+                    child: _buildSongTransitionCard(
+                      adjacentSong,
+                      entersFromBottom: _dragOffset < 0,
+                    ),
                   ),
                 Transform.translate(
-                  offset: Offset(0, _incomingSong ? 0 : _dragOffset),
-                  child: AnimatedOpacity(
-                    opacity: opacity,
-                    duration: const Duration(milliseconds: 80),
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 280),
-                      reverseDuration: const Duration(milliseconds: 240),
-                      switchInCurve: Curves.easeOutCubic,
-                      switchOutCurve: Curves.easeInCubic,
-                      transitionBuilder: (child, animation) {
-                        // Next (upward swipe) enters from the bottom; previous
-                        // (downward swipe) enters from the top.
-                        final begin =
-                            Offset(0, _swipeDirection < 0 ? 1.0 : -1.0);
-                        return SlideTransition(
-                          position: animation.drive(
-                            Tween(begin: begin, end: Offset.zero),
-                          ),
-                          child: child,
-                        );
-                      },
-                      child: KeyedSubtree(
-                        key: ValueKey(song.id),
-                        child: (_incomingSong || _isSwitchingSong)
-                            ? _buildSongTransitionCard(song)
-                            : _buildPlayerContent(song),
-                      ),
-                    ),
+                  offset: Offset(0, _dragOffset),
+                  child: Opacity(
+                    opacity: _hidePlaybackContent ? 0 : opacity,
+                    child: _buildPlayerContent(song),
                   ),
                 ),
               ],
@@ -480,10 +455,10 @@ class _PlayerPageState extends State<PlayerPage> {
       return;
     }
     setState(() {
-      _swipeDirection = shouldNext ? -1 : 1;
       _isSwitchingSong = true;
       _awaitingSongTransition = true;
-      _dragOffset = shouldNext ? -height : height;
+      _hidePlaybackContent = true;
+      _dragOffset = 0.0;
     });
     Future.delayed(const Duration(milliseconds: 180), () {
       if (!mounted) return;
@@ -498,6 +473,7 @@ class _PlayerPageState extends State<PlayerPage> {
       setState(() {
         _isSwitchingSong = false;
         _dragOffset = 0.0;
+        _hidePlaybackContent = false;
       });
     });
   }
@@ -626,32 +602,40 @@ class _PlayerPageState extends State<PlayerPage> {
     );
   }
 
-  Widget _buildSongTransitionCard(Song song) {
+  Widget _buildSongTransitionCard(
+    Song song, {
+    required bool entersFromBottom,
+  }) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxHeight < 620;
         final tiny = constraints.maxHeight < 480;
-        final topSpace = constraints.maxHeight * (tiny ? 0.28 : 0.42);
-        return Padding(
-          padding: EdgeInsets.fromLTRB(24, topSpace, 24, 0),
-          child: Column(
-            children: [
-              Text(song.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: AppDesignTokens.display(
-                      size: tiny ? 20 : (compact ? 22 : 25))),
-              SizedBox(height: tiny ? 5 : 8),
-              Text(song.singer,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: AppDesignTokens.title(
-                      size: tiny ? 15 : (compact ? 17 : 18),
-                      color:
-                          AppDesignTokens.warmWhite.withValues(alpha: 0.76))),
-            ],
+        return Align(
+          alignment:
+              entersFromBottom ? Alignment.topCenter : Alignment.bottomCenter,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+                24, entersFromBottom ? 44 : 0, 24, entersFromBottom ? 0 : 44),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(song.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: AppDesignTokens.display(
+                        size: tiny ? 20 : (compact ? 22 : 25))),
+                SizedBox(height: tiny ? 5 : 8),
+                Text(song.singer,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: AppDesignTokens.title(
+                        size: tiny ? 15 : (compact ? 17 : 18),
+                        color:
+                            AppDesignTokens.warmWhite.withValues(alpha: 0.76))),
+              ],
+            ),
           ),
         );
       },
