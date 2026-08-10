@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import '../utils/retry_helper.dart';
+import 'cenc_m4a_decryptor.dart';
 import 'settings_service.dart';
 
 class AudioCacheService {
@@ -210,22 +211,24 @@ class AudioCacheService {
     if (path.endsWith('.aac')) return 'aac';
     if (path.endsWith('.wav')) return 'wav';
     if (path.endsWith('.ogg')) return 'ogg';
-    // /stream/{track_id} has no file extension, but the API returns M4A.
+    // Encrypted CDN downloads are M4A and become standard M4A after decrypting.
     return 'm4a';
   }
 
   Future<String?> download(
     String songId,
-    String url, {
+    String downloadUrl, {
     void Function(double progress)? onProgress,
     int? br,
+    String? backupUrl,
+    String? aesKeyHex,
   }) async {
     final quality = br ?? SettingsService().quality.br;
     String path;
     File tmpFile;
 
     try {
-      path = await getFilePath(songId, url, quality);
+      path = await getFilePath(songId, downloadUrl, quality);
       final file = File(path);
       if (await file.exists() && await file.length() > 0) {
         onProgress?.call(1.0);
@@ -237,46 +240,81 @@ class AudioCacheService {
     }
 
     try {
-      return await RetryHelper.run(() async {
-        if (await tmpFile.exists()) await tmpFile.delete();
-
-        final request = http.Request('GET', Uri.parse(url));
-        request.headers['User-Agent'] = 'Mozilla/5.0';
-        final response = await _client.send(request);
-        if (response.statusCode != 200) {
-          throw Exception('HTTP ${response.statusCode}');
-        }
-
-        final totalBytes = response.contentLength ?? 0;
-        var receivedBytes = 0;
-        final sink = tmpFile.openWrite();
+      final key = aesKeyHex?.trim() ?? '';
+      if (key.isEmpty) return null;
+      final encryptedFile = File('$path.encrypted.tmp');
+      final urls = [downloadUrl, backupUrl?.trim() ?? '']
+          .where((url) => url.isNotEmpty)
+          .toSet();
+      for (final url in urls) {
         try {
-          await for (final chunk in response.stream) {
-            sink.add(chunk);
-            receivedBytes += chunk.length;
-            if (totalBytes > 0) {
-              onProgress?.call((receivedBytes / totalBytes).clamp(0.0, 1.0));
-            }
+          await RetryHelper.run(
+            () => _downloadEncryptedFile(
+              url,
+              encryptedFile,
+              onProgress: onProgress,
+            ),
+            attempts: 3,
+            delay: const Duration(seconds: 1),
+          );
+          final encryptedBytes = await encryptedFile.readAsBytes();
+          final decryptedBytes = CencM4aDecryptor.decrypt(encryptedBytes, key);
+          await tmpFile.writeAsBytes(decryptedBytes, flush: true);
+          if (await tmpFile.length() <= 0) {
+            throw const FileSystemException('解密后的音频文件为空');
           }
-        } finally {
-          await sink.close();
+          await tmpFile.rename(path);
+          if (await encryptedFile.exists()) await encryptedFile.delete();
+          await _deleteAllForSong(songId, exceptPath: path);
+          onProgress?.call(1.0);
+          return path;
+        } catch (_) {
+          try {
+            if (await encryptedFile.exists()) await encryptedFile.delete();
+            if (await tmpFile.exists()) await tmpFile.delete();
+          } catch (_) {}
         }
-
-        if (await tmpFile.length() <= 0) throw Exception('下载文件为空');
-        if (totalBytes > 0 && receivedBytes < totalBytes) {
-          throw Exception('下载未完成');
-        }
-
-        await tmpFile.rename(path);
-        await _deleteAllForSong(songId, exceptPath: path);
-        onProgress?.call(1.0);
-        return path;
-      });
+      }
+      return null;
     } catch (_) {
       try {
         if (await tmpFile.exists()) await tmpFile.delete();
       } catch (_) {}
       return null;
+    }
+  }
+
+  Future<void> _downloadEncryptedFile(
+    String url,
+    File target, {
+    void Function(double progress)? onProgress,
+  }) async {
+    if (await target.exists()) await target.delete();
+    final request = http.Request('GET', Uri.parse(url));
+    request.headers['User-Agent'] = 'Mozilla/5.0';
+    final response = await _client.send(request);
+    if (response.statusCode != 200) {
+      throw Exception('HTTP ${response.statusCode}');
+    }
+
+    final totalBytes = response.contentLength ?? 0;
+    var receivedBytes = 0;
+    final sink = target.openWrite();
+    try {
+      await for (final chunk in response.stream) {
+        sink.add(chunk);
+        receivedBytes += chunk.length;
+        if (totalBytes > 0) {
+          onProgress?.call((receivedBytes / totalBytes).clamp(0.0, 1.0));
+        }
+      }
+    } finally {
+      await sink.close();
+    }
+
+    if (await target.length() <= 0) throw const FileSystemException('下载文件为空');
+    if (totalBytes > 0 && receivedBytes < totalBytes) {
+      throw const FileSystemException('下载未完成');
     }
   }
 }

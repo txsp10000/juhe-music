@@ -210,7 +210,7 @@ class MusicApi {
             list
                 .whereType<Map>()
                 .map(StreamQuality.fromJson)
-                .where((q) => q.url.isNotEmpty)
+                .where((q) => q.downloadUrl.isNotEmpty)
                 .toList());
       } catch (_) {
         _streamRequests.remove(trackId);
@@ -221,24 +221,19 @@ class MusicApi {
 
   static Future<StreamSelection> resolveStream(
       String trackId, AudioQuality requested) async {
-    try {
-      final info = await getStreamInfo(trackId);
-      if (info.qualities.isNotEmpty) {
-        final chosen = selectStreamQuality(info.qualities, requested);
-        return StreamSelection(
-            chosen.url.startsWith('http') ? chosen.url : '$_base${chosen.url}',
-            chosen.bitrateKbps,
-            chosen.quality);
-      }
-    } catch (_) {}
-    return StreamSelection(streamUrl(trackId, quality: requested.apiValue),
-        requested.br, requested.apiValue);
-  }
-
-  static String streamUrl(String trackId, {String? quality}) {
-    final selectedQuality = quality ?? AudioQuality.highest.apiValue;
-    return Uri.parse('$_base/stream/${Uri.encodeComponent(trackId)}')
-        .replace(queryParameters: {'quality': selectedQuality}).toString();
+    final info = await getStreamInfo(trackId);
+    if (info.qualities.isEmpty) throw StateError('歌曲没有可下载的音质');
+    final chosen = selectStreamQuality(info.qualities, requested);
+    if (chosen.aesKeyHex.isEmpty) {
+      throw const FormatException('音频下载响应缺少解密密钥');
+    }
+    return StreamSelection(
+      chosen.downloadUrl,
+      chosen.backupUrl,
+      chosen.aesKeyHex,
+      chosen.bitrateKbps,
+      chosen.quality,
+    );
   }
 
   static int _qualityRank(String quality) => switch (quality) {
@@ -328,9 +323,18 @@ class TrackDetails {
 class StreamQuality {
   final String quality;
   final int bitrateKbps;
-  final String url;
+  final String downloadUrl;
+  final String backupUrl;
+  final String aesKeyHex;
   final int rank;
-  const StreamQuality(this.quality, this.bitrateKbps, this.url, this.rank);
+  const StreamQuality(
+    this.quality,
+    this.bitrateKbps,
+    this.downloadUrl,
+    this.backupUrl,
+    this.aesKeyHex,
+    this.rank,
+  );
 
   factory StreamQuality.fromJson(Map json) {
     final quality = json['quality']?.toString() ?? '';
@@ -338,8 +342,15 @@ class StreamQuality {
     final kbps = bitrate is num
         ? (bitrate > 1000 ? bitrate / 1000 : bitrate).round()
         : int.tryParse(bitrate?.toString() ?? '') ?? 0;
-    return StreamQuality(quality, kbps, json['stream_url']?.toString() ?? '',
-        MusicApi._qualityRank(quality));
+    final encryption = json['encryption'];
+    return StreamQuality(
+      quality,
+      kbps,
+      json['download_url']?.toString() ?? '',
+      json['backup_url']?.toString() ?? '',
+      encryption is Map ? encryption['aes_key_hex']?.toString() ?? '' : '',
+      MusicApi._qualityRank(quality),
+    );
   }
 }
 
@@ -350,10 +361,18 @@ class StreamInfo {
 }
 
 class StreamSelection {
-  final String url;
+  final String downloadUrl;
+  final String backupUrl;
+  final String aesKeyHex;
   final int bitrateKbps;
   final String quality;
-  const StreamSelection(this.url, this.bitrateKbps, this.quality);
+  const StreamSelection(
+    this.downloadUrl,
+    this.backupUrl,
+    this.aesKeyHex,
+    this.bitrateKbps,
+    this.quality,
+  );
 }
 
 StreamQuality selectStreamQuality(

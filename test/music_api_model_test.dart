@@ -39,18 +39,24 @@ void main() {
     expect(song.duration, 123);
   });
 
-  test('parses bitrate values reported in bps and kbps', () {
+  test('parses documented encrypted CDN stream qualities', () {
     final bps = StreamQuality.fromJson({
       'quality': 'highest',
       'bitrate': 260443,
-      'stream_url': '/stream/1?quality=highest',
+      'download_url': 'https://cdn.example.com/highest.m4a',
+      'backup_url': 'https://backup.example.com/highest.m4a',
+      'encryption': {'aes_key_hex': '00112233445566778899aabbccddeeff'},
     });
     final kbps = StreamQuality.fromJson({
       'quality': 'medium',
       'bitrate_kbps': 68,
-      'stream_url': '/stream/1?quality=medium',
+      'download_url': 'https://cdn.example.com/medium.m4a',
+      'encryption': {'aes_key_hex': 'ffeeddccbbaa99887766554433221100'},
     });
     expect(bps.bitrateKbps, 260);
+    expect(bps.downloadUrl, 'https://cdn.example.com/highest.m4a');
+    expect(bps.backupUrl, 'https://backup.example.com/highest.m4a');
+    expect(bps.aesKeyHex, '00112233445566778899aabbccddeeff');
     expect(kbps.bitrateKbps, 68);
     expect(bps.rank, greaterThan(kbps.rank));
   });
@@ -60,12 +66,14 @@ void main() {
       StreamQuality.fromJson({
         'quality': 'highest',
         'bitrate_kbps': 260,
-        'stream_url': '/stream/1?quality=highest',
+        'download_url': 'https://cdn.example.com/highest.m4a',
+        'encryption': {'aes_key_hex': '00112233445566778899aabbccddeeff'},
       }),
       StreamQuality.fromJson({
         'quality': 'medium',
         'bitrate_kbps': 68,
-        'stream_url': '/stream/1?quality=medium',
+        'download_url': 'https://cdn.example.com/medium.m4a',
+        'encryption': {'aes_key_hex': 'ffeeddccbbaa99887766554433221100'},
       }),
     ];
 

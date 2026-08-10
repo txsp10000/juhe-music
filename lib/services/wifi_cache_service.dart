@@ -65,8 +65,14 @@ class WifiCacheService {
         try {
           final stream =
               await MusicApi.resolveStream(song.id, SettingsService().quality);
-          if (stream.url.isEmpty) continue;
-          await cache.download(song.id, stream.url, br: stream.bitrateKbps);
+          if (stream.downloadUrl.isEmpty) continue;
+          await cache.download(
+            song.id,
+            stream.downloadUrl,
+            br: stream.bitrateKbps,
+            backupUrl: stream.backupUrl,
+            aesKeyHex: stream.aesKeyHex,
+          );
         } catch (_) {
           continue;
         }

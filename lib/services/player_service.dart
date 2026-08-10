@@ -617,9 +617,9 @@ class PlayerService {
       if (selection.bitrateKbps > 0) quality = selection.bitrateKbps;
     } catch (_) {}
     if (generation != _playGeneration) return;
-    final url = selection?.url;
+    final downloadUrl = selection?.downloadUrl;
     if (generation != _playGeneration) return;
-    if (url == null || url.isEmpty) {
+    if (downloadUrl == null || downloadUrl.isEmpty) {
       await _handlePlaybackFailure(generation, '无法获取播放地址，请重试');
       return;
     }
@@ -628,8 +628,10 @@ class PlayerService {
     _notifyDownloadProgress(0.0);
     final localPath = await AudioCacheService().download(
       song.id,
-      url,
+      downloadUrl,
       br: quality,
+      backupUrl: selection?.backupUrl,
+      aesKeyHex: selection?.aesKeyHex,
       onProgress: (progress) {
         if (generation == _playGeneration) {
           _notifyDownloadProgress(progress);
