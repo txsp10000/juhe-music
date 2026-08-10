@@ -152,8 +152,29 @@ class MusicApi {
     return songs;
   }
 
-  static Future<List<Song>> getSceneTracks(int sceneModeId) async {
-    final uri = Uri.parse('$_base/scene/$sceneModeId');
+  /// Loads a fresh recommendation batch for a listening mode.
+  ///
+  /// Service scene modes use [sceneModeId]. The two client-only modes use
+  /// [preference] (`familiar` or `fresh`). Exactly one is required.
+  static Future<List<Song>> getModeTracks({
+    int? sceneModeId,
+    String? preference,
+  }) async {
+    final normalizedPreference = preference?.trim();
+    final hasSceneModeId = sceneModeId != null;
+    final hasPreference =
+        normalizedPreference != null && normalizedPreference.isNotEmpty;
+    if (hasSceneModeId == hasPreference) {
+      throw ArgumentError(
+        '常用模式歌曲请求必须且只能提供 sceneModeId 或 preference',
+      );
+    }
+
+    final uri = Uri.parse('$_base/feed/mode/tracks').replace(
+      queryParameters: hasSceneModeId
+          ? {'scene_mode_id': sceneModeId.toString()}
+          : {'preference': normalizedPreference!},
+    );
     final decoded = jsonDecode(await _retry(() => _httpGet(uri)));
     final items = decoded is Map ? decoded['items'] : null;
     if (items is! List) throw const FormatException('模式歌曲响应格式无效');

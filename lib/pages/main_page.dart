@@ -165,7 +165,7 @@ class _MainPageState extends State<MainPage> {
     if (mounted) setState(() => _tab = 0);
     Toast.show(context, '正在加载「${mode.name}」...');
     try {
-      final songs = await MusicApi.getSceneTracks(mode.sceneModeId);
+      final songs = await MusicApi.getModeTracks(sceneModeId: mode.sceneModeId);
       if (!mounted || generation != _modeLoadGeneration) return;
       if (songs.isEmpty) {
         Toast.show(context, '这个模式暂时没有歌曲');

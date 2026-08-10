@@ -96,7 +96,7 @@ class _DesktopMusicPageState extends State<DesktopMusicPage> {
   Future<void> _selectMode(ListeningMode mode) async {
     setState(() => _section = _DesktopSection.listen);
     try {
-      final songs = await MusicApi.getSceneTracks(mode.sceneModeId);
+      final songs = await MusicApi.getModeTracks(sceneModeId: mode.sceneModeId);
       if (songs.isEmpty) return;
       _player.replaceQueue(songs, mode: mode);
       await _player.playAt(0);

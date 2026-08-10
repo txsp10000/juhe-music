@@ -347,9 +347,9 @@ class PlayerService {
     _loadingModeSongs = true;
     final previousLength = queue.length;
     try {
-      final songs = await MusicApi.getSceneTracks(mode.sceneModeId);
+      final songs = await MusicApi.getModeTracks(sceneModeId: mode.sceneModeId);
       if (!identical(_activeMode, mode) || songs.isEmpty) return;
-      // Scene feeds may repeat items across requests. Keep the queue
+      // Mode feeds may repeat items across requests. Keep the queue
       // stable while still allowing each scroll to contribute new songs.
       final existingIds = queue.map((song) => song.id).toSet();
       queue.addAll(songs.where((song) => existingIds.add(song.id)));
