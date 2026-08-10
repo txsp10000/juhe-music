@@ -187,17 +187,19 @@ class PlayerService {
     }
 
     try {
-      _audioHandler = await AudioService.init(
-        builder: () => _AudioPlayerTask(),
-        config: const AudioServiceConfig(
-          androidNotificationChannelId: 'com.qishui.music.channel',
-          androidNotificationChannelName: '汽水音乐',
-          androidNotificationOngoing: false,
-          androidStopForegroundOnPause: true,
-          androidShowNotificationBadge: false,
-        ),
-      );
-      await _configureAndroidAudioSession();
+      if (Platform.isAndroid || Platform.isIOS) {
+        _audioHandler = await AudioService.init(
+          builder: () => _AudioPlayerTask(),
+          config: const AudioServiceConfig(
+            androidNotificationChannelId: 'com.qishui.music.channel',
+            androidNotificationChannelName: '汽水音乐',
+            androidNotificationOngoing: false,
+            androidStopForegroundOnPause: true,
+            androidShowNotificationBadge: false,
+          ),
+        );
+        await _configureAndroidAudioSession();
+      }
     } catch (_) {
       await createdPlayer.dispose();
       if (identical(_player, createdPlayer)) _player = null;

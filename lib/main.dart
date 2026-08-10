@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'desktop/desktop_music_page.dart';
 import 'pages/main_page.dart';
 import 'services/player_service.dart';
 import 'tv/tv_routes.dart';
@@ -86,6 +88,23 @@ class MusicApp extends StatelessWidget {
       splashColor: Colors.white10,
       highlightColor: Colors.white10,
     );
+    final desktopTheme = theme.copyWith(
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: const Color(0xFFF5F5F7),
+      colorScheme: const ColorScheme.light(
+        primary: Color(0xFF0071E3),
+        surface: Color(0xFFFFFFFF),
+        secondary: Color(0xFF6E6E73),
+        onSurface: Color(0xFF1D1D1F),
+      ),
+      iconTheme: const IconThemeData(color: Color(0xFF6E6E73)),
+      textTheme: const TextTheme(
+        titleLarge: TextStyle(color: Color(0xFF1D1D1F), fontWeight: FontWeight.w700),
+        titleMedium: TextStyle(color: Color(0xFF1D1D1F), fontWeight: FontWeight.w600),
+        bodyMedium: TextStyle(color: Color(0xFF1D1D1F)),
+        bodySmall: TextStyle(color: Color(0xFF6E6E73)),
+      ),
+    );
 
     if (isTv) {
       return MaterialApp(
@@ -107,8 +126,8 @@ class MusicApp extends StatelessWidget {
     return MaterialApp(
       title: '汽水音乐',
       debugShowCheckedModeBanner: false,
-      theme: theme,
-      home: const MainPage(),
+      theme: Platform.isWindows ? desktopTheme : theme,
+      home: Platform.isWindows ? const DesktopMusicPage() : const MainPage(),
     );
   }
 }
