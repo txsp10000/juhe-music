@@ -529,25 +529,35 @@ class PlayerService {
 
   Future<void> _hydrateSongDetails(Song song, int generation) async {
     final playId = song.lyricId.isNotEmpty ? song.lyricId : song.id;
+    final picId = song.picId.isNotEmpty ? song.picId : song.id;
     final cachedLyric = await LyricCacheService().load(playId);
+    if (generation != _playGeneration) return;
+    final cachedCover = await CoverCacheService().load(picId);
     if (generation != _playGeneration) return;
     if (cachedLyric != null && cachedLyric.isNotEmpty) {
       _applyLyric(song, playId, cachedLyric);
     }
+    if (cachedCover != null) {
+      await _applyLocalCover(song, picId, cachedCover, generation);
+      if (generation != _playGeneration) return;
+    }
+
+    final needsLyric = cachedLyric == null || cachedLyric.isEmpty;
+    final needsCover = cachedCover == null;
+    if (!needsLyric && !needsCover) return;
 
     try {
       final details = await MusicApi.getTrackDetails(playId);
       if (generation != _playGeneration) return;
       final lyricText = details.lyric;
-      if (lyricText.isNotEmpty) {
+      if (needsLyric && lyricText.isNotEmpty) {
         final localLyric =
             await LyricCacheService().saveAndLoad(playId, lyricText);
         if (generation != _playGeneration) return;
         if (localLyric != null) _applyLyric(song, playId, localLyric);
       }
 
-      if (!song.cover.startsWith('file:')) {
-        final picId = song.picId.isNotEmpty ? song.picId : song.id;
+      if (needsCover) {
         final coverUrl =
             details.song.cover.isNotEmpty ? details.song.cover : song.cover;
         if (generation != _playGeneration) return;
@@ -556,22 +566,32 @@ class PlayerService {
               await CoverCacheService().download(picId, coverUrl);
           if (generation != _playGeneration) return;
           if (coverBytes != null) {
-            unawaited(ThemeService.updateFromCover(coverBytes));
+            await _applyLocalCover(song, picId, coverBytes, generation);
           }
-          final localCover = await CoverCacheService().getLocalPath(picId);
-          if (generation != _playGeneration) return;
-          final artUri = localCover == null ? null : Uri.file(localCover);
-          if (artUri != null) song.cover = artUri.toString();
-          _currentMediaItem = _currentMediaItem?.copyWith(artUri: artUri);
-          try {
-            if (_currentMediaItem != null) {
-              await _audioHandler?.updateMediaItem(_currentMediaItem!);
-            }
-          } catch (_) {}
-          _notifySongChange(song);
         }
       }
     } catch (_) {}
+  }
+
+  Future<void> _applyLocalCover(
+    Song song,
+    String picId,
+    Uint8List coverBytes,
+    int generation,
+  ) async {
+    unawaited(ThemeService.updateFromCover(coverBytes));
+    final localCover = await CoverCacheService().getLocalPath(picId);
+    if (generation != _playGeneration) return;
+    final artUri = localCover == null ? null : Uri.file(localCover);
+    if (artUri == null) return;
+    song.cover = artUri.toString();
+    _currentMediaItem = _currentMediaItem?.copyWith(artUri: artUri);
+    try {
+      if (_currentMediaItem != null) {
+        await _audioHandler?.updateMediaItem(_currentMediaItem!);
+      }
+    } catch (_) {}
+    _notifySongChange(song);
   }
 
   void _applyLyric(Song song, String playId, String lyric) {

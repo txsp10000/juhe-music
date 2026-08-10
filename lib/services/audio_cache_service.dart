@@ -186,21 +186,6 @@ class AudioCacheService {
   String _normalizePath(String path) =>
       File(path).absolute.path.replaceAll('\\', '/').toLowerCase();
 
-  Future<void> commitDownloadedFile(
-    String songId,
-    String temporaryPath,
-    String finalPath,
-  ) async {
-    final temporaryFile = File(temporaryPath);
-    if (!await temporaryFile.exists() || await temporaryFile.length() <= 0) {
-      throw const FileSystemException('Downloaded audio file is empty');
-    }
-    final finalFile = File(finalPath);
-    if (await finalFile.exists()) await finalFile.delete();
-    await temporaryFile.rename(finalPath);
-    await _deleteAllForSong(songId, exceptPath: finalPath);
-  }
-
   String _extractExt(String? url) {
     if (url == null || url.isEmpty) return 'mp3';
     final uri = Uri.tryParse(url);
