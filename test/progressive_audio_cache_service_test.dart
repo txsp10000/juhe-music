@@ -90,6 +90,33 @@ void main() {
     await upstream.close(force: true);
   });
 
+  test('uses the API M4A extension when the stream URL has no suffix',
+      () async {
+    final sourceBytes = List<int>.generate(4096, (index) => index % 251);
+    final upstream = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final upstreamSubscription = upstream.listen((request) async {
+      request.response.headers.contentType = ContentType('audio', 'mp4');
+      request.response.contentLength = sourceBytes.length;
+      request.response.add(sourceBytes);
+      await request.response.close();
+    });
+
+    final completed = Completer<String>();
+    final service = ProgressiveAudioCacheService();
+    await service.start(
+      songId: 'm4a_stream_song',
+      sourceUrl: 'http://127.0.0.1:${upstream.port}/stream/123?quality=highest',
+      quality: 260,
+      onComplete: completed.complete,
+    );
+    final cachedPath =
+        await completed.future.timeout(const Duration(seconds: 5));
+
+    expect(cachedPath.toLowerCase(), endsWith('.m4a'));
+    await upstreamSubscription.cancel();
+    await upstream.close(force: true);
+  });
+
   test('resumes an interrupted upstream stream without redownloading bytes',
       () async {
     final sourceBytes = List<int>.generate(192 * 1024, (index) => index % 239);

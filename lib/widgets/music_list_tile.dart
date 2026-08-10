@@ -68,7 +68,12 @@ class _MusicListTileState extends State<MusicListTile> {
     if (!widget.showCover) return;
     final key = song.picId.isNotEmpty ? song.picId : song.id;
     _cacheKey = key;
-    final bytes = await CoverCacheService().load(key);
+    final cache = CoverCacheService();
+    final stored = await cache.load(key);
+    final bytes = stored ??
+        (song.cover.isEmpty || song.cover.startsWith('file:')
+            ? null
+            : await cache.download(key, song.cover));
     if (mounted && _cacheKey == key && bytes != null) {
       setState(() => _coverBytes = bytes);
     }
@@ -150,18 +155,11 @@ class _MusicListTileState extends State<MusicListTile> {
   }
 
   Widget _buildLeading() {
-    if (widget.showCover &&
-        (_coverBytes != null || widget.song.cover.isNotEmpty)) {
+    if (widget.showCover && _coverBytes != null) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: _coverBytes != null
-            ? Image.memory(_coverBytes!,
-                width: 48, height: 48, fit: BoxFit.cover)
-            : Image.network(widget.song.cover,
-                width: 48,
-                height: 48,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _fallbackLeading()),
+        child: Image.memory(_coverBytes!,
+            width: 48, height: 48, fit: BoxFit.cover),
       );
     }
     return _fallbackLeading();

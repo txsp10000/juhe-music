@@ -30,7 +30,25 @@ class AudioCacheService {
           await entity.delete();
         }
       }
+      await _migrateLegacyMp4Files(dir);
     } catch (_) {}
+  }
+
+  Future<void> _migrateLegacyMp4Files(Directory dir) async {
+    await for (final entity in dir.list()) {
+      if (entity is! File || entity.path.endsWith('.tmp')) continue;
+      final name = entity.path.split('/').last.split('\\').last;
+      if (!RegExp(r'_\d+\.mp3$', caseSensitive: false).hasMatch(name)) {
+        continue;
+      }
+      final target = File(entity.path
+          .replaceFirst(RegExp(r'\.mp3$', caseSensitive: false), '.m4a'));
+      if (await target.exists()) {
+        await entity.delete();
+      } else {
+        await entity.rename(target.path);
+      }
+    }
   }
 
   Future<int> getCacheSizeBytes() async {
@@ -192,7 +210,8 @@ class AudioCacheService {
     if (path.endsWith('.aac')) return 'aac';
     if (path.endsWith('.wav')) return 'wav';
     if (path.endsWith('.ogg')) return 'ogg';
-    return 'mp3';
+    // /stream/{track_id} has no file extension, but the API returns M4A.
+    return 'm4a';
   }
 
   Future<String?> download(

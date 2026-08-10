@@ -3,22 +3,111 @@ import 'package:qishui_music/models/listening_mode.dart';
 
 void main() {
   test('常用模式包含全部场景且排除熟悉和新鲜模式', () {
+    const expected = <int, String>{
+      1: 'scene_mode_commute',
+      2: 'scene_mode_sport',
+      3: 'scene_mode_chill',
+      4: 'scene_mode_emo',
+      5: 'scene_mode_happy',
+      6: 'scene_mode_focus',
+      7: 'scene_mode_dj',
+      8: 'scene_mode_bedtime',
+      9: 'scene_mode_douyin_roam',
+      10: 'scene_mode_cantonese',
+      11: 'scene_mode_electronic',
+      12: 'scene_mode_chinese_style',
+      13: 'scene_mode_breakup',
+      14: 'scene_mode_slow_motion',
+      15: 'scene_mode_english',
+      16: 'scene_mode_nostalgic',
+      17: 'scene_mode_sweet_girl',
+      18: 'scene_mode_drunk',
+      19: 'scene_mode_love_song',
+      20: 'scene_mode_calm',
+      21: 'scene_mode_heal',
+      22: 'scene_mode_kpop',
+      23: 'scene_mode_rnb',
+      24: 'scene_mode_rap',
+      25: 'scene_mode_non_vocal',
+      26: 'scene_mode_child',
+      27: 'scene_mode_country',
+      28: 'scene_mode_rock',
+      29: 'scene_mode_folk',
+      30: 'scene_mode_jpop',
+      31: 'scene_mode_ktv',
+      32: 'scene_mode_classic',
+      33: 'scene_mode_car_mode',
+      34: 'scene_mode_fish',
+      35: 'scene_mode_rain',
+      36: 'scene_mode_travel',
+      37: 'scene_mode_game',
+      38: 'scene_mode_get_up',
+      39: 'scene_mode_beach',
+      40: 'scene_mode_night_time',
+      41: 'scene_mode_bath',
+      44: 'scene_mode_lying_flat',
+      45: 'scene_mode_lucky',
+      47: 'scene_mode_clean_up',
+      48: 'scene_mode_library',
+    };
+
+    final actual = <int, String>{
+      for (final mode in listeningModes) mode.sceneModeId: mode.subQueueType,
+    };
+
     expect(listeningModes, hasLength(45));
-
-    final ids = listeningModes.map((mode) => mode.sceneModeId).toSet();
-    final types = listeningModes.map((mode) => mode.subQueueType).toSet();
-
-    expect(ids, hasLength(listeningModes.length));
-    expect(types, hasLength(listeningModes.length));
-    expect(types, isNot(contains('familiar')));
-    expect(types, isNot(contains('fresh')));
+    expect(actual, expected);
     expect(
-        types,
-        containsAll(<String>[
-          'scene_mode_slow_motion',
-          'scene_mode_rap',
-          'scene_mode_night_time',
-          'scene_mode_classic',
-        ]));
+      listeningModes.map((mode) => mode.sceneModeId),
+      <int>[
+        14,
+        9,
+        7,
+        44,
+        4,
+        8,
+        2,
+        41,
+        3,
+        5,
+        11,
+        45,
+        48,
+        10,
+        1,
+        13,
+        15,
+        47,
+        12,
+        37,
+        33,
+        6,
+        24,
+        40,
+        21,
+        25,
+        18,
+        31,
+        38,
+        19,
+        28,
+        23,
+        20,
+        16,
+        29,
+        17,
+        22,
+        30,
+        36,
+        34,
+        26,
+        35,
+        39,
+        27,
+        32,
+      ],
+    );
+    expect(actual.values, isNot(contains('familiar')));
+    expect(actual.values, isNot(contains('fresh')));
   });
 }

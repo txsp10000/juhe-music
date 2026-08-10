@@ -10,6 +10,7 @@ import '../services/theme_service.dart';
 import '../theme/app_design_tokens.dart';
 import '../utils/toast.dart';
 import '../widgets/glass_panel.dart';
+import '../widgets/cached_cover_image.dart';
 import '../widgets/music_list_tile.dart';
 import 'playlist_detail_page.dart';
 
@@ -341,13 +342,11 @@ class _SearchResultPageState extends State<SearchResultPage> {
                     child: SizedBox(
                         width: 64,
                         height: 64,
-                        child: playlist.coverUrl.isEmpty
-                            ? Icon(Icons.queue_music_rounded, color: accent)
-                            : Image.network(playlist.coverUrl,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Icon(
-                                    Icons.queue_music_rounded,
-                                    color: accent)))),
+                        child: CachedCoverImage(
+                            cacheKey: 'playlist_${playlist.id}',
+                            url: playlist.coverUrl,
+                            fallback: Icon(Icons.queue_music_rounded,
+                                color: accent)))),
                 const SizedBox(width: 12),
                 Expanded(
                     child: Column(

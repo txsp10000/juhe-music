@@ -528,8 +528,6 @@ class _PlayerPageState extends State<PlayerPage> {
                     children: [
                       if (effectiveCoverBytes != null)
                         Image.memory(effectiveCoverBytes, fit: BoxFit.cover)
-                      else if (song.cover.isNotEmpty)
-                        Image.network(song.cover, fit: BoxFit.cover)
                       else
                         Icon(Icons.music_note_rounded,
                             color: AppDesignTokens.lyricWhite

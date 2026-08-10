@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../api/music_api.dart';
 import '../../models/song.dart';
 import '../../services/player_service.dart';
+import '../../widgets/cached_cover_image.dart';
 import '../tv_layout_metrics.dart';
 import '../tv_routes.dart';
 import '../tv_tokens.dart';
@@ -139,14 +140,11 @@ class _TvSearchResultsPageState extends State<TvSearchResultsPage> {
                 aspectRatio: 1,
                 child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: playlist.coverUrl.isEmpty
-                        ? const Icon(Icons.queue_music_rounded,
-                            color: TvTokens.focus)
-                        : Image.network(playlist.coverUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(
-                                Icons.queue_music_rounded,
-                                color: TvTokens.focus)))),
+                    child: CachedCoverImage(
+                        cacheKey: 'playlist_${playlist.id}',
+                        url: playlist.coverUrl,
+                        fallback: const Icon(Icons.queue_music_rounded,
+                            color: TvTokens.focus)))),
             SizedBox(width: metrics.value(14, minimum: 8)),
             Expanded(
                 child: Column(

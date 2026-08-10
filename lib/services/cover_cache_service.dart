@@ -58,8 +58,11 @@ class CoverCacheService {
         if (resp.statusCode == 200 && resp.bodyBytes.isNotEmpty) {
           final dir = await _getDir();
           final file = File('${dir.path}/$id.jpg');
-          await file.writeAsBytes(resp.bodyBytes);
-          return resp.bodyBytes;
+          final tempFile = File('${file.path}.tmp');
+          await tempFile.writeAsBytes(resp.bodyBytes, flush: true);
+          if (await file.exists()) await file.delete();
+          await tempFile.rename(file.path);
+          return await load(id);
         }
         throw Exception('HTTP ${resp.statusCode}');
       }, attempts: 3, delay: const Duration(seconds: 1));

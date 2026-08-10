@@ -96,7 +96,7 @@ class _DesktopMusicPageState extends State<DesktopMusicPage> {
   Future<void> _selectMode(ListeningMode mode) async {
     setState(() => _section = _DesktopSection.listen);
     try {
-      final songs = await MusicApi.getModeTracks(mode.sceneModeId);
+      final songs = await MusicApi.getSceneTracks(mode.sceneModeId);
       if (songs.isEmpty) return;
       _player.replaceQueue(songs, mode: mode);
       await _player.playAt(0);
@@ -1039,11 +1039,7 @@ class _DesktopAlbumArtState extends State<DesktopAlbumArt> {
           color: const Color(0xFFE5E5EA),
           child: _bytes != null
               ? Image.memory(_bytes!, fit: BoxFit.cover)
-              : widget.song.cover.isNotEmpty
-                  ? Image.network(widget.song.cover,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _fallback())
-                  : _fallback()));
+              : _fallback()));
   Widget _fallback() => const Center(
       child:
           Icon(Icons.music_note_rounded, color: Color(0xFFAEAEB2), size: 32));

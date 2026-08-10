@@ -11,7 +11,6 @@ import 'lyric_cache_service.dart';
 import 'audio_cache_service.dart';
 import 'cover_cache_service.dart';
 import 'settings_service.dart';
-import 'progressive_audio_cache_service.dart';
 import 'theme_service.dart';
 
 enum PlaybackQueueSource { regular, favorites, listeningMode }
@@ -348,9 +347,9 @@ class PlayerService {
     _loadingModeSongs = true;
     final previousLength = queue.length;
     try {
-      final songs = await MusicApi.getModeTracks(mode.sceneModeId);
+      final songs = await MusicApi.getSceneTracks(mode.sceneModeId);
       if (!identical(_activeMode, mode) || songs.isEmpty) return;
-      // Radio endpoints may repeat items across requests. Keep the queue
+      // Scene feeds may repeat items across requests. Keep the queue
       // stable while still allowing each scroll to contribute new songs.
       final existingIds = queue.map((song) => song.id).toSet();
       queue.addAll(songs.where((song) => existingIds.add(song.id)));
@@ -381,7 +380,6 @@ class PlayerService {
       _position = Duration.zero;
       _duration = Duration.zero;
       _openedGeneration = null;
-      await ProgressiveAudioCacheService().cancelActive();
       _suppressCompletion = true;
       try {
         await _player?.stop();
@@ -432,7 +430,6 @@ class PlayerService {
     _resumeAfterAndroidInterruption = false;
     _openedGeneration = null;
     _playGeneration++;
-    await ProgressiveAudioCacheService().cancelActive();
     _suppressCompletion = true;
     try {
       await _player?.stop();
@@ -511,10 +508,6 @@ class PlayerService {
     } finally {
       _suppressCompletion = false;
     }
-    // Do not hold the next local-file playback behind cleanup of a previous
-    // progressive download. The new stream start still serializes itself.
-    unawaited(ProgressiveAudioCacheService().cancelActive());
-
     final coverCache = CoverCacheService();
     final localCover = await coverCache.getLocalPath(picId);
     if (currentGen != _playGeneration) return;
@@ -547,8 +540,10 @@ class PlayerService {
       if (generation != _playGeneration) return;
       final lyricText = details.lyric;
       if (lyricText.isNotEmpty) {
-        _applyLyric(song, playId, lyricText);
-        await LyricCacheService().save(playId, lyricText);
+        final localLyric =
+            await LyricCacheService().saveAndLoad(playId, lyricText);
+        if (generation != _playGeneration) return;
+        if (localLyric != null) _applyLyric(song, playId, localLyric);
       }
 
       if (!song.cover.startsWith('file:')) {
@@ -597,7 +592,13 @@ class PlayerService {
   }) async {
     final player = _player;
     if (player == null) return;
-    var quality = requestedBr ?? AudioQuality.highest.br;
+    final requestedQuality = requestedBr == null
+        ? SettingsService().quality
+        : AudioQuality.values.firstWhere(
+            (candidate) => candidate.br == requestedBr,
+            orElse: () => SettingsService().quality,
+          );
+    var quality = requestedQuality.br;
     final cachedPath = await AudioCacheService().findBestCachedFile(song.id);
     if (generation != _playGeneration) return;
     if (cachedPath != null) {
@@ -612,11 +613,11 @@ class PlayerService {
     }
     StreamSelection? selection;
     try {
-      selection = await MusicApi.resolveStream(song.id, AudioQuality.highest);
+      selection = await MusicApi.resolveStream(song.id, requestedQuality);
       if (selection.bitrateKbps > 0) quality = selection.bitrateKbps;
     } catch (_) {}
     if (generation != _playGeneration) return;
-    final url = selection?.url ?? await _fetchPlayUrl(song);
+    final url = selection?.url;
     if (generation != _playGeneration) return;
     if (url == null || url.isEmpty) {
       await _handlePlaybackFailure(generation, '无法获取播放地址，请重试');
@@ -625,46 +626,29 @@ class PlayerService {
 
     _currentPlayingBr = quality;
     _notifyDownloadProgress(0.0);
-    final localStreamUrl = await ProgressiveAudioCacheService().start(
-      songId: song.id,
-      sourceUrl: url,
-      quality: quality,
+    final localPath = await AudioCacheService().download(
+      song.id,
+      url,
+      br: quality,
       onProgress: (progress) {
         if (generation == _playGeneration) {
           _notifyDownloadProgress(progress);
         }
       },
-      onComplete: (path) {
-        if (generation == _playGeneration) {
-          _currentPlayingBr = _extractBrFromPath(path);
-          _notifyDownloadProgress(null);
-        }
-      },
-      onError: (_) {
-        unawaited(
-          _handlePlaybackFailure(generation, '网络中断，播放未能继续，请重试'),
-        );
-      },
     );
     if (generation != _playGeneration) return;
-    if (_failedGeneration == generation) return;
-    if (localStreamUrl != null) {
-      await _openMedia(
-        Media(localStreamUrl),
-        generation,
-        play: play,
-        resumePosition: resumePosition,
-      );
+    if (localPath == null) {
+      await _handlePlaybackFailure(generation, '歌曲下载失败，请检查网络后重试');
       return;
     }
     _notifyDownloadProgress(null);
+    _currentPlayingBr = _extractBrFromPath(localPath);
     await _openMedia(
-      Media(url),
+      Media(Uri.file(localPath).toString()),
       generation,
       play: play,
       resumePosition: resumePosition,
     );
-    if (generation == _playGeneration) _notifyDownloadProgress(null);
   }
 
   Future<bool> _openMedia(
@@ -698,7 +682,6 @@ class PlayerService {
     _failedGeneration = generation;
     _openedGeneration = null;
     _notifyDownloadProgress(null);
-    await ProgressiveAudioCacheService().cancelActive();
     try {
       await _player?.pause();
     } catch (_) {}
@@ -717,8 +700,8 @@ class PlayerService {
     return 999;
   }
 
-  /// Restarts the current song at the selected quality using the same
-  /// progressive single-stream path as normal playback.
+  /// Downloads the current song at the selected quality, then resumes it
+  /// from the complete local cache file.
   Future<void> redownloadCurrentAtNewQuality() async {
     final song = currentSong;
     if (song == null) return;
@@ -737,7 +720,6 @@ class PlayerService {
     } finally {
       _suppressCompletion = false;
     }
-    await ProgressiveAudioCacheService().cancelActive();
     if (currentGen != _playGeneration) return;
     _notifyDownloadProgress(-1.0);
     await _prepareAndPlayAudio(
@@ -749,17 +731,7 @@ class PlayerService {
     );
   }
 
-  Future<String?> _fetchPlayUrl(Song song) async {
-    try {
-      if (song.id.isEmpty) return null;
-      return MusicApi.streamUrl(song.id);
-    } catch (_) {
-      return null;
-    }
-  }
-
   void dispose() {
-    unawaited(ProgressiveAudioCacheService().dispose());
     _positionSub?.cancel();
     _durationSub?.cancel();
     _playingSub?.cancel();

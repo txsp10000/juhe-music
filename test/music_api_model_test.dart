@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:qishui_music/api/music_api.dart';
 import 'package:qishui_music/models/song.dart';
+import 'package:qishui_music/services/settings_service.dart';
 
 void main() {
   test('builds Soda cover URL using the documented resize suffix', () {
@@ -52,5 +53,25 @@ void main() {
     expect(bps.bitrateKbps, 260);
     expect(kbps.bitrateKbps, 68);
     expect(bps.rank, greaterThan(kbps.rank));
+  });
+
+  test('selects the requested quality from stream info', () {
+    final qualities = <StreamQuality>[
+      StreamQuality.fromJson({
+        'quality': 'highest',
+        'bitrate_kbps': 260,
+        'stream_url': '/stream/1?quality=highest',
+      }),
+      StreamQuality.fromJson({
+        'quality': 'medium',
+        'bitrate_kbps': 68,
+        'stream_url': '/stream/1?quality=medium',
+      }),
+    ];
+
+    final selected = selectStreamQuality(qualities, AudioQuality.medium);
+
+    expect(selected.quality, 'medium');
+    expect(selected.bitrateKbps, 68);
   });
 }

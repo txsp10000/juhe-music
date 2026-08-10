@@ -35,11 +35,24 @@ class LyricCacheService {
     return null;
   }
 
-  /// 将歌词保存到本地缓存
-  Future<void> save(String lyricId, String lyric) async {
+  /// 将歌词原子写入本地缓存，成功后仅返回重新读取的本地内容。
+  Future<String?> saveAndLoad(String lyricId, String lyric) async {
+    File? tempFile;
     try {
       final file = await _getFile(lyricId);
-      await file.writeAsString(lyric);
-    } catch (_) {}
+      tempFile = File('${file.path}.tmp');
+      await tempFile.writeAsString(lyric, flush: true);
+      if (await file.exists()) await file.delete();
+      await tempFile.rename(file.path);
+      final cached = await load(lyricId);
+      return cached != null && cached.isNotEmpty ? cached : null;
+    } catch (_) {
+      try {
+        if (tempFile != null && await tempFile.exists()) {
+          await tempFile.delete();
+        }
+      } catch (_) {}
+      return null;
+    }
   }
 }

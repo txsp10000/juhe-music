@@ -69,12 +69,6 @@ class TvAlbumArt extends StatelessWidget {
           return Image.file(file, fit: BoxFit.cover);
         }
       }
-      return Image.network(
-        cover,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) =>
-            _fallback(metrics, hasBoundedSize, shortestSide),
-      );
     }
     return _fallback(metrics, hasBoundedSize, shortestSide);
   }

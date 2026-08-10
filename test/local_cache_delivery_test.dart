@@ -1,0 +1,73 @@
+import 'dart:io';
+
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:qishui_music/services/cover_cache_service.dart';
+import 'package:qishui_music/services/lyric_cache_service.dart';
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  const pathProviderChannel = MethodChannel('plugins.flutter.io/path_provider');
+  late Directory documents;
+
+  setUpAll(() async {
+    HttpOverrides.global = null;
+    documents = await Directory.systemTemp.createTemp(
+      'qishui_local_cache_delivery_test_',
+    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(pathProviderChannel, (call) async {
+      if (call.method == 'getApplicationDocumentsDirectory') {
+        return documents.path;
+      }
+      return null;
+    });
+  });
+
+  tearDownAll(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(pathProviderChannel, null);
+    await documents.delete(recursive: true);
+  });
+
+  test('lyrics are returned only after being persisted locally', () async {
+    const lyricId = 'local_lyric';
+    const lyric = '[00:01.00]cached lyric';
+
+    final delivered = await LyricCacheService().saveAndLoad(lyricId, lyric);
+    final file = File('${documents.path}/lyric_cache/$lyricId.lrc');
+
+    expect(delivered, lyric);
+    expect(await file.exists(), isTrue);
+    expect(await file.readAsString(), lyric);
+    expect(await File('${file.path}.tmp').exists(), isFalse);
+  });
+
+  test('cover bytes are returned from the completed local cache file',
+      () async {
+    final sourceBytes = List<int>.generate(4096, (index) => index % 251);
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final subscription = server.listen((request) async {
+      request.response.contentLength = sourceBytes.length;
+      request.response.add(sourceBytes);
+      await request.response.close();
+    });
+
+    try {
+      final delivered = await CoverCacheService().download(
+        'local_cover',
+        'http://127.0.0.1:${server.port}/cover.jpg',
+      );
+      final localPath = await CoverCacheService().getLocalPath('local_cover');
+
+      expect(localPath, isNotNull);
+      expect(delivered, sourceBytes);
+      expect(await File(localPath!).readAsBytes(), sourceBytes);
+      expect(await File('$localPath.tmp').exists(), isFalse);
+    } finally {
+      await subscription.cancel();
+      await server.close(force: true);
+    }
+  });
+}

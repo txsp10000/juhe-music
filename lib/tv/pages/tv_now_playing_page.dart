@@ -184,7 +184,7 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
     final generation = ++_modeLoadGeneration;
     setState(() => _loadingMessage = '正在加载「${mode.name}」');
     try {
-      final songs = await MusicApi.getModeTracks(mode.sceneModeId);
+      final songs = await MusicApi.getSceneTracks(mode.sceneModeId);
       if (!mounted || generation != _modeLoadGeneration) return;
       if (songs.isEmpty) throw StateError('empty mode');
       _player.replaceQueue(songs, mode: mode);

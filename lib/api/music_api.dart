@@ -152,8 +152,8 @@ class MusicApi {
     return songs;
   }
 
-  static Future<List<Song>> getModeTracks(int sceneModeId) async {
-    final uri = Uri.parse('$_base/radio/$sceneModeId');
+  static Future<List<Song>> getSceneTracks(int sceneModeId) async {
+    final uri = Uri.parse('$_base/scene/$sceneModeId');
     final decoded = jsonDecode(await _retry(() => _httpGet(uri)));
     final items = decoded is Map ? decoded['items'] : null;
     if (items is! List) throw const FormatException('模式歌曲响应格式无效');
@@ -203,19 +203,15 @@ class MusicApi {
     try {
       final info = await getStreamInfo(trackId);
       if (info.qualities.isNotEmpty) {
-        final ranked = [...info.qualities]
-          ..sort((a, b) => b.rank.compareTo(a.rank));
-        final chosen = ranked.first;
+        final chosen = selectStreamQuality(info.qualities, requested);
         return StreamSelection(
             chosen.url.startsWith('http') ? chosen.url : '$_base${chosen.url}',
             chosen.bitrateKbps,
             chosen.quality);
       }
     } catch (_) {}
-    return StreamSelection(
-        streamUrl(trackId, quality: AudioQuality.highest.apiValue),
-        AudioQuality.highest.br,
-        AudioQuality.highest.apiValue);
+    return StreamSelection(streamUrl(trackId, quality: requested.apiValue),
+        requested.br, requested.apiValue);
   }
 
   static String streamUrl(String trackId, {String? quality}) {
@@ -337,4 +333,16 @@ class StreamSelection {
   final int bitrateKbps;
   final String quality;
   const StreamSelection(this.url, this.bitrateKbps, this.quality);
+}
+
+StreamQuality selectStreamQuality(
+    List<StreamQuality> qualities, AudioQuality requested) {
+  if (qualities.isEmpty) {
+    throw StateError('没有可用音质');
+  }
+  for (final quality in qualities) {
+    if (quality.quality == requested.apiValue) return quality;
+  }
+  final ranked = [...qualities]..sort((a, b) => b.rank.compareTo(a.rank));
+  return ranked.first;
 }
