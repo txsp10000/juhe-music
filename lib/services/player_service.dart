@@ -150,6 +150,8 @@ class PlayerService {
   double _volumeBeforeDucking = 100.0;
   int? _openedGeneration;
   int? _failedGeneration;
+  Uint8List? _pendingThemeCover;
+  int? _pendingThemeGeneration;
   bool _suppressCompletion = false;
   int _seekGeneration = 0;
 
@@ -226,6 +228,9 @@ class PlayerService {
 
     _playingSub = player.stream.playing.listen((playing) {
       _isPlaying = playing;
+      if (playing) {
+        _applyPendingThemeForPlayback(_openedGeneration);
+      }
       _notifyPlayStateChanged(playing);
     });
 
@@ -482,6 +487,9 @@ class PlayerService {
     _currentIndex = index;
     final song = queue[index];
     final currentGen = ++_playGeneration;
+    ThemeService.invalidateCover();
+    _pendingThemeCover = null;
+    _pendingThemeGeneration = null;
     _openedGeneration = null;
     _failedGeneration = null;
     _notifyDownloadProgress(null);
@@ -577,7 +585,12 @@ class PlayerService {
     Uint8List coverBytes,
     int generation,
   ) async {
-    unawaited(ThemeService.updateFromCover(coverBytes));
+    if (generation != _playGeneration) return;
+    _pendingThemeCover = coverBytes;
+    _pendingThemeGeneration = generation;
+    if (_openedGeneration == generation && isPlaying) {
+      _applyPendingThemeForPlayback(generation);
+    }
     final localCover = await CoverCacheService().getLocalPath(picId);
     if (generation != _playGeneration) return;
     final artUri = localCover == null ? null : Uri.file(localCover);
@@ -590,6 +603,19 @@ class PlayerService {
       }
     } catch (_) {}
     _notifySongChange(song);
+  }
+
+  void _applyPendingThemeForPlayback(int? generation) {
+    final coverBytes = _pendingThemeCover;
+    if (generation == null ||
+        generation != _playGeneration ||
+        _pendingThemeGeneration != generation ||
+        coverBytes == null) {
+      return;
+    }
+    _pendingThemeCover = null;
+    _pendingThemeGeneration = null;
+    unawaited(ThemeService.updateFromCover(coverBytes));
   }
 
   void _applyLyric(Song song, String playId, String lyric) {
@@ -766,6 +792,8 @@ class PlayerService {
     _player?.dispose();
     _player = null;
     _audioHandler = null;
+    _pendingThemeCover = null;
+    _pendingThemeGeneration = null;
     _initialized = false;
   }
 }

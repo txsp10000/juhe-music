@@ -90,7 +90,6 @@ class _PlayerPageState extends State<PlayerPage> {
     _displayedSongId = s.id;
     _parsedLrc = _parseLrc(s.lyric);
     if (s.cover.isEmpty || s.cover != _coverUrl) {
-      ThemeService.invalidateCover();
       _coverBytes = null;
       _coverUrl = '';
     }
@@ -175,7 +174,6 @@ class _PlayerPageState extends State<PlayerPage> {
     final bytes = await CoverCacheService().resolve(picId, url);
     if (bytes != null && mounted && _coverUrl == url) {
       setState(() => _coverBytes = bytes);
-      unawaited(ThemeService.updateFromCover(bytes));
     } else if (_coverUrl == url) {
       _coverUrl = '';
     }
