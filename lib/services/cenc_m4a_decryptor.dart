@@ -4,12 +4,49 @@ import 'package:pointycastle/export.dart';
 
 class CencM4aDecryptor {
   static Uint8List decrypt(Uint8List encrypted, String aesKeyHex) {
+    return _decrypt(Uint8List.fromList(encrypted), aesKeyHex);
+  }
+
+  /// Decrypts a buffer owned by the caller and may reuse it for the result.
+  static Uint8List decryptOwned(Uint8List encrypted, String aesKeyHex) {
+    return _decrypt(encrypted, aesKeyHex);
+  }
+
+  static CencNativeDecryptPlan prepareOwnedForNative(Uint8List encrypted) {
+    final layout = _readLayout(encrypted);
+    final samples = _collectSamples(layout);
+    final repaired = _repair(encrypted, layout);
+    final table = ByteData(samples.length * 24);
+    for (var index = 0; index < samples.length; index++) {
+      final sample = samples[index];
+      final repairedOffset = sample.offset - layout.removedBytes;
+      if (repairedOffset < 0 ||
+          repairedOffset + sample.length > repaired.length) {
+        throw const FormatException('Invalid repaired CENC sample offset');
+      }
+      final recordOffset = index * 24;
+      table.setUint32(recordOffset, repairedOffset, Endian.big);
+      table.setUint32(recordOffset + 4, sample.length, Endian.big);
+      table.buffer.asUint8List(recordOffset + 8, 16)
+        ..fillRange(0, 16, 0)
+        ..setRange(0, sample.iv.length, sample.iv);
+    }
+    return CencNativeDecryptPlan(repaired, table.buffer.asUint8List());
+  }
+
+  static Uint8List _decrypt(Uint8List bytes, String aesKeyHex) {
     final key = _decodeHex(aesKeyHex);
     if (key.length != 16) {
       throw const FormatException('CENC AES-128 key must be 16 bytes');
     }
 
-    final bytes = Uint8List.fromList(encrypted);
+    final layout = _readLayout(bytes);
+    final samples = _collectSamples(layout);
+    _decryptSamples(bytes, key, samples);
+    return _repair(bytes, layout);
+  }
+
+  static _CencLayout _readLayout(Uint8List bytes) {
     final top = _walk(bytes, 0, bytes.length);
     final moov = _required(_find(top, 'moov'), 'moov');
     final trak = _required(_find(_children(bytes, moov), 'trak'), 'trak');
@@ -34,29 +71,76 @@ class CencM4aDecryptor {
     final samplesPerChunk =
         _readSamplesPerChunk(bytes, stsc, chunkOffsets.length);
 
-    _decryptSamples(
+    final removable = [senc, saio, saiz].whereType<_Mp4Box>().toList();
+    final removeStart =
+        removable.isEmpty ? 0 : removable.map((box) => box.offset).reduce(_min);
+    final removeEnd =
+        removable.isEmpty ? 0 : removable.map((box) => box.end).reduce(_max);
+    return _CencLayout(
       bytes,
-      key,
+      moov,
+      trak,
+      mdia,
+      minf,
+      stbl,
+      enca,
       ivs,
       sampleSizes,
       chunkOffsets,
       samplesPerChunk,
+      removeStart,
+      removeEnd,
     );
+  }
+
+  static List<_CencSample> _collectSamples(_CencLayout layout) {
+    final samples = <_CencSample>[];
+    var sampleIndex = 0;
+    for (var chunkIndex = 0;
+        chunkIndex < layout.chunkOffsets.length;
+        chunkIndex++) {
+      var offset = layout.chunkOffsets[chunkIndex];
+      for (var entry = 0;
+          entry < layout.samplesPerChunk[chunkIndex] &&
+              sampleIndex < layout.ivs.length;
+          entry++) {
+        final length = layout.sampleSizes[sampleIndex];
+        if (offset < 0 || length < 0 || offset + length > layout.bytes.length) {
+          throw const FormatException('Invalid CENC sample offset');
+        }
+        samples.add(_CencSample(offset, length, layout.ivs[sampleIndex]));
+        offset += length;
+        sampleIndex++;
+      }
+    }
+    if (sampleIndex != layout.ivs.length) {
+      throw const FormatException(
+          'CENC chunk table did not cover every sample');
+    }
+    return samples;
+  }
+
+  static Uint8List _repair(Uint8List bytes, _CencLayout layout) {
+    final enca = layout.enca;
     if (enca != null) {
       _writeType(bytes, enca.offset + 4, 'mp4a');
     }
 
-    final removable = [senc, saio, saiz].whereType<_Mp4Box>().toList();
-    if (removable.isEmpty) return bytes;
-    final removeStart = removable.map((box) => box.offset).reduce(_min);
-    final removeEnd = removable.map((box) => box.end).reduce(_max);
-    final removedBytes = removeEnd - removeStart;
+    final removeStart = layout.removeStart;
+    final removeEnd = layout.removeEnd;
+    final removedBytes = layout.removedBytes;
     if (removedBytes <= 0) return bytes;
 
-    final result = Uint8List(bytes.length - removedBytes);
-    result.setRange(0, removeStart, bytes);
-    result.setRange(removeStart, result.length, bytes, removeEnd);
-    for (final parent in [stbl, minf, mdia, trak, moov]) {
+    final resultLength = bytes.length - removedBytes;
+    bytes.setRange(removeStart, resultLength, bytes, removeEnd);
+    final result = Uint8List.sublistView(bytes, 0, resultLength);
+    for (final parent in [
+      layout.stbl,
+      layout.minf,
+      layout.mdia,
+      layout.trak,
+      layout.moov,
+    ]) {
       _writeUint32(result, parent.offset, parent.size - removedBytes);
     }
     _fixChunkOffsets(result, removedBytes);
@@ -229,36 +313,11 @@ class CencM4aDecryptor {
   static void _decryptSamples(
     Uint8List bytes,
     Uint8List key,
-    List<Uint8List> ivs,
-    List<int> sampleSizes,
-    List<int> chunkOffsets,
-    List<int> samplesPerChunk,
+    List<_CencSample> samples,
   ) {
-    var sampleIndex = 0;
-    for (var chunkIndex = 0; chunkIndex < chunkOffsets.length; chunkIndex++) {
-      var offset = chunkOffsets[chunkIndex];
-      for (var entry = 0;
-          entry < samplesPerChunk[chunkIndex] && sampleIndex < ivs.length;
-          entry++) {
-        final length = sampleSizes[sampleIndex];
-        if (offset < 0 || length < 0 || offset + length > bytes.length) {
-          throw const FormatException('Invalid CENC sample offset');
-        }
-        final iv = Uint8List(16)
-          ..setRange(0, ivs[sampleIndex].length, ivs[sampleIndex]);
-        final cipher = SICStreamCipher(AESEngine())
-          ..init(true, ParametersWithIV(KeyParameter(key), iv));
-        final decrypted = cipher.process(Uint8List.fromList(
-          bytes.sublist(offset, offset + length),
-        ));
-        bytes.setRange(offset, offset + length, decrypted);
-        offset += length;
-        sampleIndex++;
-      }
-    }
-    if (sampleIndex != ivs.length) {
-      throw const FormatException(
-          'CENC chunk table did not cover every sample');
+    final decryptor = _AesCtrSampleDecryptor(key);
+    for (final sample in samples) {
+      decryptor.decrypt(bytes, sample.offset, sample.length, sample.iv);
     }
   }
 
@@ -329,6 +388,88 @@ class CencM4aDecryptor {
 
   static int _min(int a, int b) => a < b ? a : b;
   static int _max(int a, int b) => a > b ? a : b;
+}
+
+class CencNativeDecryptPlan {
+  final Uint8List repairedEncrypted;
+  final Uint8List sampleTable;
+
+  const CencNativeDecryptPlan(this.repairedEncrypted, this.sampleTable);
+}
+
+class _CencLayout {
+  final Uint8List bytes;
+  final _Mp4Box moov;
+  final _Mp4Box trak;
+  final _Mp4Box mdia;
+  final _Mp4Box minf;
+  final _Mp4Box stbl;
+  final _Mp4Box? enca;
+  final List<Uint8List> ivs;
+  final List<int> sampleSizes;
+  final List<int> chunkOffsets;
+  final List<int> samplesPerChunk;
+  final int removeStart;
+  final int removeEnd;
+
+  const _CencLayout(
+    this.bytes,
+    this.moov,
+    this.trak,
+    this.mdia,
+    this.minf,
+    this.stbl,
+    this.enca,
+    this.ivs,
+    this.sampleSizes,
+    this.chunkOffsets,
+    this.samplesPerChunk,
+    this.removeStart,
+    this.removeEnd,
+  );
+
+  int get removedBytes => removeEnd - removeStart;
+}
+
+class _CencSample {
+  final int offset;
+  final int length;
+  final Uint8List iv;
+
+  const _CencSample(this.offset, this.length, this.iv);
+}
+
+class _AesCtrSampleDecryptor {
+  final AESEngine _aes = AESEngine();
+  final Uint8List _counter = Uint8List(16);
+  final Uint8List _keyStream = Uint8List(16);
+
+  _AesCtrSampleDecryptor(Uint8List key) {
+    _aes.init(true, KeyParameter(key));
+  }
+
+  void decrypt(Uint8List bytes, int offset, int length, Uint8List iv) {
+    _counter.fillRange(0, _counter.length, 0);
+    _counter.setRange(0, iv.length, iv);
+    var position = offset;
+    final end = offset + length;
+    while (position < end) {
+      _aes.processBlock(_counter, 0, _keyStream, 0);
+      final blockEnd = position + 16 < end ? position + 16 : end;
+      for (var index = position; index < blockEnd; index++) {
+        bytes[index] ^= _keyStream[index - position];
+      }
+      _incrementCounter();
+      position = blockEnd;
+    }
+  }
+
+  void _incrementCounter() {
+    for (var index = _counter.length - 1; index >= 0; index--) {
+      _counter[index] = (_counter[index] + 1) & 0xff;
+      if (_counter[index] != 0) return;
+    }
+  }
 }
 
 class _Mp4Box {

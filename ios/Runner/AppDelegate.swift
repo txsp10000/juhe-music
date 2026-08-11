@@ -2,12 +2,15 @@
 import UIKit
 import AVFAudio
 import MediaPlayer
+import CommonCrypto
+import Darwin
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
   private var lastArtUri: String = ""
   private var cachedArtwork: MPMediaItemArtwork?
   private var nowPlayingChannel: FlutterMethodChannel?
+  private var diagnosticsChannel: FlutterMethodChannel?
   private var isPlaybackActive: Bool = false
   private var wasPlayingBeforeInterruption: Bool = false
 
@@ -31,6 +34,7 @@ import MediaPlayer
     DispatchQueue.main.async {
       if let controller = self.window?.rootViewController as? FlutterViewController {
         self.setupNowPlayingChannel(messenger: controller.binaryMessenger)
+        self.setupDiagnosticsChannel(messenger: controller.binaryMessenger)
       }
     }
 
@@ -187,6 +191,179 @@ import MediaPlayer
         result(nil)
       }
     }
+  }
+
+  private func setupDiagnosticsChannel(messenger: FlutterBinaryMessenger) {
+    guard diagnosticsChannel == nil else { return }
+    let channel = FlutterMethodChannel(
+      name: "com.sandian.music/diagnostics",
+      binaryMessenger: messenger
+    )
+    diagnosticsChannel = channel
+    channel.setMethodCallHandler { (call, result) in
+      guard let args = call.arguments as? [String: Any] else {
+        result(FlutterError(code: "invalid_arguments", message: "Missing arguments", details: nil))
+        return
+      }
+      switch call.method {
+      case "log":
+        NSLog("AudioCacheService: %@", args["message"] as? String ?? "")
+        result(nil)
+      case "decryptAudioFile":
+        guard let path = args["path"] as? String,
+              let keyHex = args["keyHex"] as? String,
+              let table = args["sampleTable"] as? FlutterStandardTypedData else {
+          result(FlutterError(
+            code: "invalid_arguments",
+            message: "Missing native decrypt arguments",
+            details: nil
+          ))
+          return
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+          let startedAt = DispatchTime.now().uptimeNanoseconds
+          do {
+            try self.decryptAudioFile(path: path, keyHex: keyHex, sampleTable: table.data)
+            let elapsedMs = Int((DispatchTime.now().uptimeNanoseconds - startedAt) / 1_000_000)
+            DispatchQueue.main.async { result(elapsedMs) }
+          } catch {
+            NSLog("AudioCacheService: native audio decrypt failed: %@", error.localizedDescription)
+            DispatchQueue.main.async {
+              result(FlutterError(
+                code: "native_decrypt_failed",
+                message: error.localizedDescription,
+                details: nil
+              ))
+            }
+          }
+        }
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
+  private func decryptAudioFile(path: String, keyHex: String, sampleTable: Data) throws {
+    let key = try decodeHex(keyHex)
+    guard key.count == kCCKeySizeAES128 else {
+      throw nativeDecryptError("AES-128 key must contain 32 hex characters")
+    }
+    guard sampleTable.count % 24 == 0 else {
+      throw nativeDecryptError("Invalid CENC sample table")
+    }
+
+    let fd = open(path, O_RDWR)
+    guard fd >= 0 else {
+      throw nativeDecryptError("Unable to open decrypted audio output")
+    }
+    defer { close(fd) }
+
+    var fileInfo = stat()
+    guard fstat(fd, &fileInfo) == 0, fileInfo.st_size > 0 else {
+      throw nativeDecryptError("Unable to read decrypted audio output size")
+    }
+    let fileSize = Int(fileInfo.st_size)
+    guard let mapping = mmap(
+      nil,
+      fileSize,
+      PROT_READ | PROT_WRITE,
+      MAP_SHARED,
+      fd,
+      0
+    ), mapping != MAP_FAILED else {
+      throw nativeDecryptError("Unable to map decrypted audio output")
+    }
+    defer { munmap(mapping, fileSize) }
+
+    let table = [UInt8](sampleTable)
+    var maximumSampleLength = 0
+    for recordOffset in stride(from: 0, to: table.count, by: 24) {
+      maximumSampleLength = max(maximumSampleLength, readUInt32(table, recordOffset + 4))
+    }
+    var output = [UInt8](repeating: 0, count: maximumSampleLength)
+
+    for recordOffset in stride(from: 0, to: table.count, by: 24) {
+      let offset = readUInt32(table, recordOffset)
+      let length = readUInt32(table, recordOffset + 4)
+      guard offset <= fileSize - length else {
+        throw nativeDecryptError("Invalid CENC sample offset")
+      }
+      let iv = Array(table[(recordOffset + 8)..<(recordOffset + 24)])
+      var cryptor: CCCryptorRef?
+      let createStatus = key.withUnsafeBytes { keyBuffer in
+        iv.withUnsafeBytes { ivBuffer in
+          CCCryptorCreateWithMode(
+            CCOperation(kCCDecrypt),
+            CCMode(kCCModeCTR),
+            CCAlgorithm(kCCAlgorithmAES),
+            CCPadding(ccNoPadding),
+            ivBuffer.baseAddress,
+            keyBuffer.baseAddress,
+            key.count,
+            nil,
+            0,
+            0,
+            CCModeOptions(kCCModeOptionCTR_BE),
+            &cryptor
+          )
+        }
+      }
+      guard createStatus == kCCSuccess, let activeCryptor = cryptor else {
+        throw nativeDecryptError("Unable to initialize AES-CTR: \(createStatus)")
+      }
+
+      var moved = 0
+      let updateStatus = output.withUnsafeMutableBytes { outputBuffer in
+        CCCryptorUpdate(
+          activeCryptor,
+          mapping.advanced(by: offset),
+          length,
+          outputBuffer.baseAddress,
+          length,
+          &moved
+        )
+      }
+      CCCryptorRelease(activeCryptor)
+      guard updateStatus == kCCSuccess, moved == length else {
+        throw nativeDecryptError("AES-CTR update failed: \(updateStatus)")
+      }
+      output.withUnsafeBytes { outputBuffer in
+        memcpy(mapping.advanced(by: offset), outputBuffer.baseAddress!, moved)
+      }
+    }
+  }
+
+  private func decodeHex(_ value: String) throws -> [UInt8] {
+    guard value.count % 2 == 0 else {
+      throw nativeDecryptError("Invalid AES key hex")
+    }
+    var bytes: [UInt8] = []
+    bytes.reserveCapacity(value.count / 2)
+    var index = value.startIndex
+    while index < value.endIndex {
+      let next = value.index(index, offsetBy: 2)
+      guard let byte = UInt8(value[index..<next], radix: 16) else {
+        throw nativeDecryptError("Invalid AES key hex")
+      }
+      bytes.append(byte)
+      index = next
+    }
+    return bytes
+  }
+
+  private func readUInt32(_ bytes: [UInt8], _ offset: Int) -> Int {
+    return Int(bytes[offset]) << 24
+      | Int(bytes[offset + 1]) << 16
+      | Int(bytes[offset + 2]) << 8
+      | Int(bytes[offset + 3])
+  }
+
+  private func nativeDecryptError(_ message: String) -> NSError {
+    return NSError(
+      domain: "com.sandian.music.audio-decrypt",
+      code: 1,
+      userInfo: [NSLocalizedDescriptionKey: message]
+    )
   }
 
   private func loadArtwork(from urlString: String) {

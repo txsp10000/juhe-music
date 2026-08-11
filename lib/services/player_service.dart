@@ -637,7 +637,7 @@ class PlayerService {
 
     _currentPlayingBr = quality;
     _notifyDownloadProgress(0.0);
-    final localPath = await AudioCacheService().download(
+    final cacheResult = await AudioCacheService().download(
       song.id,
       downloadUrl,
       br: quality,
@@ -648,10 +648,22 @@ class PlayerService {
           _notifyDownloadProgress(progress);
         }
       },
+      onPreparing: () {
+        if (generation == _playGeneration) {
+          _notifyDownloadProgress(-1.0);
+        }
+      },
     );
     if (generation != _playGeneration) return;
+    final localPath = cacheResult.path;
     if (localPath == null) {
-      await _handlePlaybackFailure(generation, '歌曲下载失败，请检查网络后重试');
+      final message = switch (cacheResult.failureStage) {
+        AudioCacheFailureStage.decrypt => '歌曲解密失败，请重试',
+        AudioCacheFailureStage.cacheWrite => '歌曲缓存失败，请检查存储空间',
+        AudioCacheFailureStage.setup => '歌曲缓存初始化失败，请重试',
+        _ => '歌曲下载失败，请检查网络后重试',
+      };
+      await _handlePlaybackFailure(generation, message);
       return;
     }
     _notifyDownloadProgress(null);

@@ -250,6 +250,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1B2C3D61234567800AABBCC /* CarPlaySceneDelegate.swift in Sources */,
+				97C146FA1CF9000F007C117D /* AppDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -274,6 +275,11 @@
 		97C146F81CF9000F007C117D /* Assets.xcassets in Resources */ = {
 			isa = PBXBuildFile;
 			fileRef = 97C146F91CF9000F007C117D /* Assets.xcassets */;
+		};
+
+		97C146FA1CF9000F007C117D /* AppDelegate.swift in Sources */ = {
+			isa = PBXBuildFile;
+			fileRef = 97C146F11CF9000F007C117D /* AppDelegate.swift */;
 		};
 
 		A1B2C3D61234567800AABBCC /* CarPlaySceneDelegate.swift in Sources */ = {
@@ -405,4 +411,3 @@
 	};
 	rootObject = 97C146E61CF9000F007C117D /* Project object */;
 }
-

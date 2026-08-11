@@ -29,6 +29,32 @@ void main() {
     );
     final stco = _findNested(decrypted, 'stco')!;
     expect(_readUint32(decrypted, stco.offset + 16), mdat.offset + 8);
+
+    final plan = CencM4aDecryptor.prepareOwnedForNative(
+      Uint8List.fromList(file),
+    );
+    final nativeEquivalent = Uint8List.fromList(plan.repairedEncrypted);
+    final table = ByteData.sublistView(plan.sampleTable);
+    for (var offset = 0; offset < plan.sampleTable.length; offset += 24) {
+      final sampleOffset = table.getUint32(offset, Endian.big);
+      final sampleLength = table.getUint32(offset + 4, Endian.big);
+      final sampleIv = plan.sampleTable.sublist(offset + 8, offset + 24);
+      final clear = _aesCtr(
+        key,
+        sampleIv,
+        Uint8List.sublistView(
+          nativeEquivalent,
+          sampleOffset,
+          sampleOffset + sampleLength,
+        ),
+      );
+      nativeEquivalent.setRange(
+        sampleOffset,
+        sampleOffset + sampleLength,
+        clear,
+      );
+    }
+    expect(nativeEquivalent, decrypted);
   });
 }
 

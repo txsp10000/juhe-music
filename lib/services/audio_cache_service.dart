@@ -1,9 +1,24 @@
+import 'dart:async';
+import 'dart:developer' as developer;
 import 'dart:io';
+import 'dart:isolate';
+import 'dart:ui' as ui;
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import '../utils/retry_helper.dart';
 import 'cenc_m4a_decryptor.dart';
 import 'settings_service.dart';
+
+enum AudioCacheFailureStage { setup, download, decrypt, cacheWrite }
+
+class AudioCacheResult {
+  final String? path;
+  final AudioCacheFailureStage? failureStage;
+
+  const AudioCacheResult.success(this.path) : failureStage = null;
+  const AudioCacheResult.failure(this.failureStage) : path = null;
+}
 
 class AudioCacheService {
   static final AudioCacheService _instance = AudioCacheService._();
@@ -200,10 +215,11 @@ class AudioCacheService {
     return 'm4a';
   }
 
-  Future<String?> download(
+  Future<AudioCacheResult> download(
     String songId,
     String downloadUrl, {
     void Function(double progress)? onProgress,
+    void Function()? onPreparing,
     int? br,
     String? backupUrl,
     String? aesKeyHex,
@@ -217,20 +233,25 @@ class AudioCacheService {
       final file = File(path);
       if (await file.exists() && await file.length() > 0) {
         onProgress?.call(1.0);
-        return path;
+        return AudioCacheResult.success(path);
       }
       tmpFile = File('$path.tmp');
-    } catch (_) {
-      return null;
+    } catch (error, stackTrace) {
+      await _logDiagnostic('Audio cache setup failed: $error\n$stackTrace');
+      return const AudioCacheResult.failure(AudioCacheFailureStage.setup);
     }
 
     try {
       final key = aesKeyHex?.trim() ?? '';
-      if (key.isEmpty) return null;
+      if (key.isEmpty) {
+        await _logDiagnostic('Audio decrypt setup failed: AES key is empty');
+        return const AudioCacheResult.failure(AudioCacheFailureStage.decrypt);
+      }
       final encryptedFile = File('$path.encrypted.tmp');
       final urls = [downloadUrl, backupUrl?.trim() ?? '']
           .where((url) => url.isNotEmpty)
           .toSet();
+      var downloaded = false;
       for (final url in urls) {
         try {
           await RetryHelper.run(
@@ -242,31 +263,101 @@ class AudioCacheService {
             attempts: 3,
             delay: const Duration(seconds: 1),
           );
-          final encryptedBytes = await encryptedFile.readAsBytes();
-          final decryptedBytes = CencM4aDecryptor.decrypt(encryptedBytes, key);
-          await tmpFile.writeAsBytes(decryptedBytes, flush: true);
-          if (await tmpFile.length() <= 0) {
-            throw const FileSystemException('解密后的音频文件为空');
-          }
-          await tmpFile.rename(path);
-          if (await encryptedFile.exists()) await encryptedFile.delete();
-          await _deleteAllForSong(songId, exceptPath: path);
-          onProgress?.call(1.0);
-          return path;
-        } catch (_) {
+          downloaded = true;
+          break;
+        } catch (error, stackTrace) {
+          developer.log(
+            'Audio download failed from ${Uri.tryParse(url)?.host ?? 'unknown host'}',
+            name: 'AudioCacheService',
+            error: error,
+            stackTrace: stackTrace,
+          );
+          await _logDiagnostic(
+            'Audio download failed: host=${Uri.tryParse(url)?.host ?? 'unknown'}, '
+            'error=$error\n$stackTrace',
+          );
           try {
             if (await encryptedFile.exists()) await encryptedFile.delete();
-            if (await tmpFile.exists()) await tmpFile.delete();
           } catch (_) {}
         }
       }
-      return null;
-    } catch (_) {
+      if (!downloaded) {
+        return const AudioCacheResult.failure(AudioCacheFailureStage.download);
+      }
+
+      try {
+        onPreparing?.call();
+        final decryptStats = await _decryptAudioInIsolate(
+          encryptedFile.path,
+          tmpFile.path,
+          key,
+        );
+        if (decryptStats.outputBytes <= 0) {
+          throw const FileSystemException('Decrypted audio file is empty');
+        }
+        await _logDiagnostic(
+          'Audio decrypt completed: inputBytes=${decryptStats.inputBytes}, '
+          'outputBytes=${decryptStats.outputBytes}, readMs=${decryptStats.readMs}, '
+          'decryptMs=${decryptStats.decryptMs}, writeMs=${decryptStats.writeMs}',
+          isError: false,
+        );
+        try {
+          await tmpFile.rename(path);
+        } catch (error) {
+          throw _AudioCacheWriteException(error);
+        }
+        unawaited(_cleanupCommittedDownload(
+          encryptedFile,
+          songId,
+          path,
+        ));
+        return AudioCacheResult.success(path);
+      } catch (error, stackTrace) {
+        final encryptedLength = await _safeLength(encryptedFile);
+        final fileSummary = await _describeMp4(encryptedFile);
+        final stage = error is _AudioCacheWriteException
+            ? AudioCacheFailureStage.cacheWrite
+            : AudioCacheFailureStage.decrypt;
+        developer.log(
+          'Audio decrypt/cache failed',
+          name: 'AudioCacheService',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        await _logDiagnostic(
+          'Audio ${stage.name} failed: error=$error, '
+          'encryptedBytes=$encryptedLength, keyHexLength=${key.length}, '
+          'file=$fileSummary\n$stackTrace',
+        );
+        try {
+          if (await tmpFile.exists()) await tmpFile.delete();
+        } catch (_) {}
+        return AudioCacheResult.failure(stage);
+      }
+    } catch (error, stackTrace) {
+      developer.log(
+        'Audio cache setup failed',
+        name: 'AudioCacheService',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      await _logDiagnostic('Audio cache setup failed: $error\n$stackTrace');
       try {
         if (await tmpFile.exists()) await tmpFile.delete();
       } catch (_) {}
-      return null;
+      return const AudioCacheResult.failure(AudioCacheFailureStage.setup);
     }
+  }
+
+  Future<void> _cleanupCommittedDownload(
+    File encryptedFile,
+    String songId,
+    String path,
+  ) async {
+    try {
+      if (await encryptedFile.exists()) await encryptedFile.delete();
+      await _deleteAllForSong(songId, exceptPath: path);
+    } catch (_) {}
   }
 
   Future<void> _downloadEncryptedFile(
@@ -302,4 +393,231 @@ class AudioCacheService {
       throw const FileSystemException('下载未完成');
     }
   }
+}
+
+class _AudioCacheWriteException implements Exception {
+  final Object cause;
+  const _AudioCacheWriteException(this.cause);
+
+  @override
+  String toString() => 'Unable to commit decrypted audio: $cause';
+}
+
+const _diagnosticsChannel = MethodChannel('com.sandian.music/diagnostics');
+
+Future<void> _logDiagnostic(String message, {bool isError = true}) async {
+  try {
+    await _diagnosticsChannel.invokeMethod<void>('log', {
+      'message': message,
+      'level': isError ? 'error' : 'info',
+    });
+  } catch (_) {}
+}
+
+Future<int> _safeLength(File file) async {
+  try {
+    return await file.length();
+  } catch (_) {
+    return -1;
+  }
+}
+
+Future<String> _describeMp4(File file) async {
+  try {
+    final handle = await file.open();
+    try {
+      final length = await handle.length();
+      final bytes = await handle.read(length.clamp(0, 4096));
+      final header = bytes
+          .take(32)
+          .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+          .join();
+      final boxes = <String>[];
+      var offset = 0;
+      while (offset + 8 <= bytes.length && boxes.length < 12) {
+        final size = _readDiagnosticUint32(bytes, offset);
+        final type =
+            String.fromCharCodes(bytes.sublist(offset + 4, offset + 8));
+        boxes.add('$type:$size');
+        if (size < 8 || offset + size > length) break;
+        offset += size;
+        if (offset >= bytes.length) break;
+      }
+      return 'header=$header, topBoxes=${boxes.join(',')}';
+    } finally {
+      await handle.close();
+    }
+  } catch (error) {
+    return 'unreadable($error)';
+  }
+}
+
+int _readDiagnosticUint32(Uint8List bytes, int offset) =>
+    (bytes[offset] << 24) |
+    (bytes[offset + 1] << 16) |
+    (bytes[offset + 2] << 8) |
+    bytes[offset + 3];
+
+class _AudioDecryptStats {
+  final int inputBytes;
+  final int outputBytes;
+  final int readMs;
+  final int decryptMs;
+  final int writeMs;
+
+  const _AudioDecryptStats(
+    this.inputBytes,
+    this.outputBytes,
+    this.readMs,
+    this.decryptMs,
+    this.writeMs,
+  );
+}
+
+Future<_AudioDecryptStats> _decryptAudioInIsolate(
+  String encryptedPath,
+  String outputPath,
+  String aesKeyHex,
+) async {
+  final responsePort = ReceivePort();
+  final errorPort = ReceivePort();
+  Isolate? isolate;
+  try {
+    final rootToken = ui.RootIsolateToken.instance;
+    isolate = await Isolate.spawn<List<Object?>>(
+      _decryptAudioIsolateEntry,
+      <Object?>[
+        responsePort.sendPort,
+        encryptedPath,
+        outputPath,
+        aesKeyHex,
+        rootToken,
+      ],
+      onError: errorPort.sendPort,
+      errorsAreFatal: true,
+    );
+    final result = await Future.any<List<Object?>>([
+      responsePort.first.then((value) => (value as List).cast<Object?>()),
+      errorPort.first.then(
+        (value) => <Object?>[false, 'Decrypt isolate error: $value', ''],
+      ),
+    ]).timeout(const Duration(minutes: 3));
+    if (result.first == true) {
+      return _AudioDecryptStats(
+        result[1] as int,
+        result[2] as int,
+        result[3] as int,
+        result[4] as int,
+        result[5] as int,
+      );
+    }
+    throw StateError('${result[1]}\n${result[2]}');
+  } finally {
+    responsePort.close();
+    errorPort.close();
+    isolate?.kill(priority: Isolate.immediate);
+  }
+}
+
+void _decryptAudioIsolateEntry(List<Object?> message) async {
+  final responsePort = message[0] as SendPort;
+  try {
+    final rootToken = message[4] as ui.RootIsolateToken?;
+    final encryptedPath = message[1] as String;
+    final outputPath = message[2] as String;
+    final aesKeyHex = message[3] as String;
+    _AudioDecryptStats stats;
+    if ((Platform.isAndroid || Platform.isIOS) && rootToken != null) {
+      try {
+        stats = await _decryptAudioToFileNative(
+          encryptedPath,
+          outputPath,
+          aesKeyHex,
+          rootToken,
+        );
+      } catch (_) {
+        stats = await _decryptAudioToFile(
+          encryptedPath,
+          outputPath,
+          aesKeyHex,
+        );
+      }
+    } else {
+      stats = await _decryptAudioToFile(
+        encryptedPath,
+        outputPath,
+        aesKeyHex,
+      );
+    }
+    responsePort.send(<Object?>[
+      true,
+      stats.inputBytes,
+      stats.outputBytes,
+      stats.readMs,
+      stats.decryptMs,
+      stats.writeMs,
+    ]);
+  } catch (error, stackTrace) {
+    responsePort
+        .send(<Object?>[false, error.toString(), stackTrace.toString()]);
+  }
+}
+
+Future<_AudioDecryptStats> _decryptAudioToFileNative(
+  String encryptedPath,
+  String outputPath,
+  String aesKeyHex,
+  ui.RootIsolateToken rootToken,
+) async {
+  BackgroundIsolateBinaryMessenger.ensureInitialized(rootToken);
+  final readWatch = Stopwatch()..start();
+  final encryptedBytes = await File(encryptedPath).readAsBytes();
+  readWatch.stop();
+  final prepareWatch = Stopwatch()..start();
+  final plan = CencM4aDecryptor.prepareOwnedForNative(encryptedBytes);
+  prepareWatch.stop();
+  final writeWatch = Stopwatch()..start();
+  await File(outputPath).writeAsBytes(plan.repairedEncrypted);
+  writeWatch.stop();
+  final nativeMs = await _diagnosticsChannel.invokeMethod<int>(
+        'decryptAudioFile',
+        <String, Object>{
+          'path': outputPath,
+          'keyHex': aesKeyHex,
+          'sampleTable': plan.sampleTable,
+        },
+      ) ??
+      0;
+  return _AudioDecryptStats(
+    encryptedBytes.length,
+    plan.repairedEncrypted.length,
+    readWatch.elapsedMilliseconds,
+    prepareWatch.elapsedMilliseconds + nativeMs,
+    writeWatch.elapsedMilliseconds,
+  );
+}
+
+Future<_AudioDecryptStats> _decryptAudioToFile(
+  String encryptedPath,
+  String outputPath,
+  String aesKeyHex,
+) async {
+  final readWatch = Stopwatch()..start();
+  final encryptedBytes = await File(encryptedPath).readAsBytes();
+  readWatch.stop();
+  final decryptWatch = Stopwatch()..start();
+  final decryptedBytes =
+      CencM4aDecryptor.decryptOwned(encryptedBytes, aesKeyHex);
+  decryptWatch.stop();
+  final writeWatch = Stopwatch()..start();
+  final output = File(outputPath);
+  await output.writeAsBytes(decryptedBytes);
+  writeWatch.stop();
+  return _AudioDecryptStats(
+    encryptedBytes.length,
+    decryptedBytes.length,
+    readWatch.elapsedMilliseconds,
+    decryptWatch.elapsedMilliseconds,
+    writeWatch.elapsedMilliseconds,
+  );
 }
