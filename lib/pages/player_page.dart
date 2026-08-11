@@ -162,7 +162,7 @@ class _PlayerPageState extends State<PlayerPage> {
     final song = _player.queue[index];
     if (song.cover.isEmpty) return;
     final picId = song.picId.isNotEmpty ? song.picId : song.id;
-    unawaited(CoverCacheService().download(picId, song.cover));
+    unawaited(CoverCacheService().resolve(picId, song.cover));
   }
 
   Future<void> _loadCover(Song song) async {
@@ -172,18 +172,10 @@ class _PlayerPageState extends State<PlayerPage> {
     _coverUrl = url;
     _coverBytes = null;
     final picId = song.picId.isNotEmpty ? song.picId : song.id;
-    final coverCache = CoverCacheService();
-    final cached = await coverCache.load(picId);
-    if (cached != null && mounted && _coverUrl == url) {
-      setState(() => _coverBytes = cached);
-      unawaited(ThemeService.updateFromCover(cached));
-      return;
-    }
-    if (url.startsWith('file://')) return;
-    final downloaded = await coverCache.download(picId, url);
-    if (downloaded != null && mounted && _coverUrl == url) {
-      setState(() => _coverBytes = downloaded);
-      unawaited(ThemeService.updateFromCover(downloaded));
+    final bytes = await CoverCacheService().resolve(picId, url);
+    if (bytes != null && mounted && _coverUrl == url) {
+      setState(() => _coverBytes = bytes);
+      unawaited(ThemeService.updateFromCover(bytes));
     } else if (_coverUrl == url) {
       _coverUrl = '';
     }

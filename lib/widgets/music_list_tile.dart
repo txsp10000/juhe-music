@@ -44,6 +44,7 @@ class MusicListTile extends StatefulWidget {
 class _MusicListTileState extends State<MusicListTile> {
   Uint8List? _coverBytes;
   String? _cacheKey;
+  String? _coverSource;
 
   @override
   void initState() {
@@ -54,11 +55,14 @@ class _MusicListTileState extends State<MusicListTile> {
   @override
   void didUpdateWidget(covariant MusicListTile oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.song.id != widget.song.id ||
-        oldWidget.song.picId != widget.song.picId ||
+    final song = widget.song;
+    final key = song.picId.isNotEmpty ? song.picId : song.id;
+    if (_cacheKey != key ||
+        _coverSource != song.cover ||
         oldWidget.showCover != widget.showCover) {
       _coverBytes = null;
       _cacheKey = null;
+      _coverSource = null;
       _loadCachedCover();
     }
   }
@@ -67,14 +71,14 @@ class _MusicListTileState extends State<MusicListTile> {
     final song = widget.song;
     if (!widget.showCover) return;
     final key = song.picId.isNotEmpty ? song.picId : song.id;
+    final source = song.cover;
     _cacheKey = key;
-    final cache = CoverCacheService();
-    final stored = await cache.load(key);
-    final bytes = stored ??
-        (song.cover.isEmpty || song.cover.startsWith('file:')
-            ? null
-            : await cache.download(key, song.cover));
-    if (mounted && _cacheKey == key && bytes != null) {
+    _coverSource = source;
+    final bytes = await CoverCacheService().resolve(key, source);
+    if (mounted &&
+        _cacheKey == key &&
+        _coverSource == source &&
+        bytes != null) {
       setState(() => _coverBytes = bytes);
     }
   }

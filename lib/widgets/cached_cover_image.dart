@@ -44,11 +44,7 @@ class _CachedCoverImageState extends State<CachedCoverImage> {
   Future<void> _load() async {
     final generation = ++_loadGeneration;
     final cache = CoverCacheService();
-    final stored = await cache.load(widget.cacheKey);
-    final bytes = stored ??
-        (widget.url.isEmpty || widget.url.startsWith('file:')
-            ? null
-            : await cache.download(widget.cacheKey, widget.url));
+    final bytes = await cache.resolve(widget.cacheKey, widget.url);
     if (!mounted || generation != _loadGeneration) return;
     if (bytes != null) setState(() => _bytes = bytes);
   }

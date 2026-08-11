@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.qishui.music"
+    namespace = "com.sandian.music"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "29.0.14206865"
 
@@ -28,7 +28,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.qishui.music"
+        applicationId = "com.sandian.music"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

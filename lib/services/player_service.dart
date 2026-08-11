@@ -189,8 +189,8 @@ class PlayerService {
         _audioHandler = await AudioService.init(
           builder: () => _AudioPlayerTask(),
           config: const AudioServiceConfig(
-            androidNotificationChannelId: 'com.qishui.music.channel',
-            androidNotificationChannelName: '汽水音乐',
+            androidNotificationChannelId: 'com.sandian.music.channel',
+            androidNotificationChannelName: '三点音乐',
             androidNotificationOngoing: false,
             androidStopForegroundOnPause: true,
             androidShowNotificationBadge: false,
@@ -493,7 +493,7 @@ class PlayerService {
       id: song.id,
       title: song.name,
       artist: song.singer,
-      album: song.album.isNotEmpty ? song.album : '汽水音乐',
+      album: song.album.isNotEmpty ? song.album : '三点音乐',
       artUri: song.cover.startsWith('file:') ? Uri.tryParse(song.cover) : null,
     );
     try {
@@ -561,8 +561,7 @@ class PlayerService {
             details.song.cover.isNotEmpty ? details.song.cover : song.cover;
         if (generation != _playGeneration) return;
         if (coverUrl.isNotEmpty) {
-          final coverBytes =
-              await CoverCacheService().download(picId, coverUrl);
+          final coverBytes = await CoverCacheService().resolve(picId, coverUrl);
           if (generation != _playGeneration) return;
           if (coverBytes != null) {
             await _applyLocalCover(song, picId, coverBytes, generation);
@@ -761,7 +760,7 @@ class PlayerService {
 
 class _AudioPlayerTask extends BaseAudioHandler {
   static const _nowPlayingChannel =
-      MethodChannel('com.qishui.music/nowplaying');
+      MethodChannel('com.sandian.music/nowplaying');
 
   String? _pauseReason;
   bool _resumeAfterInterruption = false;

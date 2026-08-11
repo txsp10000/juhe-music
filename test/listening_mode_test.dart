@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:qishui_music/models/listening_mode.dart';
 
 void main() {
-  test('常用模式包含全部场景且排除熟悉和新鲜模式', () {
+  test('常用模式排除抖音漫游、熟悉和新鲜模式', () {
     const expected = <int, String>{
       1: 'scene_mode_commute',
       2: 'scene_mode_sport',
@@ -12,7 +12,6 @@ void main() {
       6: 'scene_mode_focus',
       7: 'scene_mode_dj',
       8: 'scene_mode_bedtime',
-      9: 'scene_mode_douyin_roam',
       10: 'scene_mode_cantonese',
       11: 'scene_mode_electronic',
       12: 'scene_mode_chinese_style',
@@ -55,13 +54,12 @@ void main() {
       for (final mode in listeningModes) mode.sceneModeId: mode.subQueueType,
     };
 
-    expect(listeningModes, hasLength(45));
+    expect(listeningModes, hasLength(44));
     expect(actual, expected);
     expect(
       listeningModes.map((mode) => mode.sceneModeId),
       <int>[
         14,
-        9,
         7,
         44,
         4,
@@ -109,5 +107,6 @@ void main() {
     );
     expect(actual.values, isNot(contains('familiar')));
     expect(actual.values, isNot(contains('fresh')));
+    expect(actual.values, isNot(contains('scene_mode_douyin_roam')));
   });
 }

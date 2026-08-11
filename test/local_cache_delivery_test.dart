@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +8,9 @@ import 'package:qishui_music/services/lyric_cache_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  final pngBytes = base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  );
 
   const pathProviderChannel = MethodChannel('plugins.flutter.io/path_provider');
   late Directory documents;
@@ -46,7 +50,7 @@ void main() {
 
   test('cover bytes are returned from the completed local cache file',
       () async {
-    final sourceBytes = List<int>.generate(4096, (index) => index % 251);
+    final sourceBytes = pngBytes;
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final subscription = server.listen((request) async {
       request.response.contentLength = sourceBytes.length;
@@ -65,6 +69,71 @@ void main() {
       expect(delivered, sourceBytes);
       expect(await File(localPath!).readAsBytes(), sourceBytes);
       expect(await File('$localPath.tmp').exists(), isFalse);
+    } finally {
+      await subscription.cancel();
+      await server.close(force: true);
+    }
+  });
+
+  test('local file covers are persisted before being returned', () async {
+    final source = File('${documents.path}/source-cover.png');
+    await source.writeAsBytes(pngBytes, flush: true);
+
+    final delivered = await CoverCacheService().resolve(
+      'local_file_cover',
+      source.uri.toString(),
+    );
+    final localPath =
+        await CoverCacheService().getLocalPath('local_file_cover');
+
+    expect(delivered, pngBytes);
+    expect(localPath, isNotNull);
+    expect(localPath, isNot(source.path));
+    expect(await File(localPath!).readAsBytes(), pngBytes);
+  });
+
+  test('invalid cover responses never become cache hits', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final subscription = server.listen((request) async {
+      request.response.headers.contentType = ContentType.html;
+      request.response.write('<html>temporary CDN error</html>');
+      await request.response.close();
+    });
+
+    try {
+      final delivered = await CoverCacheService().download(
+        'invalid_cover',
+        'http://127.0.0.1:${server.port}/cover.jpg',
+      );
+
+      expect(delivered, isNull);
+      expect(await CoverCacheService().getLocalPath('invalid_cover'), isNull);
+    } finally {
+      await subscription.cancel();
+      await server.close(force: true);
+    }
+  });
+
+  test('invalid existing cover cache is removed and redownloaded', () async {
+    final cacheDir = Directory('${documents.path}/cover_cache');
+    await cacheDir.create(recursive: true);
+    final cachedFile = File('${cacheDir.path}/recovered_cover.jpg');
+    await cachedFile.writeAsString('<html>stale error</html>', flush: true);
+
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final subscription = server.listen((request) async {
+      request.response.add(pngBytes);
+      await request.response.close();
+    });
+
+    try {
+      final delivered = await CoverCacheService().download(
+        'recovered_cover',
+        'http://127.0.0.1:${server.port}/cover.png',
+      );
+
+      expect(delivered, pngBytes);
+      expect(await cachedFile.readAsBytes(), pngBytes);
     } finally {
       await subscription.cancel();
       await server.close(force: true);

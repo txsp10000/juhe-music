@@ -178,10 +178,6 @@ class _DesktopMusicPageState extends State<DesktopMusicPage> {
           child: const Icon(Icons.graphic_eq_rounded,
               color: Colors.white, size: 17),
         ),
-        const SizedBox(width: 10),
-        const Text('汽水音乐',
-            style: TextStyle(
-                color: _ink, fontSize: 16, fontWeight: FontWeight.w700)),
         const SizedBox(width: 20),
         if (!compact)
           Expanded(
@@ -998,6 +994,7 @@ class DesktopAlbumArt extends StatefulWidget {
 class _DesktopAlbumArtState extends State<DesktopAlbumArt> {
   Uint8List? _bytes;
   String? _cacheKey;
+  String? _coverSource;
   @override
   void initState() {
     super.initState();
@@ -1007,10 +1004,12 @@ class _DesktopAlbumArtState extends State<DesktopAlbumArt> {
   @override
   void didUpdateWidget(covariant DesktopAlbumArt oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.song.id != widget.song.id ||
-        oldWidget.song.picId != widget.song.picId) {
+    final song = widget.song;
+    final key = song.picId.isNotEmpty ? song.picId : song.id;
+    if (_cacheKey != key || _coverSource != song.cover) {
       _bytes = null;
       _cacheKey = null;
+      _coverSource = null;
       _load();
     }
   }
@@ -1018,14 +1017,14 @@ class _DesktopAlbumArtState extends State<DesktopAlbumArt> {
   Future<void> _load() async {
     final key =
         widget.song.picId.isNotEmpty ? widget.song.picId : widget.song.id;
+    final source = widget.song.cover;
     _cacheKey = key;
-    final cache = CoverCacheService();
-    final stored = await cache.load(key);
-    final bytes = stored ??
-        (widget.song.cover.isEmpty
-            ? null
-            : await cache.download(key, widget.song.cover));
-    if (mounted && _cacheKey == key && bytes != null) {
+    _coverSource = source;
+    final bytes = await CoverCacheService().resolve(key, source);
+    if (mounted &&
+        _cacheKey == key &&
+        _coverSource == source &&
+        bytes != null) {
       setState(() => _bytes = bytes);
     }
   }

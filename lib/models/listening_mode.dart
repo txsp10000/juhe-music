@@ -22,11 +22,6 @@ const listeningModes = <ListeningMode>[
       subQueueType: 'scene_mode_slow_motion',
       icon: Icons.slow_motion_video_rounded),
   ListeningMode(
-      name: '抖音漫游',
-      sceneModeId: 9,
-      subQueueType: 'scene_mode_douyin_roam',
-      icon: Icons.explore_rounded),
-  ListeningMode(
       name: 'DJ模式',
       sceneModeId: 7,
       subQueueType: 'scene_mode_dj',

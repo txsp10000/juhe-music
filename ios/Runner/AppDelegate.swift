@@ -140,7 +140,7 @@ import MediaPlayer
   private func setupNowPlayingChannel(messenger: FlutterBinaryMessenger) {
     guard nowPlayingChannel == nil else { return }
     let channel = FlutterMethodChannel(
-      name: "com.qishui.music/nowplaying",
+      name: "com.sandian.music/nowplaying",
       binaryMessenger: messenger
     )
     nowPlayingChannel = channel

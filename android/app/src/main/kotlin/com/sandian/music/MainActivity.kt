@@ -1,4 +1,4 @@
-package com.qishui.music
+package com.sandian.music
 
 import com.ryanheise.audioservice.AudioServiceActivity
 import android.view.InputDevice

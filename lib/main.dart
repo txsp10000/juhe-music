@@ -99,8 +99,10 @@ class MusicApp extends StatelessWidget {
       ),
       iconTheme: const IconThemeData(color: Color(0xFF6E6E73)),
       textTheme: const TextTheme(
-        titleLarge: TextStyle(color: Color(0xFF1D1D1F), fontWeight: FontWeight.w700),
-        titleMedium: TextStyle(color: Color(0xFF1D1D1F), fontWeight: FontWeight.w600),
+        titleLarge:
+            TextStyle(color: Color(0xFF1D1D1F), fontWeight: FontWeight.w700),
+        titleMedium:
+            TextStyle(color: Color(0xFF1D1D1F), fontWeight: FontWeight.w600),
         bodyMedium: TextStyle(color: Color(0xFF1D1D1F)),
         bodySmall: TextStyle(color: Color(0xFF6E6E73)),
       ),
@@ -108,7 +110,7 @@ class MusicApp extends StatelessWidget {
 
     if (isTv) {
       return MaterialApp(
-        title: '汽水音乐',
+        title: '三点音乐',
         debugShowCheckedModeBanner: false,
         theme: theme.copyWith(
           pageTransitionsTheme: const PageTransitionsTheme(
@@ -124,7 +126,7 @@ class MusicApp extends StatelessWidget {
     }
 
     return MaterialApp(
-      title: '汽水音乐',
+      title: '三点音乐',
       debugShowCheckedModeBanner: false,
       theme: Platform.isWindows ? desktopTheme : theme,
       home: Platform.isWindows ? const DesktopMusicPage() : const MainPage(),

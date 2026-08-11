@@ -57,7 +57,7 @@
           target = project.targets.find { |t| t.name == 'Runner' }
 
           target.build_configurations.each do |config|
-            config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.qishui.music'
+            config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.sandian.music'
             config.build_settings['CODE_SIGN_ENTITLEMENTS'] = 'Runner/Runner.entitlements'
             config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
             # iOS 26.4 SDK 禁止编译期 ad-hoc 签名，改为完全禁用编译期签名
@@ -82,8 +82,8 @@
       - name: Configure Info.plist
         script: |
           PLIST="ios/Runner/Info.plist"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 汽水音乐" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleName 汽水音乐" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 三点音乐" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleName 三点音乐" "$PLIST"
           /usr/libexec/PlistBuddy -c "Delete :UIBackgroundModes" "$PLIST" 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" "$PLIST"
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" "$PLIST"
