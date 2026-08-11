@@ -3,7 +3,6 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import '../api/music_api.dart';
 import 'favorites_service.dart';
 import 'audio_cache_service.dart';
-import 'settings_service.dart';
 
 /// WiFi下自动缓存收藏列表中未缓存的歌曲
 class WifiCacheService {
@@ -51,20 +50,18 @@ class WifiCacheService {
     try {
       final songs = await FavoritesService.load();
       final cache = AudioCacheService();
-      final br = SettingsService().quality.br;
 
       for (final song in songs) {
         // 每首歌下载前重新检测是否还在WiFi
         if (!await _isOnWifi()) break;
 
-        // 检查是否已缓存
-        final cached = await cache.findCachedFile(song.id, requestedBr: br);
-        if (cached != null) continue;
-
-        // 获取播放地址并下载
+        // Resolve the best service quality before deciding whether a download
+        // is needed, so Wi-Fi prefetch follows the same automatic policy.
         try {
-          final stream =
-              await MusicApi.resolveStream(song.id, SettingsService().quality);
+          final stream = await MusicApi.resolveStream(song.id);
+          final cached = await cache.findCachedFile(song.id,
+              requestedBr: stream.bitrateKbps);
+          if (cached != null) continue;
           if (stream.downloadUrl.isEmpty) continue;
           await cache.download(
             song.id,

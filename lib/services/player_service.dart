@@ -10,7 +10,6 @@ import '../api/music_api.dart';
 import 'lyric_cache_service.dart';
 import 'audio_cache_service.dart';
 import 'cover_cache_service.dart';
-import 'settings_service.dart';
 import 'theme_service.dart';
 
 enum PlaybackQueueSource { regular, favorites, listeningMode }
@@ -608,17 +607,10 @@ class PlayerService {
     int generation, {
     bool play = true,
     Duration resumePosition = Duration.zero,
-    int? requestedBr,
   }) async {
     final player = _player;
     if (player == null) return;
-    final requestedQuality = requestedBr == null
-        ? SettingsService().quality
-        : AudioQuality.values.firstWhere(
-            (candidate) => candidate.br == requestedBr,
-            orElse: () => SettingsService().quality,
-          );
-    var quality = requestedQuality.br;
+    var quality = 0;
     final cachedPath = await AudioCacheService().findBestCachedFile(song.id);
     if (generation != _playGeneration) return;
     if (cachedPath != null) {
@@ -633,7 +625,7 @@ class PlayerService {
     }
     StreamSelection? selection;
     try {
-      selection = await MusicApi.resolveStream(song.id, requestedQuality);
+      selection = await MusicApi.resolveStream(song.id);
       if (selection.bitrateKbps > 0) quality = selection.bitrateKbps;
     } catch (_) {}
     if (generation != _playGeneration) return;
@@ -722,7 +714,7 @@ class PlayerService {
     return 999;
   }
 
-  /// Downloads the current song at the selected quality, then resumes it
+  /// Downloads the current song at the best available quality, then resumes it
   /// from the complete local cache file.
   Future<void> redownloadCurrentAtNewQuality() async {
     final song = currentSong;
@@ -730,7 +722,6 @@ class PlayerService {
     final currentGen = ++_playGeneration;
     final wasPlaying = isPlaying;
     final resumePosition = position;
-    final quality = SettingsService().quality.br;
     _openedGeneration = null;
     _failedGeneration = null;
     final player = _player;
@@ -749,7 +740,6 @@ class PlayerService {
       currentGen,
       play: wasPlaying,
       resumePosition: resumePosition,
-      requestedBr: quality,
     );
   }
 

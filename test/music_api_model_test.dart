@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:qishui_music/api/music_api.dart';
 import 'package:qishui_music/models/song.dart';
-import 'package:qishui_music/services/settings_service.dart';
 
 void main() {
   test('builds Soda cover URL using the documented resize suffix', () {
@@ -61,13 +60,19 @@ void main() {
     expect(bps.rank, greaterThan(kbps.rank));
   });
 
-  test('selects the requested quality from stream info', () {
+  test('selects the highest available quality from stream info', () {
     final qualities = <StreamQuality>[
       StreamQuality.fromJson({
         'quality': 'highest',
         'bitrate_kbps': 260,
         'download_url': 'https://cdn.example.com/highest.m4a',
         'encryption': {'aes_key_hex': '00112233445566778899aabbccddeeff'},
+      }),
+      StreamQuality.fromJson({
+        'quality': 'spatial',
+        'bitrate_kbps': 321,
+        'download_url': 'https://cdn.example.com/spatial.m4a',
+        'encryption': {'aes_key_hex': '102132435465768798a9babcbddceeff'},
       }),
       StreamQuality.fromJson({
         'quality': 'medium',
@@ -77,9 +82,9 @@ void main() {
       }),
     ];
 
-    final selected = selectStreamQuality(qualities, AudioQuality.medium);
+    final selected = selectStreamQuality(qualities);
 
-    expect(selected.quality, 'medium');
-    expect(selected.bitrateKbps, 68);
+    expect(selected.quality, 'spatial');
+    expect(selected.bitrateKbps, 321);
   });
 }

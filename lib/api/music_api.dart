@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/song.dart';
-import '../services/settings_service.dart';
 import '../utils/retry_helper.dart';
 
 class MusicApi {
@@ -219,11 +218,11 @@ class MusicApi {
     });
   }
 
-  static Future<StreamSelection> resolveStream(
-      String trackId, AudioQuality requested) async {
+  /// Resolves the highest quality currently available for this track.
+  static Future<StreamSelection> resolveStream(String trackId) async {
     final info = await getStreamInfo(trackId);
     if (info.qualities.isEmpty) throw StateError('歌曲没有可下载的音质');
-    final chosen = selectStreamQuality(info.qualities, requested);
+    final chosen = selectStreamQuality(info.qualities);
     if (chosen.aesKeyHex.isEmpty) {
       throw const FormatException('音频下载响应缺少解密密钥');
     }
@@ -375,14 +374,15 @@ class StreamSelection {
   );
 }
 
-StreamQuality selectStreamQuality(
-    List<StreamQuality> qualities, AudioQuality requested) {
+StreamQuality selectStreamQuality(List<StreamQuality> qualities) {
   if (qualities.isEmpty) {
     throw StateError('没有可用音质');
   }
-  for (final quality in qualities) {
-    if (quality.quality == requested.apiValue) return quality;
-  }
-  final ranked = [...qualities]..sort((a, b) => b.rank.compareTo(a.rank));
+  final ranked = [...qualities]..sort((a, b) {
+      final rankComparison = b.rank.compareTo(a.rank);
+      return rankComparison != 0
+          ? rankComparison
+          : b.bitrateKbps.compareTo(a.bitrateKbps);
+    });
   return ranked.first;
 }
