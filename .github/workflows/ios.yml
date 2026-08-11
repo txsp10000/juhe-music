@@ -32,4 +32,21 @@ jobs:
         run: flutter test
 
       - name: Build iOS simulator app
-        run: flutter build ios --simulator --release
+        shell: bash
+        run: |
+          set +e
+          flutter build ios --simulator --release 2>&1 | tee ios-build.log
+          build_status=${PIPESTATUS[0]}
+          if [[ $build_status -ne 0 ]]; then
+            errors=$(grep -Ei '(^|[^a-z])(error:|exception|failed|failure|undefined symbols|could not)' ios-build.log | tail -n 20 || true)
+            if [[ -z $errors ]]; then
+              errors=$(tail -n 20 ios-build.log)
+            fi
+            while IFS= read -r line; do
+              line=${line//'%'/'%25'}
+              line=${line//$'\r'/'%0D'}
+              line=${line//$'\n'/'%0A'}
+              echo "::error title=iOS build failure::$line"
+            done <<< "$errors"
+          fi
+          exit $build_status
