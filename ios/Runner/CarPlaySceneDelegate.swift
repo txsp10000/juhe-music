@@ -145,10 +145,12 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     detail: String,
     source: String
   ) -> CPListItem {
-    CPListItem(text: title, detailText: detail) { [weak self] _, completion in
+    let item = CPListItem(text: title, detailText: detail)
+    item.handler = { [weak self] _, completion in
       self?.openCollection(title: title, source: source, completion: completion)
         ?? completion()
     }
+    return item
   }
 
   private func makeModesTemplate() -> CPListTemplate {
@@ -174,10 +176,12 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         let items = modes.prefix(CPListTemplate.maximumItemCount).map { [weak self] mode -> CPListItem in
           let name = mode["name"] as? String ?? "听歌场景"
           let sceneModeId = mode["sceneModeId"] as? Int ?? -1
-          return CPListItem(text: name, detailText: "点按后开始播放") { _, completion in
+          let item = CPListItem(text: name, detailText: "点按后开始播放")
+          item.handler = { _, completion in
             self?.playMode(name: name, sceneModeId: sceneModeId, completion: completion)
               ?? completion()
           }
+          return item
         }
         template.updateSections([CPListSection(items: items)])
       }
@@ -263,10 +267,12 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
       let singer = song["singer"] as? String ?? "未知歌手"
       let album = song["album"] as? String ?? ""
       let detail = album.isEmpty ? singer : "\(singer) · \(album)"
-      return CPListItem(text: name, detailText: detail) { [weak self] _, completion in
+      let item = CPListItem(text: name, detailText: detail)
+      item.handler = { [weak self] _, completion in
         self?.playSong(source: source, index: index, completion: completion)
           ?? completion()
       }
+      return item
     }
   }
 
