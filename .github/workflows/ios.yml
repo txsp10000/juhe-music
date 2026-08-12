@@ -44,10 +44,15 @@ jobs:
         if: failure()
         run: |
           if [ -f pod-install.log ]; then
+            error_text=$(grep -E -A 12 -B 3 '\[!\]|[Ee]rror|Exception' pod-install.log | tail -80 || tail -80 pod-install.log)
             echo "## CocoaPods error" >> "$GITHUB_STEP_SUMMARY"
             echo '```text' >> "$GITHUB_STEP_SUMMARY"
-            grep -E -A 12 -B 3 '\[!\]|[Ee]rror|Exception' pod-install.log | tail -80 >> "$GITHUB_STEP_SUMMARY" || tail -80 pod-install.log >> "$GITHUB_STEP_SUMMARY"
+            printf '%s\n' "$error_text" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
+            error_text=${error_text//'%'/'%25'}
+            error_text=${error_text//$'\r'/'%0D'}
+            error_text=${error_text//$'\n'/'%0A'}
+            echo "::error title=CocoaPods install failed::$error_text"
           fi
 
       - name: Build unsigned iOS release
