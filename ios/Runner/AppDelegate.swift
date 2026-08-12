@@ -142,6 +142,7 @@ import Darwin
   }
 
   private func setupNowPlayingChannel(messenger: FlutterBinaryMessenger) {
+    CarPlayBridge.shared.configure(messenger: messenger)
     guard nowPlayingChannel == nil else { return }
     let channel = FlutterMethodChannel(
       name: "com.music/nowplaying",

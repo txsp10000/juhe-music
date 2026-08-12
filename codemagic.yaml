@@ -18,8 +18,6 @@ workflows:
       - name: Setup Flutter project
         script: |
           flutter config --no-enable-swift-package-manager
-          rm -rf ios
-          flutter create --platforms=ios .
           flutter pub get
 
       - name: Patch Podfile to disable codesigning for all targets
@@ -94,7 +92,6 @@ workflows:
           /usr/libexec/PlistBuddy -c "Delete :NSAppTransportSecurity" "$PLIST" 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" "$PLIST"
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Delete :UIApplicationSceneManifest" "$PLIST" 2>/dev/null || true
 
       - name: Build iOS
         script: |

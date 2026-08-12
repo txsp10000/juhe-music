@@ -11,6 +11,7 @@ import 'lyric_cache_service.dart';
 import 'audio_cache_service.dart';
 import 'cover_cache_service.dart';
 import 'theme_service.dart';
+import 'playback_history_service.dart';
 
 enum PlaybackQueueSource { regular, favorites, listeningMode }
 
@@ -486,6 +487,7 @@ class PlayerService {
     }
     _currentIndex = index;
     final song = queue[index];
+    unawaited(PlaybackHistoryService.record(song));
     final currentGen = ++_playGeneration;
     ThemeService.invalidateCover();
     _pendingThemeCover = null;

@@ -8,6 +8,7 @@ import 'tv/tv_routes.dart';
 import 'services/settings_service.dart';
 import 'services/audio_cache_service.dart';
 import 'services/app_environment.dart';
+import 'services/carplay_service.dart';
 import 'theme/app_design_tokens.dart';
 
 Future<void> _bootstrapBackgroundServices() async {
@@ -23,6 +24,7 @@ Future<void> _bootstrapBackgroundServices() async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SettingsService().load();
+  CarPlayService.initialize();
   runApp(const MusicApp());
 
   unawaited(_bootstrapBackgroundServices());
