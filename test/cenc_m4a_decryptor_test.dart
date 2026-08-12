@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pointycastle/export.dart';
-import 'package:qishui_music/services/cenc_m4a_decryptor.dart';
+import 'package:music/services/cenc_m4a_decryptor.dart';
 
 void main() {
   test('decrypts and repairs a CENC M4A sample table', () {

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:qishui_music/utils/lyric_parser.dart';
+import 'package:music/utils/lyric_parser.dart';
 
 void main() {
   test('parses KRC line and per-character timing', () {

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
-import 'package:qishui_music/services/theme_service.dart';
-import 'package:qishui_music/theme/app_design_tokens.dart';
+import 'package:music/services/theme_service.dart';
+import 'package:music/theme/app_design_tokens.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

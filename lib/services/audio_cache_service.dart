@@ -403,7 +403,7 @@ class _AudioCacheWriteException implements Exception {
   String toString() => 'Unable to commit decrypted audio: $cause';
 }
 
-const _diagnosticsChannel = MethodChannel('com.sandian.music/diagnostics');
+const _diagnosticsChannel = MethodChannel('com.music/diagnostics');
 
 Future<void> _logDiagnostic(String message, {bool isError = true}) async {
   try {

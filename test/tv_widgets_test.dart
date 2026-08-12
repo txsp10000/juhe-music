@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:qishui_music/models/song.dart';
-import 'package:qishui_music/tv/tv_layout_metrics.dart';
-import 'package:qishui_music/tv/widgets/tv_button.dart';
-import 'package:qishui_music/tv/widgets/tv_focus_card.dart';
-import 'package:qishui_music/tv/widgets/tv_queue_panel.dart';
+import 'package:music/models/song.dart';
+import 'package:music/tv/tv_layout_metrics.dart';
+import 'package:music/tv/widgets/tv_button.dart';
+import 'package:music/tv/widgets/tv_focus_card.dart';
+import 'package:music/tv/widgets/tv_queue_panel.dart';
 
 void main() {
   testWidgets('TV layout keeps content inside a five-percent safe zone',

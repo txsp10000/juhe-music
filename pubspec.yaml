@@ -1,5 +1,5 @@
-name: qishui_music
-description: 三点音乐 - Flutter cross-platform music app
+name: music
+description: 音乐 - Flutter cross-platform music app
 publish_to: 'none'
 version: 1.0.0+2
 

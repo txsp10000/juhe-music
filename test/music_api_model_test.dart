@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:qishui_music/api/music_api.dart';
-import 'package:qishui_music/models/song.dart';
+import 'package:music/api/music_api.dart';
+import 'package:music/models/song.dart';
 
 void main() {
   test('builds Soda cover URL using the documented resize suffix', () {

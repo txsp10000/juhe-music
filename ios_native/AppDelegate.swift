@@ -144,7 +144,7 @@ import Darwin
   private func setupNowPlayingChannel(messenger: FlutterBinaryMessenger) {
     guard nowPlayingChannel == nil else { return }
     let channel = FlutterMethodChannel(
-      name: "com.sandian.music/nowplaying",
+      name: "com.music/nowplaying",
       binaryMessenger: messenger
     )
     nowPlayingChannel = channel
@@ -196,7 +196,7 @@ import Darwin
   private func setupDiagnosticsChannel(messenger: FlutterBinaryMessenger) {
     guard diagnosticsChannel == nil else { return }
     let channel = FlutterMethodChannel(
-      name: "com.sandian.music/diagnostics",
+      name: "com.music/diagnostics",
       binaryMessenger: messenger
     )
     diagnosticsChannel = channel
@@ -360,7 +360,7 @@ import Darwin
 
   private func nativeDecryptError(_ message: String) -> NSError {
     return NSError(
-      domain: "com.sandian.music.audio-decrypt",
+      domain: "com.music.audio-decrypt",
       code: 1,
       userInfo: [NSLocalizedDescriptionKey: message]
     )

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:qishui_music/models/listening_mode.dart';
+import 'package:music/models/listening_mode.dart';
 
 void main() {
   test('常用模式排除抖音漫游、熟悉和新鲜模式', () {

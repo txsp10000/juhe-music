@@ -191,7 +191,7 @@ class PlayerService {
         _audioHandler = await AudioService.init(
           builder: () => _AudioPlayerTask(),
           config: const AudioServiceConfig(
-            androidNotificationChannelId: 'com.sandian.music.channel',
+            androidNotificationChannelId: 'com.music.channel',
             androidNotificationChannelName: '三点音乐',
             androidNotificationOngoing: false,
             androidStopForegroundOnPause: true,
@@ -799,8 +799,7 @@ class PlayerService {
 }
 
 class _AudioPlayerTask extends BaseAudioHandler {
-  static const _nowPlayingChannel =
-      MethodChannel('com.sandian.music/nowplaying');
+  static const _nowPlayingChannel = MethodChannel('com.music/nowplaying');
 
   String? _pauseReason;
   bool _resumeAfterInterruption = false;

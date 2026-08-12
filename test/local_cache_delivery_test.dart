@@ -3,8 +3,8 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:qishui_music/services/cover_cache_service.dart';
-import 'package:qishui_music/services/lyric_cache_service.dart';
+import 'package:music/services/cover_cache_service.dart';
+import 'package:music/services/lyric_cache_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
