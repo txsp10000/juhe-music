@@ -6,6 +6,43 @@
 	objectVersion = 54;
 	objects = {
 
+		D0C0DEA01CF9000F007C117D /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = D0C0DEA11CF9000F007C117D /* GeneratedPluginRegistrant.m */; };
+		D0C0DEA21CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D0C0DEA31CF9000F007C117D /* Main.storyboard */; };
+		D0C0DEA41CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D0C0DEA51CF9000F007C117D /* LaunchScreen.storyboard */; };
+
+		D0C0DEA61CF9000F007C117D /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
+		D0C0DEA11CF9000F007C117D /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
+		D0C0DEA71CF9000F007C117D /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
+		D0C0DEA81CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
+		D0C0DEA91CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
+
+		D0C0DEB21CF90195004384FC /* Debug.xcconfig */ = {
+			isa = PBXFileReference;
+			fileEncoding = 4;
+			lastKnownFileType = text.xcconfig;
+			name = Debug.xcconfig;
+			path = Flutter/Debug.xcconfig;
+			sourceTree = "<group>";
+		};
+
+		D0C0DEB31CF90195004384FC /* Release.xcconfig */ = {
+			isa = PBXFileReference;
+			fileEncoding = 4;
+			lastKnownFileType = text.xcconfig;
+			name = Release.xcconfig;
+			path = Flutter/Release.xcconfig;
+			sourceTree = "<group>";
+		};
+
+		D0C0DEB41CF90195004384FC /* Generated.xcconfig */ = {
+			isa = PBXFileReference;
+			fileEncoding = 4;
+			lastKnownFileType = text.xcconfig;
+			name = Generated.xcconfig;
+			path = Flutter/Generated.xcconfig;
+			sourceTree = "<group>";
+		};
+
 		9740EEB21CF90195004384FC /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -112,7 +149,7 @@
 
 		97C147001CF9000F007C117D /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 9740EEB21CF90195004384FC /* Debug */;
+			baseConfigurationReference = D0C0DEB21CF90195004384FC /* Debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -132,7 +169,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.music;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				SWIFT_OBJC_BRIDGING_HEADER = "";
+				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
@@ -141,7 +178,7 @@
 
 		97C147011CF9000F007C117D /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 9740EEB31CF90195004384FC /* Release */;
+			baseConfigurationReference = D0C0DEB31CF90195004384FC /* Release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -159,7 +196,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.music;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				SWIFT_OBJC_BRIDGING_HEADER = "";
+				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -245,12 +282,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-97C146EA1CF9000F007C117D /* Sources */ = {
+		97C146EA1CF9000F007C117D /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				A1B2C3D61234567800AABBCC /* CarPlaySceneDelegate.swift in Sources */,
 				97C146FA1CF9000F007C117D /* AppDelegate.swift in Sources */,
+				D0C0DEA01CF9000F007C117D /* GeneratedPluginRegistrant.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -259,7 +297,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D0C0DEA41CF9000F007C117D /* LaunchScreen.storyboard in Resources */,
 				97C146F81CF9000F007C117D /* Assets.xcassets in Resources */,
+				D0C0DEA21CF9000F007C117D /* Main.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -313,10 +353,15 @@
 		97C146F01CF9000F007C117D /* Runner */ = {
 			isa = PBXGroup;
 			children = (
+				D0C0DEA31CF9000F007C117D /* Main.storyboard */,
 				A1B2C3D41234567800AABBCC /* CarPlaySceneDelegate.swift */,
 				97C146F11CF9000F007C117D /* AppDelegate.swift */,
 				97C146F91CF9000F007C117D /* Assets.xcassets */,
+				D0C0DEA51CF9000F007C117D /* LaunchScreen.storyboard */,
 				97C146F51CF9000F007C117D /* Info.plist */,
+				D0C0DEA61CF9000F007C117D /* GeneratedPluginRegistrant.h */,
+				D0C0DEA11CF9000F007C117D /* GeneratedPluginRegistrant.m */,
+				D0C0DEA71CF9000F007C117D /* Runner-Bridging-Header.h */,
 			);
 			name = Runner;
 			sourceTree = "<group>";
@@ -359,6 +404,24 @@
 			sourceTree = "<group>";
 		};
 
+		D0C0DEA31CF9000F007C117D /* Main.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				D0C0DEA81CF9000F007C117D /* Base */,
+			);
+			name = Main.storyboard;
+			sourceTree = "<group>";
+		};
+
+		D0C0DEA51CF9000F007C117D /* LaunchScreen.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				D0C0DEA91CF9000F007C117D /* Base */,
+			);
+			name = LaunchScreen.storyboard;
+			sourceTree = "<group>";
+		};
+
 		97C147021CF9000F007C117D /* Build configuration list */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -372,6 +435,9 @@
 		9740EEB11CF90186004384FC /* Flutter */ = {
 			isa = PBXGroup;
 			children = (
+				D0C0DEB21CF90195004384FC /* Debug.xcconfig */,
+				D0C0DEB31CF90195004384FC /* Release.xcconfig */,
+				D0C0DEB41CF90195004384FC /* Generated.xcconfig */,
 			);
 			name = Flutter;
 			sourceTree = "<group>";
