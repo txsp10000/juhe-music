@@ -1,16 +1,16 @@
-ï»¿workflows:
+workflows:
   ios-build:
     name: iOS Build
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
       flutter: stable
-      # iOS 26.4 SDK ç¦æ­¢ç¼–è¯‘æœŸæ— ç­¾å/adhoc ç­¾åï¼Œå›ºå®šä½¿ç”¨ Xcode 16.2 çš„æ—§ SDK
+      # iOS 26.4 SDK ½ûÖ¹±àÒëÆÚÎÞÇ©Ãû/adhoc Ç©Ãû£¬¹Ì¶¨Ê¹ÓÃ Xcode 16.2 µÄ¾É SDK
       xcode: "16.2"
       cocoapods: default
     triggering:
       events: []
-      # è‡ªåŠ¨æž„å»ºå·²å…³é—­ï¼Œéœ€æ‰‹åŠ¨è§¦å‘
+      # ×Ô¶¯¹¹½¨ÒÑ¹Ø±Õ£¬ÐèÊÖ¶¯´¥·¢
       # branch_patterns:
       #   - pattern: main
       #     include: true
@@ -60,8 +60,8 @@
             config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.music'
             config.build_settings['CODE_SIGN_ENTITLEMENTS'] = 'Runner/Runner.entitlements'
             config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
-            # iOS 26.4 SDK ç¦æ­¢ç¼–è¯‘æœŸ ad-hoc ç­¾åï¼Œæ”¹ä¸ºå®Œå…¨ç¦ç”¨ç¼–è¯‘æœŸç­¾å
-            # ç¼–è¯‘å®ŒæˆåŽåœ¨ Package æ­¥éª¤æ‰‹åŠ¨ codesign
+            # iOS 26.4 SDK ½ûÖ¹±àÒëÆÚ ad-hoc Ç©Ãû£¬¸ÄÎªÍêÈ«½ûÓÃ±àÒëÆÚÇ©Ãû
+            # ±àÒëÍê³ÉºóÔÚ Package ²½ÖèÊÖ¶¯ codesign
             config.build_settings['CODE_SIGN_STYLE'] = 'Manual'
             config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
             config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
@@ -82,8 +82,8 @@
       - name: Configure Info.plist
         script: |
           PLIST="ios/Runner/Info.plist"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName éŸ³ä¹" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleName éŸ³ä¹" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName ÒôÀÖ" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleName ÒôÀÖ" "$PLIST"
           /usr/libexec/PlistBuddy -c "Delete :UIBackgroundModes" "$PLIST" 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" "$PLIST"
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" "$PLIST"
@@ -98,7 +98,7 @@
 
       - name: Generate app icons
         script: |
-          ICON_SRC="assets/cleaned-image_c20cb225_compressed.png"
+          ICON_SRC="assets/cleaned-image_6e6754aa_compressed.png"
           ICON_DIR="ios/Runner/Assets.xcassets/AppIcon.appiconset"
           if [ -f "$ICON_SRC" ]; then
             for SIZE in 20 29 40 58 60 76 80 87 120 152 167 180 1024; do
@@ -109,14 +109,14 @@
 
       - name: Build iOS
         script: |
-          # ç¡®ä¿ pod install å·²æ‰§è¡Œï¼ˆflutter pub get å·²åœ¨ä¸Šä¸€æ­¥å®Œæˆï¼‰
+          # È·±£ pod install ÒÑÖ´ÐÐ£¨flutter pub get ÒÑÔÚÉÏÒ»²½Íê³É£©
           cd ios
           pod install
           cd ..
 
-          # ç›´æŽ¥ä½¿ç”¨ xcodebuildï¼Œç»•è¿‡ flutter build çš„è¯ä¹¦æ£€æŸ¥
-          # iOS 26.4 SDK ç¦æ­¢ç¼–è¯‘æœŸ CODE_SIGN_IDENTITY=-ï¼Œæ”¹ç”¨å®Œå…¨ç¦ç”¨ç¼–è¯‘æœŸç­¾å
-          # ç¼–è¯‘å®ŒæˆåŽåœ¨ Package æ­¥éª¤æ‰‹åŠ¨ codesign
+          # Ö±½ÓÊ¹ÓÃ xcodebuild£¬ÈÆ¹ý flutter build µÄÖ¤Êé¼ì²é
+          # iOS 26.4 SDK ½ûÖ¹±àÒëÆÚ CODE_SIGN_IDENTITY=-£¬¸ÄÓÃÍêÈ«½ûÓÃ±àÒëÆÚÇ©Ãû
+          # ±àÒëÍê³ÉºóÔÚ Package ²½ÖèÊÖ¶¯ codesign
           echo "Running xcodebuild (no signing during build)..."
           xcodebuild \
             -workspace ios/Runner.xcworkspace \
@@ -141,7 +141,7 @@
           echo "=== Verifying build output ==="
           APP_PATH="build/ios/Release-iphoneos/Runner.app"
           if [ ! -d "$APP_PATH" ]; then
-            # å¦‚æžœä¸åœ¨é¢„æœŸè·¯å¾„ï¼Œå°è¯•æœç´¢
+            # Èç¹û²»ÔÚÔ¤ÆÚÂ·¾¶£¬³¢ÊÔËÑË÷
             APP_PATH=$(find build -name "Runner.app" -type d 2>/dev/null | head -1)
             if [ -z "$APP_PATH" ]; then
               echo "ERROR: Runner.app not found after build"
@@ -150,7 +150,7 @@
           fi
           echo "App path: $APP_PATH"
 
-          # éªŒè¯äºŒè¿›åˆ¶æ–‡ä»¶å­˜åœ¨ï¼ˆFlutter çš„ Runner ä»…ä¸ºè–„å£³ ~160KBï¼Œæ ¸å¿ƒä»£ç åœ¨ Frameworks ä¸­ï¼‰
+          # ÑéÖ¤¶þ½øÖÆÎÄ¼þ´æÔÚ£¨Flutter µÄ Runner ½öÎª±¡¿Ç ~160KB£¬ºËÐÄ´úÂëÔÚ Frameworks ÖÐ£©
           BINARY="$APP_PATH/Runner"
           if [ ! -f "$BINARY" ]; then
             echo "ERROR: Binary not found at $BINARY"
@@ -159,19 +159,19 @@
           BINARY_SIZE=$(stat -f%z "$BINARY" 2>/dev/null || stat -c%s "$BINARY" 2>/dev/null || echo 0)
           echo "Runner binary: $BINARY_SIZE bytes ($(echo "scale=1; $BINARY_SIZE/1048576" | bc)MB)"
 
-          # éªŒè¯ App.frameworkï¼ˆåŒ…å« Dart AOT ç¼–è¯‘ä»£ç ï¼‰
+          # ÑéÖ¤ App.framework£¨°üº¬ Dart AOT ±àÒë´úÂë£©
           if [ ! -d "$APP_PATH/Frameworks/App.framework" ]; then
             echo "ERROR: App.framework not found - Dart AOT compilation may have failed"
             exit 1
           fi
 
-          # éªŒè¯ Flutter.frameworkï¼ˆFlutter å¼•æ“Žï¼‰
+          # ÑéÖ¤ Flutter.framework£¨Flutter ÒýÇæ£©
           if [ ! -d "$APP_PATH/Frameworks/Flutter.framework" ]; then
             echo "ERROR: Flutter.framework not found"
             exit 1
           fi
 
-          # éªŒè¯æ€» .app å¤§å°ï¼ˆFlutter å®Œæ•´åŒ…åº” â‰¥ 15MBï¼‰
+          # ÑéÖ¤×Ü .app ´óÐ¡£¨Flutter ÍêÕû°üÓ¦ ¡Ý 15MB£©
            APP_SIZE=$(du -sk "$APP_PATH" | cut -f1)
            APP_SIZE_MB=$((APP_SIZE / 1024))
            echo "App total size: ${APP_SIZE_MB}MB"
@@ -180,7 +180,7 @@
             exit 1
           fi
 
-          # åˆ—å‡ºæ‰€æœ‰ Frameworks
+          # ÁÐ³öËùÓÐ Frameworks
           echo "Frameworks:"
           ls "$APP_PATH/Frameworks/" 2>/dev/null
           echo "=== Build verified successfully ==="
@@ -199,7 +199,7 @@
 
           echo "Found app: $APP_PATH"
 
-          # é‡æ–°éªŒè¯äºŒè¿›åˆ¶
+          # ÖØÐÂÑéÖ¤¶þ½øÖÆ
           BINARY_SIZE=$(stat -f%z "$BINARY" 2>/dev/null || stat -c%s "$BINARY" 2>/dev/null || echo 0)
           echo "Binary: $BINARY ($(echo "scale=1; $BINARY_SIZE/1048576" | bc)MB)"
 
