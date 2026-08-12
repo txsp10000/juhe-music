@@ -260,7 +260,7 @@
 			);
 			dependencies = (
 			);
-			name = Runner;
+			path = Runner;
 			productName = Runner;
 			productReference = 97C146EE1CF9000F007C117D /* Runner.app */;
 			productType = "com.apple.product-type.application";
@@ -366,7 +366,7 @@
 				D0C0DEA11CF9000F007C117D /* GeneratedPluginRegistrant.m */,
 				D0C0DEA71CF9000F007C117D /* Runner-Bridging-Header.h */,
 			);
-			name = Runner;
+			path = Runner;
 			sourceTree = "<group>";
 		};
 
