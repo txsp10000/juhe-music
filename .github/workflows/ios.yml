@@ -60,6 +60,27 @@ jobs:
           set -o pipefail
           flutter build ios --release --no-codesign 2>&1 | tee ios-build.log
 
+      - name: Package unsigned IPA
+        run: |
+          app_path=$(find build/ios -type d -name Runner.app -path '*iphoneos*' -print -quit)
+          if [ -z "$app_path" ]; then
+            echo "Runner.app was not found after the iOS build" >&2
+            exit 1
+          fi
+          rm -rf build/ios/ipa
+          mkdir -p build/ios/ipa/Payload
+          ditto "$app_path" build/ios/ipa/Payload/Runner.app
+          (cd build/ios/ipa && zip -qry JuheMusic-iOS-unsigned.ipa Payload)
+          rm -rf build/ios/ipa/Payload
+
+      - name: Upload iOS build
+        uses: actions/upload-artifact@v4
+        with:
+          name: JuheMusic-iOS-unsigned
+          path: build/ios/ipa/JuheMusic-iOS-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Report iOS build failure
         if: failure()
         run: |
