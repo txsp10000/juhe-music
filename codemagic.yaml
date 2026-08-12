@@ -96,17 +96,6 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$PLIST"
           /usr/libexec/PlistBuddy -c "Delete :UIApplicationSceneManifest" "$PLIST" 2>/dev/null || true
 
-      - name: Generate app icons
-        script: |
-          ICON_SRC="assets/cleaned-image_6e6754aa_compressed.png"
-          ICON_DIR="ios/Runner/Assets.xcassets/AppIcon.appiconset"
-          if [ -f "$ICON_SRC" ]; then
-            for SIZE in 20 29 40 58 60 76 80 87 120 152 167 180 1024; do
-              sips -z $SIZE $SIZE "$ICON_SRC" --out "$ICON_DIR/Icon-App-${SIZE}x${SIZE}.png" >/dev/null 2>&1
-            done
-            printf '%s\n' '{"images":[{"size":"20x20","idiom":"iphone","filename":"Icon-App-40x40.png","scale":"2x"},{"size":"20x20","idiom":"iphone","filename":"Icon-App-60x60.png","scale":"3x"},{"size":"29x29","idiom":"iphone","filename":"Icon-App-58x58.png","scale":"2x"},{"size":"29x29","idiom":"iphone","filename":"Icon-App-87x87.png","scale":"3x"},{"size":"40x40","idiom":"iphone","filename":"Icon-App-80x80.png","scale":"2x"},{"size":"40x40","idiom":"iphone","filename":"Icon-App-120x120.png","scale":"3x"},{"size":"60x60","idiom":"iphone","filename":"Icon-App-120x120.png","scale":"2x"},{"size":"60x60","idiom":"iphone","filename":"Icon-App-180x180.png","scale":"3x"},{"size":"20x20","idiom":"ipad","filename":"Icon-App-20x20.png","scale":"1x"},{"size":"20x20","idiom":"ipad","filename":"Icon-App-40x40.png","scale":"2x"},{"size":"29x29","idiom":"ipad","filename":"Icon-App-29x29.png","scale":"1x"},{"size":"29x29","idiom":"ipad","filename":"Icon-App-58x58.png","scale":"2x"},{"size":"40x40","idiom":"ipad","filename":"Icon-App-40x40.png","scale":"1x"},{"size":"40x40","idiom":"ipad","filename":"Icon-App-80x80.png","scale":"2x"},{"size":"76x76","idiom":"ipad","filename":"Icon-App-76x76.png","scale":"1x"},{"size":"76x76","idiom":"ipad","filename":"Icon-App-152x152.png","scale":"2x"},{"size":"83.5x83.5","idiom":"ipad","filename":"Icon-App-167x167.png","scale":"2x"},{"size":"1024x1024","idiom":"ios-marketing","filename":"Icon-App-1024x1024.png","scale":"1x"}],"info":{"version":1,"author":"xcode"}}' > "$ICON_DIR/Contents.json"
-          fi
-
       - name: Build iOS
         script: |
           # 确保 pod install 已执行（flutter pub get 已在上一步完成）
