@@ -6,6 +6,7 @@
 	objectVersion = 54;
 	objects = {
 
+		D0C0DEC01E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = D0C0DEC11E833CAA004F5970 /* AppFrameworkInfo.plist */; };
 		D0C0DEA01CF9000F007C117D /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = D0C0DEA11CF9000F007C117D /* GeneratedPluginRegistrant.m */; };
 		D0C0DEA21CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D0C0DEA31CF9000F007C117D /* Main.storyboard */; };
 		D0C0DEA41CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D0C0DEA51CF9000F007C117D /* LaunchScreen.storyboard */; };
@@ -15,6 +16,7 @@
 		D0C0DEA71CF9000F007C117D /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		D0C0DEA81CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		D0C0DEA91CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		D0C0DEC11E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
 
 		D0C0DEB21CF90195004384FC /* Debug.xcconfig */ = {
 			isa = PBXFileReference;
@@ -298,6 +300,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D0C0DEA41CF9000F007C117D /* LaunchScreen.storyboard in Resources */,
+				D0C0DEC01E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */,
 				97C146F81CF9000F007C117D /* Assets.xcassets in Resources */,
 				D0C0DEA21CF9000F007C117D /* Main.storyboard in Resources */,
 			);
@@ -435,6 +438,7 @@
 		9740EEB11CF90186004384FC /* Flutter */ = {
 			isa = PBXGroup;
 			children = (
+				D0C0DEC11E833CAA004F5970 /* AppFrameworkInfo.plist */,
 				D0C0DEB21CF90195004384FC /* Debug.xcconfig */,
 				D0C0DEB31CF90195004384FC /* Release.xcconfig */,
 				D0C0DEB41CF90195004384FC /* Generated.xcconfig */,

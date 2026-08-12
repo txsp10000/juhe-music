@@ -29,6 +29,7 @@ workflows:
         script: |
           # xcodeproj/nanaimo rejects a UTF-8 BOM before the pbxproj header.
           ruby -e 'path="ios/Runner.xcodeproj/project.pbxproj"; data=File.binread(path); File.binwrite(path, data.delete_prefix("\xEF\xBB\xBF".b))'
+          test -f ios/Flutter/AppFrameworkInfo.plist
           test -f ios/Flutter/Debug.xcconfig
           test -f ios/Flutter/Release.xcconfig
           test -f ios/Runner/CarPlaySceneDelegate.swift
