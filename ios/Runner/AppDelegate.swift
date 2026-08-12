@@ -6,7 +6,7 @@ import CommonCrypto
 import Darwin
 
 @main
-@objc class AppDelegate: FlutterAppDelegate {
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var lastArtUri: String = ""
   private var cachedArtwork: MPMediaItemArtwork?
   private var nowPlayingChannel: FlutterMethodChannel?
@@ -18,8 +18,6 @@ import Darwin
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    GeneratedPluginRegistrant.register(with: self)
-
     let session = AVAudioSession.sharedInstance()
     do {
       try session.setCategory(.playback, mode: .default, policy: .longFormAudio)
@@ -29,16 +27,14 @@ import Darwin
     UIApplication.shared.beginReceivingRemoteControlEvents()
     setupAudioObservers()
 
-    let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
 
-    DispatchQueue.main.async {
-      if let controller = self.window?.rootViewController as? FlutterViewController {
-        self.setupNowPlayingChannel(messenger: controller.binaryMessenger)
-        self.setupDiagnosticsChannel(messenger: controller.binaryMessenger)
-      }
-    }
-
-    return result
+  func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+    GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    let messenger = engineBridge.applicationRegistrar.messenger()
+    setupNowPlayingChannel(messenger: messenger)
+    setupDiagnosticsChannel(messenger: messenger)
   }
 
   // MARK: - Audio Session Observers

@@ -10,6 +10,7 @@
 		D0C0DEA01CF9000F007C117D /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = D0C0DEA11CF9000F007C117D /* GeneratedPluginRegistrant.m */; };
 		D0C0DEA21CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D0C0DEA31CF9000F007C117D /* Main.storyboard */; };
 		D0C0DEA41CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D0C0DEA51CF9000F007C117D /* LaunchScreen.storyboard */; };
+		A1B2C3DA1234567800AABBCC /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3DB1234567800AABBCC /* SceneDelegate.swift */; };
 
 		D0C0DEA61CF9000F007C117D /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		D0C0DEA11CF9000F007C117D /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
@@ -17,6 +18,7 @@
 		D0C0DEA81CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		D0C0DEA91CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		D0C0DEC11E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
+		A1B2C3DB1234567800AABBCC /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 
 		D0C0DEB21CF90195004384FC /* Debug.xcconfig */ = {
 			isa = PBXFileReference;
@@ -288,6 +290,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3DA1234567800AABBCC /* SceneDelegate.swift in Sources */,
 				A1B2C3D61234567800AABBCC /* CarPlaySceneDelegate.swift in Sources */,
 				97C146FA1CF9000F007C117D /* AppDelegate.swift in Sources */,
 				D0C0DEA01CF9000F007C117D /* GeneratedPluginRegistrant.m in Sources */,
@@ -357,6 +360,7 @@
 			isa = PBXGroup;
 			children = (
 				D0C0DEA31CF9000F007C117D /* Main.storyboard */,
+				A1B2C3DB1234567800AABBCC /* SceneDelegate.swift */,
 				A1B2C3D41234567800AABBCC /* CarPlaySceneDelegate.swift */,
 				97C146F11CF9000F007C117D /* AppDelegate.swift */,
 				97C146F91CF9000F007C117D /* Assets.xcassets */,
