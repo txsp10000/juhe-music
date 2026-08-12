@@ -9,12 +9,12 @@
     <application
         android:banner="@drawable/tv_banner"
         android:icon="@mipmap/ic_launcher"
-        android:label="三点音乐">
+        android:label="音乐">
         <activity
             android:name=".MainActivity"
             android:banner="@drawable/tv_banner"
             android:icon="@mipmap/ic_launcher"
-            android:label="三点音乐"
+            android:label="音乐"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
