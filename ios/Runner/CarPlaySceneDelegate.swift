@@ -95,19 +95,57 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
   private func installRootTemplate(on interfaceController: CPInterfaceController) {
     let library = makeLibraryTemplate()
     let modes = makeModesTemplate()
-    let search = CPSearchTemplate()
-    search.delegate = self
-    search.tabTitle = "搜索"
-    search.tabImage = UIImage(systemName: "magnifyingglass")
-
-    let nowPlaying = CPNowPlayingTemplate.shared
-    nowPlaying.tabTitle = "正在播放"
-    nowPlaying.tabImage = UIImage(systemName: "play.circle")
+    let search = makeSearchLauncherTemplate()
+    let nowPlaying = makeNowPlayingLauncherTemplate()
 
     let root = CPTabBarTemplate(
       templates: [library, modes, search, nowPlaying]
     )
     interfaceController.setRootTemplate(root, animated: false)
+  }
+
+  private func makeSearchLauncherTemplate() -> CPListTemplate {
+    let item = CPListItem(
+      text: "搜索歌曲",
+      detailText: "按歌曲名或歌手搜索"
+    )
+    item.handler = { [weak self] _, completion in
+      guard let self else {
+        completion()
+        return
+      }
+      let search = CPSearchTemplate()
+      search.delegate = self
+      self.interfaceController?.pushTemplate(search, animated: true)
+      completion()
+    }
+
+    let template = CPListTemplate(
+      title: "搜索",
+      sections: [CPListSection(items: [item])]
+    )
+    template.tabTitle = "搜索"
+    template.tabImage = UIImage(systemName: "magnifyingglass")
+    return template
+  }
+
+  private func makeNowPlayingLauncherTemplate() -> CPListTemplate {
+    let item = CPListItem(
+      text: "打开正在播放",
+      detailText: "查看歌曲与播放控制"
+    )
+    item.handler = { [weak self] _, completion in
+      self?.showNowPlaying()
+      completion()
+    }
+
+    let template = CPListTemplate(
+      title: "正在播放",
+      sections: [CPListSection(items: [item])]
+    )
+    template.tabTitle = "正在播放"
+    template.tabImage = UIImage(systemName: "play.circle")
+    return template
   }
 
   private func makeLibraryTemplate(
@@ -321,13 +359,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
   }
 
   private func showNowPlaying() {
-    guard let root = interfaceController?.rootTemplate as? CPTabBarTemplate else { return }
-    if #available(iOS 17.0, *),
-       let index = root.templates.firstIndex(where: {
-         $0 === CPNowPlayingTemplate.shared
-       }) {
-      root.selectTemplate(at: index)
-    }
+    interfaceController?.pushTemplate(CPNowPlayingTemplate.shared, animated: true)
   }
 
   private func showError(_ message: String) {
