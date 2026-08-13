@@ -819,23 +819,13 @@ class _PlayerPageState extends State<PlayerPage> {
             : null,
       );
     }
-    final first = _firstLyric(song.lyric);
-    final fallback = song.album.isNotEmpty ? song.album : '何必沾惹愁滋味';
     return _LyricWindow(
-      current: LyricLine(0, 0, [LyricSyllable(0, 0, first)]),
-      next: LyricLine(0, 0, [LyricSyllable(0, 0, fallback)]),
+      current: const LyricLine(
+        0,
+        0,
+        [LyricSyllable(0, 0, '暂无歌词')],
+      ),
     );
-  }
-
-  String _firstLyric(String? lyric) {
-    if (lyric == null || lyric.isEmpty) return '纵此生也不过百岁';
-    final line = lyric
-        .split('\n')
-        .firstWhere((l) => l.trim().isNotEmpty, orElse: () => '纵此生也不过百岁')
-        .replaceAll(RegExp(r'\[.*?\]'), '')
-        .replaceAll(RegExp(r'<\d+,\d+,\d+>'), '')
-        .trim();
-    return line.isEmpty ? '纵此生也不过百岁' : line;
   }
 }
 

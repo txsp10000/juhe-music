@@ -528,7 +528,7 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> with RouteAware {
       ),
       child: Center(
         child: lines.isEmpty
-            ? Text(song == null ? '播放歌曲后显示歌词' : '正在获取歌词',
+            ? Text(song == null ? '播放歌曲后显示歌词' : '暂无歌词',
                 style: TvTokens.body(
                     size: metrics.font(24), color: TvTokens.muted))
             : ListView.separated(
@@ -938,23 +938,7 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> with RouteAware {
           .toList();
       if (lines.isNotEmpty) return lines;
     }
-    final first = _firstLyric(song.lyric);
-    final fallback = song.album.isNotEmpty ? song.album : '歌词加载后会显示在这里';
-    return [
-      LyricLine(0, 0, [LyricSyllable(0, 0, first)]),
-      LyricLine(0, 0, [LyricSyllable(0, 0, fallback)])
-    ];
-  }
-
-  String _firstLyric(String? lyric) {
-    if (lyric == null || lyric.isEmpty) return '正在获取歌词';
-    final line = lyric
-        .split('\n')
-        .firstWhere((value) => value.trim().isNotEmpty, orElse: () => '正在获取歌词')
-        .replaceAll(RegExp(r'\[.*?\]'), '')
-        .replaceAll(RegExp(r'<\d+,\d+,\d+>'), '')
-        .trim();
-    return line.isEmpty ? '正在获取歌词' : line;
+    return const [];
   }
 
   String _formatDuration(Duration value) {

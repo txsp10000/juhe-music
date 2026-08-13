@@ -1023,7 +1023,7 @@ private final class CarPlayNowPlayingViewController: UIViewController {
     } else if !(nextLyricLabel.text ?? "").isEmpty {
       karaokeView.update(text: "歌词即将开始", fontSize: lyricFontSize)
     } else {
-      karaokeView.update(text: "纯音乐，请欣赏", fontSize: lyricFontSize)
+      karaokeView.update(text: "暂无歌词", fontSize: lyricFontSize)
     }
   }
 
