@@ -4,9 +4,5 @@
 <dict>
     <key>SBStarkCapable</key>
     <true/>
-    <key>platform-application</key>
-    <true/>
-    <key>com.apple.private.security.no-sandbox</key>
-    <true/>
 </dict>
 </plist>

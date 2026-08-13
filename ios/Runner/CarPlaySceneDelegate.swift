@@ -152,6 +152,7 @@ private final class CarPlayHomeViewController: UIViewController {
   private let statusLabel = UILabel()
   private let grid = UIStackView()
   private let nowPlayingBar = CarPlayNowPlayingBar()
+  private var didLogLayout = false
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -167,25 +168,37 @@ private final class CarPlayHomeViewController: UIViewController {
     CarPlayDiagnosticLog.write("PRIVATE_UI home_view_did_appear")
   }
 
+  override func viewDidLayoutSubviews() {
+    super.viewDidLayoutSubviews()
+    guard !didLogLayout else { return }
+    didLogLayout = true
+    CarPlayDiagnosticLog.write(
+      "PRIVATE_UI layout bounds=\(view.bounds) safe=\(view.safeAreaInsets) scale=\(view.window?.screen.scale ?? 0)"
+    )
+  }
+
   private func buildLayout() {
     titleLabel.text = "音乐"
-    titleLabel.font = .systemFont(ofSize: 34, weight: .bold)
+    titleLabel.font = .systemFont(ofSize: 20, weight: .bold)
     titleLabel.textColor = .white
 
     statusLabel.text = "正在连接音乐库"
-    statusLabel.font = .systemFont(ofSize: 15, weight: .medium)
+    statusLabel.font = .systemFont(ofSize: 11, weight: .medium)
     statusLabel.textColor = UIColor.white.withAlphaComponent(0.62)
+    statusLabel.textAlignment = .right
+    statusLabel.lineBreakMode = .byTruncatingTail
 
     let heading = UIStackView(arrangedSubviews: [titleLabel, statusLabel])
-    heading.axis = .vertical
-    heading.spacing = 3
+    heading.axis = .horizontal
+    heading.alignment = .center
+    heading.spacing = 12
 
     grid.axis = .vertical
-    grid.spacing = 12
+    grid.spacing = 4
     for pairStart in stride(from: 0, to: collections.count, by: 2) {
       let row = UIStackView()
       row.axis = .horizontal
-      row.spacing = 12
+      row.spacing = 6
       row.distribution = .fillEqually
       for index in pairStart..<min(pairStart + 2, collections.count) {
         let button = CarPlayCollectionButton(collection: collections[index])
@@ -208,25 +221,23 @@ private final class CarPlayHomeViewController: UIViewController {
       }
     }
 
-    [heading, grid, nowPlayingBar].forEach {
-      $0.translatesAutoresizingMaskIntoConstraints = false
-      view.addSubview($0)
-    }
+    let content = UIStackView(arrangedSubviews: [heading, grid, nowPlayingBar])
+    content.axis = .vertical
+    content.spacing = 0
+    content.setCustomSpacing(6, after: heading)
+    content.setCustomSpacing(8, after: grid)
+    content.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(content)
 
     NSLayoutConstraint.activate([
-      heading.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 18),
-      heading.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 28),
-      heading.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -28),
-
-      grid.topAnchor.constraint(equalTo: heading.bottomAnchor, constant: 18),
-      grid.leadingAnchor.constraint(equalTo: heading.leadingAnchor),
-      grid.trailingAnchor.constraint(equalTo: heading.trailingAnchor),
-
-      nowPlayingBar.leadingAnchor.constraint(equalTo: heading.leadingAnchor),
-      nowPlayingBar.trailingAnchor.constraint(equalTo: heading.trailingAnchor),
-      nowPlayingBar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -14),
-      nowPlayingBar.heightAnchor.constraint(equalToConstant: 78),
-      grid.bottomAnchor.constraint(lessThanOrEqualTo: nowPlayingBar.topAnchor, constant: -16),
+      content.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 16),
+      content.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16),
+      content.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
+      content.topAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor, constant: 6),
+      content.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -6),
+      heading.heightAnchor.constraint(equalToConstant: 24),
+      grid.heightAnchor.constraint(equalToConstant: 84),
+      nowPlayingBar.heightAnchor.constraint(equalToConstant: 52),
     ])
   }
 
@@ -284,16 +295,18 @@ private final class CarPlayCollectionButton: UIControl {
     let title = UILabel()
     title.text = collection.title
     title.textColor = .white
-    title.font = .systemFont(ofSize: 21, weight: .semibold)
+    title.font = .systemFont(ofSize: 14, weight: .semibold)
+    title.lineBreakMode = .byTruncatingTail
 
     let subtitle = UILabel()
     subtitle.text = collection.subtitle
     subtitle.textColor = UIColor.white.withAlphaComponent(0.55)
-    subtitle.font = .systemFont(ofSize: 13, weight: .regular)
+    subtitle.font = .systemFont(ofSize: 9, weight: .regular)
+    subtitle.lineBreakMode = .byTruncatingTail
 
     let labels = UIStackView(arrangedSubviews: [title, subtitle])
     labels.axis = .vertical
-    labels.spacing = 3
+    labels.spacing = 1
 
     [icon, labels].forEach {
       $0.isUserInteractionEnabled = false
@@ -302,13 +315,13 @@ private final class CarPlayCollectionButton: UIControl {
     }
 
     NSLayoutConstraint.activate([
-      heightAnchor.constraint(equalToConstant: 78),
-      icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
+      heightAnchor.constraint(equalToConstant: 40),
+      icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
       icon.centerYAnchor.constraint(equalTo: centerYAnchor),
-      icon.widthAnchor.constraint(equalToConstant: 30),
-      icon.heightAnchor.constraint(equalToConstant: 30),
-      labels.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 14),
-      labels.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+      icon.widthAnchor.constraint(equalToConstant: 18),
+      icon.heightAnchor.constraint(equalToConstant: 18),
+      labels.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 8),
+      labels.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
       labels.centerYAnchor.constraint(equalTo: centerYAnchor),
     ])
   }
@@ -336,17 +349,17 @@ private final class CarPlayNowPlayingBar: UIView {
 
     titleLabel.text = "暂无播放"
     titleLabel.textColor = .white
-    titleLabel.font = .systemFont(ofSize: 18, weight: .semibold)
+    titleLabel.font = .systemFont(ofSize: 14, weight: .semibold)
     titleLabel.lineBreakMode = .byTruncatingTail
 
     artistLabel.text = "选择歌曲开始播放"
     artistLabel.textColor = UIColor.white.withAlphaComponent(0.56)
-    artistLabel.font = .systemFont(ofSize: 13)
+    artistLabel.font = .systemFont(ofSize: 9)
     artistLabel.lineBreakMode = .byTruncatingTail
 
     let labels = UIStackView(arrangedSubviews: [titleLabel, artistLabel])
     labels.axis = .vertical
-    labels.spacing = 3
+    labels.spacing = 1
 
     let previous = controlButton(symbol: "backward.fill", action: #selector(previousTapped))
     playButton.setImage(UIImage(systemName: "play.fill"), for: .normal)
@@ -355,7 +368,7 @@ private final class CarPlayNowPlayingBar: UIView {
     let next = controlButton(symbol: "forward.fill", action: #selector(nextTapped))
     let controls = UIStackView(arrangedSubviews: [previous, playButton, next])
     controls.axis = .horizontal
-    controls.spacing = 16
+    controls.spacing = 8
     controls.distribution = .fillEqually
 
     [labels, controls].forEach {
@@ -363,13 +376,13 @@ private final class CarPlayNowPlayingBar: UIView {
       addSubview($0)
     }
     NSLayoutConstraint.activate([
-      labels.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
+      labels.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
       labels.centerYAnchor.constraint(equalTo: centerYAnchor),
-      labels.trailingAnchor.constraint(lessThanOrEqualTo: controls.leadingAnchor, constant: -12),
-      controls.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
+      labels.trailingAnchor.constraint(lessThanOrEqualTo: controls.leadingAnchor, constant: -8),
+      controls.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
       controls.centerYAnchor.constraint(equalTo: centerYAnchor),
-      controls.widthAnchor.constraint(equalToConstant: 150),
-      controls.heightAnchor.constraint(equalToConstant: 48),
+      controls.widthAnchor.constraint(equalToConstant: 108),
+      controls.heightAnchor.constraint(equalToConstant: 36),
     ])
   }
 
@@ -423,7 +436,7 @@ private class CarPlayBaseListViewController: UIViewController, UITableViewDataSo
     let title = UILabel()
     title.text = heading
     title.textColor = .white
-    title.font = .systemFont(ofSize: 28, weight: .bold)
+    title.font = .systemFont(ofSize: 18, weight: .bold)
 
     let header = UIStackView(arrangedSubviews: [back, title])
     header.axis = .horizontal
@@ -434,7 +447,7 @@ private class CarPlayBaseListViewController: UIViewController, UITableViewDataSo
     tableView.separatorColor = UIColor.white.withAlphaComponent(0.12)
     tableView.dataSource = self
     tableView.delegate = self
-    tableView.rowHeight = 66
+    tableView.rowHeight = 44
     tableView.tableFooterView = UIView()
 
     [header, tableView].forEach {
@@ -442,14 +455,14 @@ private class CarPlayBaseListViewController: UIViewController, UITableViewDataSo
       view.addSubview($0)
     }
     NSLayoutConstraint.activate([
-      header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
-      header.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 18),
-      header.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -18),
-      header.heightAnchor.constraint(equalToConstant: 48),
-      tableView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 10),
-      tableView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 20),
-      tableView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -20),
-      tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+      header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 4),
+      header.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 10),
+      header.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -10),
+      header.heightAnchor.constraint(equalToConstant: 32),
+      tableView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 2),
+      tableView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
+      tableView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
+      tableView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
     ])
   }
 
@@ -468,10 +481,10 @@ private class CarPlayBaseListViewController: UIViewController, UITableViewDataSo
     cell.backgroundColor = .clear
     cell.textLabel?.text = title
     cell.textLabel?.textColor = .white
-    cell.textLabel?.font = .systemFont(ofSize: 18, weight: .semibold)
+    cell.textLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
     cell.detailTextLabel?.text = detail
     cell.detailTextLabel?.textColor = UIColor.white.withAlphaComponent(0.52)
-    cell.detailTextLabel?.font = .systemFont(ofSize: 13)
+    cell.detailTextLabel?.font = .systemFont(ofSize: 9)
     cell.accessoryType = .disclosureIndicator
     cell.tintColor = UIColor.white.withAlphaComponent(0.45)
   }
