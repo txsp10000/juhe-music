@@ -18,6 +18,7 @@ import Darwin
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    CarPlayDiagnosticLog.writeLaunchSummary()
     let session = AVAudioSession.sharedInstance()
     do {
       try session.setCategory(.playback, mode: .default, policy: .longFormAudio)
@@ -31,6 +32,7 @@ import Darwin
   }
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
+    CarPlayDiagnosticLog.write("FLUTTER_ENGINE initialized")
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     let messenger = engineBridge.applicationRegistrar.messenger()
     setupNowPlayingChannel(messenger: messenger)
@@ -198,16 +200,22 @@ import Darwin
     )
     diagnosticsChannel = channel
     channel.setMethodCallHandler { (call, result) in
-      guard let args = call.arguments as? [String: Any] else {
-        result(FlutterError(code: "invalid_arguments", message: "Missing arguments", details: nil))
-        return
-      }
       switch call.method {
+      case "readCarPlayLog":
+        result(CarPlayDiagnosticLog.read())
+      case "clearCarPlayLog":
+        CarPlayDiagnosticLog.clear()
+        result(nil)
       case "log":
+        guard let args = call.arguments as? [String: Any] else {
+          result(FlutterError(code: "invalid_arguments", message: "Missing arguments", details: nil))
+          return
+        }
         NSLog("AudioCacheService: %@", args["message"] as? String ?? "")
         result(nil)
       case "decryptAudioFile":
-        guard let path = args["path"] as? String,
+        guard let args = call.arguments as? [String: Any],
+              let path = args["path"] as? String,
               let keyHex = args["keyHex"] as? String,
               let table = args["sampleTable"] as? FlutterStandardTypedData else {
           result(FlutterError(

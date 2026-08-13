@@ -18,6 +18,7 @@ final class CarPlayBridge {
 
   func configure(messenger: FlutterBinaryMessenger) {
     guard channel == nil else { return }
+    CarPlayDiagnosticLog.write("BRIDGE configure pending=\(pendingInvocations.count)")
     channel = FlutterMethodChannel(
       name: "com.music/carplay",
       binaryMessenger: messenger
@@ -39,6 +40,7 @@ final class CarPlayBridge {
     completion: @escaping (Any?, Error?) -> Void
   ) {
     guard let channel else {
+      CarPlayDiagnosticLog.write("BRIDGE queue method=\(method)")
       pendingInvocations.append(
         PendingInvocation(
           method: method,
@@ -48,6 +50,7 @@ final class CarPlayBridge {
       )
       return
     }
+    CarPlayDiagnosticLog.write("BRIDGE invoke method=\(method)")
     channel.invokeMethod(method, arguments: arguments) { result in
       if let error = result as? FlutterError {
         completion(nil, CarPlayBridgeError.flutter(error.message))
@@ -69,16 +72,30 @@ private enum CarPlayBridgeError: LocalizedError {
   }
 }
 
-final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
+@objc final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   private weak var interfaceController: CPInterfaceController?
   private var rootTemplate: CPListTemplate?
   private var searchResults: [[String: Any]] = []
   private var searchGeneration = 0
 
+  override init() {
+    super.init()
+    CarPlayDiagnosticLog.write("SCENE_DELEGATE initialized")
+  }
+
+  func sceneWillEnterForeground(_ scene: UIScene) {
+    CarPlayDiagnosticLog.write("SCENE willEnterForeground")
+  }
+
+  func sceneDidBecomeActive(_ scene: UIScene) {
+    CarPlayDiagnosticLog.write("SCENE didBecomeActive root=\(interfaceController?.rootTemplate != nil)")
+  }
+
   func templateApplicationScene(
     _ templateApplicationScene: CPTemplateApplicationScene,
     didConnect interfaceController: CPInterfaceController
   ) {
+    CarPlayDiagnosticLog.write("DID_CONNECT interfaceController received")
     self.interfaceController = interfaceController
     installRootTemplate(on: interfaceController)
   }
@@ -87,6 +104,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     _ templateApplicationScene: CPTemplateApplicationScene,
     didDisconnectInterfaceController interfaceController: CPInterfaceController
   ) {
+    CarPlayDiagnosticLog.write("DID_DISCONNECT")
     self.interfaceController = nil
     rootTemplate = nil
     searchResults = []
@@ -99,11 +117,13 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
       sections: makeRootSections()
     )
     rootTemplate = root
+    CarPlayDiagnosticLog.write("SET_ROOT begin type=CPListTemplate sections=2 items=6")
     interfaceController.setRootTemplate(root, animated: false) { [weak self, weak root] success, error in
       if let error {
-        NSLog("CarPlay: failed to install root template: %@", error.localizedDescription)
+        CarPlayDiagnosticLog.write("SET_ROOT failed error=\(error.localizedDescription)")
         return
       }
+      CarPlayDiagnosticLog.write("SET_ROOT completed success=\(success)")
       guard success, let self, let root, self.rootTemplate === root else { return }
       self.refreshLibrary()
     }
