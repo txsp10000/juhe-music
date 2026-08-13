@@ -58,7 +58,8 @@ jobs:
       - name: Build unsigned iOS release
         run: |
           set -o pipefail
-          flutter build ios --release --no-codesign 2>&1 | tee ios-build.log
+          flutter build ios --release --no-codesign \
+            --build-number "$GITHUB_RUN_NUMBER" 2>&1 | tee ios-build.log
 
       - name: Sign app with CarPlay entitlement
         run: |
@@ -68,6 +69,10 @@ jobs:
             echo "Runner.app was not found after the iOS build" >&2
             exit 1
           fi
+
+          /usr/libexec/PlistBuddy \
+            -c "Add :CarPlayDiagnosticRevision string $GITHUB_SHA" \
+            "$app_path/Info.plist"
 
           while IFS= read -r -d '' component; do
             codesign --force --sign - "$component"
@@ -101,15 +106,16 @@ jobs:
           fi
           mkdir -p build/ios/ipa/Payload
           ditto "$app_path" build/ios/ipa/Payload/Runner.app
-          (cd build/ios/ipa && zip -qry JuheMusic-iOS-CarPlay-TrollStore.ipa Payload)
+          ipa_name="JuheMusic-iOS-CarPlay-${GITHUB_RUN_NUMBER}.ipa"
+          (cd build/ios/ipa && zip -qry "$ipa_name" Payload)
           rm -rf build/ios/ipa/Payload
 
       - name: Upload iOS build
         uses: actions/upload-artifact@v4
         with:
-          name: JuheMusic-iOS-CarPlay-TrollStore
+          name: JuheMusic-iOS-CarPlay-${{ github.run_number }}
           path: |
-            build/ios/ipa/JuheMusic-iOS-CarPlay-TrollStore.ipa
+            build/ios/ipa/JuheMusic-iOS-CarPlay-${{ github.run_number }}.ipa
             build/ios/ipa/embedded-entitlements.plist
           if-no-files-found: error
           retention-days: 30

@@ -81,9 +81,10 @@ import UIKit
     let info = Bundle.main.infoDictionary ?? [:]
     let version = info["CFBundleShortVersionString"] as? String ?? "?"
     let build = info["CFBundleVersion"] as? String ?? "?"
+    let revision = info["CarPlayDiagnosticRevision"] as? String ?? "local"
     let manifest = info["UIApplicationSceneManifest"] as? [String: Any]
     let configurations = manifest?["UISceneConfigurations"] as? [String: Any]
     let roles = configurations?.keys.sorted().joined(separator: ", ") ?? "none"
-    write("APP_LAUNCH version=\(version)(\(build)) iOS=\(UIDevice.current.systemVersion) roles=\(roles)")
+    write("APP_LAUNCH version=\(version)(\(build)) revision=\(revision) logic=templateDidAppear-v1 iOS=\(UIDevice.current.systemVersion) roles=\(roles)")
   }
 }
