@@ -60,24 +60,57 @@ jobs:
           set -o pipefail
           flutter build ios --release --no-codesign 2>&1 | tee ios-build.log
 
-      - name: Package unsigned IPA
+      - name: Sign app with CarPlay entitlement
         run: |
+          set -euo pipefail
           app_path=$(find build/ios -type d -name Runner.app -path '*iphoneos*' -print -quit)
           if [ -z "$app_path" ]; then
             echo "Runner.app was not found after the iOS build" >&2
             exit 1
           fi
-          rm -rf build/ios/ipa
+
+          while IFS= read -r -d '' component; do
+            codesign --force --sign - "$component"
+          done < <(find "$app_path" -depth \
+            \( -type d \( -name '*.framework' -o -name '*.appex' \) \
+            -o -type f -name '*.dylib' \) -print0)
+
+          codesign --force --sign - \
+            --entitlements ios/Runner/Runner.entitlements \
+            "$app_path"
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+
+          mkdir -p build/ios/ipa
+          codesign -d --entitlements :- "$app_path" \
+            > build/ios/ipa/embedded-entitlements.plist
+          carplay_enabled=$(/usr/libexec/PlistBuddy \
+            -c 'Print :com.apple.developer.carplay-audio' \
+            build/ios/ipa/embedded-entitlements.plist)
+          if [ "$carplay_enabled" != "true" ]; then
+            echo "CarPlay audio entitlement is missing from Runner.app" >&2
+            exit 1
+          fi
+
+      - name: Package CarPlay IPA
+        run: |
+          set -euo pipefail
+          app_path=$(find build/ios -type d -name Runner.app -path '*iphoneos*' -print -quit)
+          if [ -z "$app_path" ]; then
+            echo "Runner.app was not found after the iOS build" >&2
+            exit 1
+          fi
           mkdir -p build/ios/ipa/Payload
           ditto "$app_path" build/ios/ipa/Payload/Runner.app
-          (cd build/ios/ipa && zip -qry JuheMusic-iOS-unsigned.ipa Payload)
+          (cd build/ios/ipa && zip -qry JuheMusic-iOS-CarPlay-TrollStore.ipa Payload)
           rm -rf build/ios/ipa/Payload
 
       - name: Upload iOS build
         uses: actions/upload-artifact@v4
         with:
-          name: JuheMusic-iOS-unsigned
-          path: build/ios/ipa/JuheMusic-iOS-unsigned.ipa
+          name: JuheMusic-iOS-CarPlay-TrollStore
+          path: |
+            build/ios/ipa/JuheMusic-iOS-CarPlay-TrollStore.ipa
+            build/ios/ipa/embedded-entitlements.plist
           if-no-files-found: error
           retention-days: 30
 
