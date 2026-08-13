@@ -73,11 +73,12 @@ private enum CarPlayBridgeError: LocalizedError {
 }
 
 @objc final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
-  private weak var interfaceController: CPInterfaceController?
+  private var interfaceController: CPInterfaceController?
   private var rootTemplate: CPListTemplate?
   private var searchResults: [[String: Any]] = []
   private var searchGeneration = 0
-  private var libraryRefreshScheduled = false
+  private var rootDidAppear = false
+  private var libraryRefreshStarted = false
 
   override init() {
     super.init()
@@ -90,7 +91,6 @@ private enum CarPlayBridgeError: LocalizedError {
 
   func sceneDidBecomeActive(_ scene: UIScene) {
     CarPlayDiagnosticLog.write("SCENE didBecomeActive root=\(interfaceController?.rootTemplate != nil)")
-    scheduleLibraryRefresh()
   }
 
   func templateApplicationScene(
@@ -99,6 +99,7 @@ private enum CarPlayBridgeError: LocalizedError {
   ) {
     CarPlayDiagnosticLog.write("DID_CONNECT interfaceController received")
     self.interfaceController = interfaceController
+    interfaceController.delegate = self
     installRootTemplate(on: interfaceController)
   }
 
@@ -107,9 +108,11 @@ private enum CarPlayBridgeError: LocalizedError {
     didDisconnectInterfaceController interfaceController: CPInterfaceController
   ) {
     CarPlayDiagnosticLog.write("DID_DISCONNECT")
+    interfaceController.delegate = nil
     self.interfaceController = nil
     rootTemplate = nil
-    libraryRefreshScheduled = false
+    rootDidAppear = false
+    libraryRefreshStarted = false
     searchResults = []
     searchGeneration += 1
   }
@@ -183,23 +186,19 @@ private enum CarPlayBridgeError: LocalizedError {
     ])]
   }
 
-  private func scheduleLibraryRefresh() {
-    guard !libraryRefreshScheduled else { return }
-    libraryRefreshScheduled = true
-    CarPlayDiagnosticLog.write("REFRESH_LIBRARY scheduled delay=0.8s")
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
-      guard let self,
-            let root = self.rootTemplate,
-            let installedRoot = self.interfaceController?.rootTemplate,
-            installedRoot === root else {
-        CarPlayDiagnosticLog.write("REFRESH_LIBRARY skipped root_not_attached")
-        return
-      }
-      CarPlayDiagnosticLog.write("REFRESH_LIBRARY begin")
-      root.updateSections(self.makeRootSections())
-      CarPlayDiagnosticLog.write("REFRESH_LIBRARY static_sections_applied")
-      self.refreshLibrary()
+  private func startLibraryRefreshAfterRootAppears() {
+    guard rootDidAppear, !libraryRefreshStarted else { return }
+    guard let root = rootTemplate,
+          let installedRoot = interfaceController?.rootTemplate,
+          installedRoot === root else {
+      CarPlayDiagnosticLog.write("REFRESH_LIBRARY skipped root_not_attached")
+      return
     }
+    libraryRefreshStarted = true
+    CarPlayDiagnosticLog.write("REFRESH_LIBRARY begin after_root_appeared")
+    root.updateSections(makeRootSections())
+    CarPlayDiagnosticLog.write("REFRESH_LIBRARY static_sections_applied")
+    refreshLibrary()
   }
 
   private func collectionItem(
@@ -386,6 +385,36 @@ private enum CarPlayBridgeError: LocalizedError {
   private func countText(_ count: Int?) -> String {
     guard let count else { return "正在同步…" }
     return count == 0 ? "暂无歌曲" : "\(count) 首歌曲"
+  }
+}
+
+extension CarPlaySceneDelegate: CPInterfaceControllerDelegate {
+  func templateWillAppear(_ aTemplate: CPTemplate, animated: Bool) {
+    CarPlayDiagnosticLog.write(
+      "TEMPLATE willAppear type=\(String(describing: type(of: aTemplate))) animated=\(animated)"
+    )
+  }
+
+  func templateDidAppear(_ aTemplate: CPTemplate, animated: Bool) {
+    let isRoot = aTemplate === rootTemplate
+    CarPlayDiagnosticLog.write(
+      "TEMPLATE didAppear type=\(String(describing: type(of: aTemplate))) root=\(isRoot)"
+    )
+    guard isRoot else { return }
+    rootDidAppear = true
+    startLibraryRefreshAfterRootAppears()
+  }
+
+  func templateWillDisappear(_ aTemplate: CPTemplate, animated: Bool) {
+    CarPlayDiagnosticLog.write(
+      "TEMPLATE willDisappear type=\(String(describing: type(of: aTemplate)))"
+    )
+  }
+
+  func templateDidDisappear(_ aTemplate: CPTemplate, animated: Bool) {
+    CarPlayDiagnosticLog.write(
+      "TEMPLATE didDisappear type=\(String(describing: type(of: aTemplate)))"
+    )
   }
 }
 
