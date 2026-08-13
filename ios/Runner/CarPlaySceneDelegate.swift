@@ -77,6 +77,7 @@ private enum CarPlayBridgeError: LocalizedError {
   private var rootTemplate: CPListTemplate?
   private var searchResults: [[String: Any]] = []
   private var searchGeneration = 0
+  private var libraryRefreshScheduled = false
 
   override init() {
     super.init()
@@ -89,6 +90,7 @@ private enum CarPlayBridgeError: LocalizedError {
 
   func sceneDidBecomeActive(_ scene: UIScene) {
     CarPlayDiagnosticLog.write("SCENE didBecomeActive root=\(interfaceController?.rootTemplate != nil)")
+    scheduleLibraryRefresh()
   }
 
   func templateApplicationScene(
@@ -107,6 +109,7 @@ private enum CarPlayBridgeError: LocalizedError {
     CarPlayDiagnosticLog.write("DID_DISCONNECT")
     self.interfaceController = nil
     rootTemplate = nil
+    libraryRefreshScheduled = false
     searchResults = []
     searchGeneration += 1
   }
@@ -114,19 +117,14 @@ private enum CarPlayBridgeError: LocalizedError {
   private func installRootTemplate(on interfaceController: CPInterfaceController) {
     let root = CPListTemplate(
       title: "音乐",
-      sections: makeRootSections()
+      sections: [CPListSection(items: [
+        CPListItem(text: "CarPlay 已连接", detailText: "正在载入音乐库"),
+      ])]
     )
     rootTemplate = root
-    CarPlayDiagnosticLog.write("SET_ROOT begin type=CPListTemplate sections=2 items=6")
-    interfaceController.setRootTemplate(root, animated: false) { [weak self, weak root] success, error in
-      if let error {
-        CarPlayDiagnosticLog.write("SET_ROOT failed error=\(error.localizedDescription)")
-        return
-      }
-      CarPlayDiagnosticLog.write("SET_ROOT completed success=\(success)")
-      guard success, let self, let root, self.rootTemplate === root else { return }
-      self.refreshLibrary()
-    }
+    CarPlayDiagnosticLog.write("SET_ROOT begin type=CPListTemplate sections=1 items=1")
+    interfaceController.setRootTemplate(root, animated: false, completion: nil)
+    CarPlayDiagnosticLog.write("SET_ROOT dispatched installed=\(interfaceController.rootTemplate === root)")
   }
 
   private func makeRootSections(counts: [String: Int] = [:]) -> [CPListSection] {
@@ -163,34 +161,45 @@ private enum CarPlayBridgeError: LocalizedError {
       completion()
     }
 
-    return [
-      CPListSection(
-        items: [
-          collectionItem(
-            title: "最近播放",
-            detail: countText(counts["recent"]),
-            source: "recent"
-          ),
-          collectionItem(
-            title: "我的收藏",
-            detail: countText(counts["favorites"]),
-            source: "favorites"
-          ),
-          collectionItem(
-            title: "当前队列",
-            detail: countText(counts["queue"]),
-            source: "queue"
-          ),
-        ],
-        header: "音乐库",
-        sectionIndexTitle: nil
+    return [CPListSection(items: [
+      collectionItem(
+        title: "最近播放",
+        detail: countText(counts["recent"]),
+        source: "recent"
       ),
-      CPListSection(
-        items: [modes, search, nowPlaying],
-        header: "发现",
-        sectionIndexTitle: nil
+      collectionItem(
+        title: "我的收藏",
+        detail: countText(counts["favorites"]),
+        source: "favorites"
       ),
-    ]
+      collectionItem(
+        title: "当前队列",
+        detail: countText(counts["queue"]),
+        source: "queue"
+      ),
+      modes,
+      search,
+      nowPlaying,
+    ])]
+  }
+
+  private func scheduleLibraryRefresh() {
+    guard !libraryRefreshScheduled else { return }
+    libraryRefreshScheduled = true
+    CarPlayDiagnosticLog.write("REFRESH_LIBRARY scheduled delay=0.8s")
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+      guard let self,
+            let root = self.rootTemplate,
+            let installedRoot = self.interfaceController?.rootTemplate,
+            installedRoot === root else {
+        CarPlayDiagnosticLog.write("REFRESH_LIBRARY skipped root_not_attached")
+        return
+      }
+      CarPlayDiagnosticLog.write("REFRESH_LIBRARY begin")
+      root.updateSections(self.makeRootSections())
+      CarPlayDiagnosticLog.write("REFRESH_LIBRARY static_sections_applied")
+      self.refreshLibrary()
+    }
   }
 
   private func collectionItem(
