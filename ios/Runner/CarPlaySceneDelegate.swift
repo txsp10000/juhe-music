@@ -91,6 +91,12 @@ private enum CarPlayBridgeError: LocalizedError {
 
   func sceneDidBecomeActive(_ scene: UIScene) {
     CarPlayDiagnosticLog.write("SCENE didBecomeActive root=\(interfaceController?.rootTemplate != nil)")
+    guard rootTemplate == nil, let interfaceController else { return }
+    CarPlayDiagnosticLog.write("SET_ROOT scheduling after_scene_active")
+    DispatchQueue.main.async { [weak self, weak interfaceController] in
+      guard let self, let interfaceController, self.rootTemplate == nil else { return }
+      self.installRootTemplate(on: interfaceController)
+    }
   }
 
   func templateApplicationScene(
@@ -100,7 +106,6 @@ private enum CarPlayBridgeError: LocalizedError {
     CarPlayDiagnosticLog.write("DID_CONNECT interfaceController received")
     self.interfaceController = interfaceController
     interfaceController.delegate = self
-    installRootTemplate(on: interfaceController)
   }
 
   func templateApplicationScene(
@@ -125,8 +130,14 @@ private enum CarPlayBridgeError: LocalizedError {
       ])]
     )
     rootTemplate = root
-    CarPlayDiagnosticLog.write("SET_ROOT begin type=CPListTemplate sections=1 items=1")
-    interfaceController.setRootTemplate(root, animated: false, completion: nil)
+    CarPlayDiagnosticLog.write("SET_ROOT begin after_scene_active type=CPListTemplate sections=1 items=1")
+    interfaceController.setRootTemplate(root, animated: true) { success, error in
+      if let error {
+        CarPlayDiagnosticLog.write("SET_ROOT completion failed error=\(error.localizedDescription)")
+        return
+      }
+      CarPlayDiagnosticLog.write("SET_ROOT completion success=\(success)")
+    }
     CarPlayDiagnosticLog.write("SET_ROOT dispatched installed=\(interfaceController.rootTemplate === root)")
   }
 
