@@ -152,7 +152,15 @@ private final class CarPlayHomeViewController: UIViewController {
   private let statusLabel = UILabel()
   private let grid = UIStackView()
   private let nowPlayingBar = CarPlayNowPlayingBar()
-  private var didLogLayout = false
+  private var content: UIStackView?
+  private var heading: UIStackView?
+  private var contentTopConstraint: NSLayoutConstraint?
+  private var contentBottomConstraint: NSLayoutConstraint?
+  private var contentLeadingConstraint: NSLayoutConstraint?
+  private var contentTrailingConstraint: NSLayoutConstraint?
+  private var headingHeightConstraint: NSLayoutConstraint?
+  private var nowPlayingHeightConstraint: NSLayoutConstraint?
+  private var lastLayoutSize = CGSize.zero
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -170,11 +178,39 @@ private final class CarPlayHomeViewController: UIViewController {
 
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
-    guard !didLogLayout else { return }
-    didLogLayout = true
+    let safeSize = view.safeAreaLayoutGuide.layoutFrame.size
+    guard safeSize.width > 0, safeSize.height > 0, safeSize != lastLayoutSize else { return }
+    lastLayoutSize = safeSize
+    applyAdaptiveLayout(for: safeSize)
     CarPlayDiagnosticLog.write(
       "PRIVATE_UI layout bounds=\(view.bounds) safe=\(view.safeAreaInsets) scale=\(view.window?.screen.scale ?? 0)"
     )
+  }
+
+  private func applyAdaptiveLayout(for size: CGSize) {
+    guard let content, let heading else { return }
+    let heightScale = min(max(size.height / 240, 0.72), 2.0)
+    let horizontalInset = min(max(size.width * 0.025, 8), 32)
+    let verticalInset = min(max(size.height * 0.025, 2), 12)
+    let headingHeight = min(max(size.height * 0.12, 20), 48)
+    let nowPlayingHeight = min(max(size.height * 0.25, 42), 96)
+
+    contentTopConstraint?.constant = verticalInset
+    contentBottomConstraint?.constant = -verticalInset
+    contentLeadingConstraint?.constant = horizontalInset
+    contentTrailingConstraint?.constant = -horizontalInset
+    headingHeightConstraint?.constant = headingHeight
+    nowPlayingHeightConstraint?.constant = nowPlayingHeight
+
+    content.setCustomSpacing(min(max(size.height * 0.025, 3), 12), after: heading)
+    content.setCustomSpacing(min(max(size.height * 0.03, 4), 14), after: grid)
+    grid.spacing = min(max(size.height * 0.018, 3), 10)
+    grid.arrangedSubviews.compactMap { $0 as? UIStackView }.forEach { row in
+      row.spacing = min(max(size.width * 0.01, 4), 16)
+    }
+
+    titleLabel.font = .systemFont(ofSize: 20 * heightScale, weight: .bold)
+    statusLabel.font = .systemFont(ofSize: 11 * heightScale, weight: .medium)
   }
 
   private func buildLayout() {
@@ -192,13 +228,13 @@ private final class CarPlayHomeViewController: UIViewController {
     heading.axis = .horizontal
     heading.alignment = .center
     heading.spacing = 12
+    self.heading = heading
 
     grid.axis = .vertical
-    grid.spacing = 4
+    grid.distribution = .fillEqually
     for pairStart in stride(from: 0, to: collections.count, by: 2) {
       let row = UIStackView()
       row.axis = .horizontal
-      row.spacing = 6
       row.distribution = .fillEqually
       for index in pairStart..<min(pairStart + 2, collections.count) {
         let button = CarPlayCollectionButton(collection: collections[index])
@@ -224,20 +260,25 @@ private final class CarPlayHomeViewController: UIViewController {
     let content = UIStackView(arrangedSubviews: [heading, grid, nowPlayingBar])
     content.axis = .vertical
     content.spacing = 0
-    content.setCustomSpacing(6, after: heading)
-    content.setCustomSpacing(8, after: grid)
     content.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(content)
+    self.content = content
+
+    let top = content.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor)
+    let bottom = content.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
+    let leading = content.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor)
+    let trailing = content.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor)
+    let headingHeight = heading.heightAnchor.constraint(equalToConstant: 24)
+    let nowPlayingHeight = nowPlayingBar.heightAnchor.constraint(equalToConstant: 52)
+    contentTopConstraint = top
+    contentBottomConstraint = bottom
+    contentLeadingConstraint = leading
+    contentTrailingConstraint = trailing
+    headingHeightConstraint = headingHeight
+    nowPlayingHeightConstraint = nowPlayingHeight
 
     NSLayoutConstraint.activate([
-      content.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 16),
-      content.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16),
-      content.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
-      content.topAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor, constant: 6),
-      content.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -6),
-      heading.heightAnchor.constraint(equalToConstant: 24),
-      grid.heightAnchor.constraint(equalToConstant: 84),
-      nowPlayingBar.heightAnchor.constraint(equalToConstant: 52),
+      top, bottom, leading, trailing, headingHeight, nowPlayingHeight,
     ])
   }
 
@@ -283,28 +324,36 @@ private final class CarPlayHomeViewController: UIViewController {
 }
 
 private final class CarPlayCollectionButton: UIControl {
+  private let icon: UIImageView
+  private let titleLabel: UILabel
+  private let subtitleLabel: UILabel
+  private var iconLeadingConstraint: NSLayoutConstraint!
+  private var iconWidthConstraint: NSLayoutConstraint!
+  private var iconHeightConstraint: NSLayoutConstraint!
+  private var labelsLeadingConstraint: NSLayoutConstraint!
+  private var labelsTrailingConstraint: NSLayoutConstraint!
+  private var lastHeight: CGFloat = 0
+
   init(collection: CarPlayCollection) {
+    icon = UIImageView(image: UIImage(systemName: collection.symbol))
+    titleLabel = UILabel()
+    subtitleLabel = UILabel()
     super.init(frame: .zero)
     backgroundColor = UIColor.white.withAlphaComponent(0.075)
     layer.cornerRadius = 8
 
-    let icon = UIImageView(image: UIImage(systemName: collection.symbol))
     icon.tintColor = collection.tint
     icon.contentMode = .scaleAspectFit
 
-    let title = UILabel()
-    title.text = collection.title
-    title.textColor = .white
-    title.font = .systemFont(ofSize: 14, weight: .semibold)
-    title.lineBreakMode = .byTruncatingTail
+    titleLabel.text = collection.title
+    titleLabel.textColor = .white
+    titleLabel.lineBreakMode = .byTruncatingTail
 
-    let subtitle = UILabel()
-    subtitle.text = collection.subtitle
-    subtitle.textColor = UIColor.white.withAlphaComponent(0.55)
-    subtitle.font = .systemFont(ofSize: 9, weight: .regular)
-    subtitle.lineBreakMode = .byTruncatingTail
+    subtitleLabel.text = collection.subtitle
+    subtitleLabel.textColor = UIColor.white.withAlphaComponent(0.55)
+    subtitleLabel.lineBreakMode = .byTruncatingTail
 
-    let labels = UIStackView(arrangedSubviews: [title, subtitle])
+    let labels = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])
     labels.axis = .vertical
     labels.spacing = 1
 
@@ -314,20 +363,38 @@ private final class CarPlayCollectionButton: UIControl {
       addSubview($0)
     }
 
+    iconLeadingConstraint = icon.leadingAnchor.constraint(equalTo: leadingAnchor)
+    iconWidthConstraint = icon.widthAnchor.constraint(equalToConstant: 18)
+    iconHeightConstraint = icon.heightAnchor.constraint(equalToConstant: 18)
+    labelsLeadingConstraint = labels.leadingAnchor.constraint(equalTo: icon.trailingAnchor)
+    labelsTrailingConstraint = labels.trailingAnchor.constraint(equalTo: trailingAnchor)
     NSLayoutConstraint.activate([
-      heightAnchor.constraint(equalToConstant: 40),
-      icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
+      iconLeadingConstraint,
       icon.centerYAnchor.constraint(equalTo: centerYAnchor),
-      icon.widthAnchor.constraint(equalToConstant: 18),
-      icon.heightAnchor.constraint(equalToConstant: 18),
-      labels.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 8),
-      labels.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+      iconWidthConstraint, iconHeightConstraint,
+      labelsLeadingConstraint, labelsTrailingConstraint,
       labels.centerYAnchor.constraint(equalTo: centerYAnchor),
     ])
   }
 
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
+  }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    guard bounds.height > 0, bounds.height != lastHeight else { return }
+    lastHeight = bounds.height
+    let scale = min(max(bounds.height / 40, 0.72), 2.0)
+    let inset = min(max(bounds.height * 0.25, 7), 20)
+    let iconSize = min(max(bounds.height * 0.45, 14), 36)
+    iconLeadingConstraint.constant = inset
+    iconWidthConstraint.constant = iconSize
+    iconHeightConstraint.constant = iconSize
+    labelsLeadingConstraint.constant = min(max(bounds.height * 0.2, 6), 16)
+    labelsTrailingConstraint.constant = -inset
+    titleLabel.font = .systemFont(ofSize: 14 * scale, weight: .semibold)
+    subtitleLabel.font = .systemFont(ofSize: 9 * scale, weight: .regular)
   }
 
   override var isHighlighted: Bool {
@@ -341,6 +408,13 @@ private final class CarPlayNowPlayingBar: UIView {
   private let titleLabel = UILabel()
   private let artistLabel = UILabel()
   private let playButton = UIButton(type: .system)
+  private var labelsLeadingConstraint: NSLayoutConstraint!
+  private var labelsTrailingConstraint: NSLayoutConstraint!
+  private var controlsTrailingConstraint: NSLayoutConstraint!
+  private var controlsWidthConstraint: NSLayoutConstraint!
+  private var controlsHeightConstraint: NSLayoutConstraint!
+  private var controls: UIStackView!
+  private var lastSize = CGSize.zero
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -366,7 +440,7 @@ private final class CarPlayNowPlayingBar: UIView {
     playButton.tintColor = .white
     playButton.addTarget(self, action: #selector(playTapped), for: .touchUpInside)
     let next = controlButton(symbol: "forward.fill", action: #selector(nextTapped))
-    let controls = UIStackView(arrangedSubviews: [previous, playButton, next])
+    controls = UIStackView(arrangedSubviews: [previous, playButton, next])
     controls.axis = .horizontal
     controls.spacing = 8
     controls.distribution = .fillEqually
@@ -375,19 +449,38 @@ private final class CarPlayNowPlayingBar: UIView {
       $0.translatesAutoresizingMaskIntoConstraints = false
       addSubview($0)
     }
+    labelsLeadingConstraint = labels.leadingAnchor.constraint(equalTo: leadingAnchor)
+    labelsTrailingConstraint = labels.trailingAnchor.constraint(lessThanOrEqualTo: controls.leadingAnchor)
+    controlsTrailingConstraint = controls.trailingAnchor.constraint(equalTo: trailingAnchor)
+    controlsWidthConstraint = controls.widthAnchor.constraint(equalToConstant: 108)
+    controlsHeightConstraint = controls.heightAnchor.constraint(equalToConstant: 36)
     NSLayoutConstraint.activate([
-      labels.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+      labelsLeadingConstraint,
       labels.centerYAnchor.constraint(equalTo: centerYAnchor),
-      labels.trailingAnchor.constraint(lessThanOrEqualTo: controls.leadingAnchor, constant: -8),
-      controls.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+      labelsTrailingConstraint, controlsTrailingConstraint,
       controls.centerYAnchor.constraint(equalTo: centerYAnchor),
-      controls.widthAnchor.constraint(equalToConstant: 108),
-      controls.heightAnchor.constraint(equalToConstant: 36),
+      controlsWidthConstraint, controlsHeightConstraint,
     ])
   }
 
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
+  }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    guard bounds.width > 0, bounds.height > 0, bounds.size != lastSize else { return }
+    lastSize = bounds.size
+    let scale = min(max(bounds.height / 52, 0.72), 2.0)
+    let horizontalInset = min(max(bounds.height * 0.22, 8), 24)
+    labelsLeadingConstraint.constant = horizontalInset
+    labelsTrailingConstraint.constant = -min(max(bounds.height * 0.15, 5), 16)
+    controlsTrailingConstraint.constant = -horizontalInset
+    controlsWidthConstraint.constant = min(max(bounds.width * 0.22, 90), 240)
+    controlsHeightConstraint.constant = min(max(bounds.height * 0.7, 30), 72)
+    controls.spacing = min(max(bounds.height * 0.15, 5), 16)
+    titleLabel.font = .systemFont(ofSize: 14 * scale, weight: .semibold)
+    artistLabel.font = .systemFont(ofSize: 9 * scale)
   }
 
   func refresh() {
@@ -414,6 +507,15 @@ private final class CarPlayNowPlayingBar: UIView {
 private class CarPlayBaseListViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
   let tableView = UITableView(frame: .zero, style: .plain)
   private let heading: String
+  private let headingLabel = UILabel()
+  private var headerTopConstraint: NSLayoutConstraint!
+  private var headerLeadingConstraint: NSLayoutConstraint!
+  private var headerTrailingConstraint: NSLayoutConstraint!
+  private var headerHeightConstraint: NSLayoutConstraint!
+  private var tableLeadingConstraint: NSLayoutConstraint!
+  private var tableTrailingConstraint: NSLayoutConstraint!
+  private var backWidthConstraint: NSLayoutConstraint!
+  private var lastLayoutSize = CGSize.zero
 
   init(title: String) {
     heading = title
@@ -433,37 +535,61 @@ private class CarPlayBaseListViewController: UIViewController, UITableViewDataSo
     back.tintColor = .white
     back.addTarget(self, action: #selector(close), for: .touchUpInside)
 
-    let title = UILabel()
-    title.text = heading
-    title.textColor = .white
-    title.font = .systemFont(ofSize: 18, weight: .bold)
+    headingLabel.text = heading
+    headingLabel.textColor = .white
+    headingLabel.font = .systemFont(ofSize: 18, weight: .bold)
 
-    let header = UIStackView(arrangedSubviews: [back, title])
+    let header = UIStackView(arrangedSubviews: [back, headingLabel])
     header.axis = .horizontal
     header.spacing = 14
-    back.widthAnchor.constraint(equalToConstant: 44).isActive = true
+    backWidthConstraint = back.widthAnchor.constraint(equalToConstant: 44)
+    backWidthConstraint.isActive = true
 
     tableView.backgroundColor = .clear
     tableView.separatorColor = UIColor.white.withAlphaComponent(0.12)
     tableView.dataSource = self
     tableView.delegate = self
-    tableView.rowHeight = 44
+    tableView.rowHeight = UITableView.automaticDimension
+    tableView.estimatedRowHeight = 44
     tableView.tableFooterView = UIView()
 
     [header, tableView].forEach {
       $0.translatesAutoresizingMaskIntoConstraints = false
       view.addSubview($0)
     }
+    headerTopConstraint = header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor)
+    headerLeadingConstraint = header.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor)
+    headerTrailingConstraint = header.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor)
+    headerHeightConstraint = header.heightAnchor.constraint(equalToConstant: 32)
+    tableLeadingConstraint = tableView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor)
+    tableTrailingConstraint = tableView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor)
     NSLayoutConstraint.activate([
-      header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 4),
-      header.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 10),
-      header.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -10),
-      header.heightAnchor.constraint(equalToConstant: 32),
+      headerTopConstraint, headerLeadingConstraint, headerTrailingConstraint, headerHeightConstraint,
       tableView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 2),
-      tableView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
-      tableView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
+      tableLeadingConstraint, tableTrailingConstraint,
       tableView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
     ])
+  }
+
+  override func viewDidLayoutSubviews() {
+    super.viewDidLayoutSubviews()
+    let size = view.safeAreaLayoutGuide.layoutFrame.size
+    guard size.width > 0, size.height > 0, size != lastLayoutSize else { return }
+    lastLayoutSize = size
+    let scale = min(max(size.height / 240, 0.72), 2.0)
+    let horizontalInset = min(max(size.width * 0.02, 6), 28)
+    let headerHeight = min(max(size.height * 0.16, 28), 64)
+    headerTopConstraint.constant = min(max(size.height * 0.015, 2), 10)
+    headerLeadingConstraint.constant = horizontalInset
+    headerTrailingConstraint.constant = -horizontalInset
+    headerHeightConstraint.constant = headerHeight
+    tableLeadingConstraint.constant = horizontalInset
+    tableTrailingConstraint.constant = -horizontalInset
+    backWidthConstraint.constant = headerHeight
+    headingLabel.font = .systemFont(ofSize: 18 * scale, weight: .bold)
+    tableView.rowHeight = min(max(size.height * 0.19, 38), 84)
+    tableView.reloadData()
+    CarPlayDiagnosticLog.write("PRIVATE_UI list_layout size=\(size) row=\(tableView.rowHeight)")
   }
 
   @objc private func close() { dismiss(animated: true) }
@@ -478,13 +604,14 @@ private class CarPlayBaseListViewController: UIViewController, UITableViewDataSo
   }
 
   func configureCell(_ cell: UITableViewCell, title: String, detail: String) {
+    let scale = min(max(view.safeAreaLayoutGuide.layoutFrame.height / 240, 0.72), 2.0)
     cell.backgroundColor = .clear
     cell.textLabel?.text = title
     cell.textLabel?.textColor = .white
-    cell.textLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
+    cell.textLabel?.font = .systemFont(ofSize: 14 * scale, weight: .semibold)
     cell.detailTextLabel?.text = detail
     cell.detailTextLabel?.textColor = UIColor.white.withAlphaComponent(0.52)
-    cell.detailTextLabel?.font = .systemFont(ofSize: 9)
+    cell.detailTextLabel?.font = .systemFont(ofSize: 9 * scale)
     cell.accessoryType = .disclosureIndicator
     cell.tintColor = UIColor.white.withAlphaComponent(0.45)
   }
