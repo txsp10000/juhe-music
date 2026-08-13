@@ -14,17 +14,39 @@ import UIKit
 
   private static var logURL: URL {
     FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+      .appendingPathComponent("CarPlay-Diagnostics.txt")
+  }
+
+  private static var legacyLogURL: URL {
+    FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
       .appendingPathComponent("carplay-diagnostics.log")
+  }
+
+  private static func prepareLogFile() {
+    let fileManager = FileManager.default
+    if !fileManager.fileExists(atPath: logURL.path),
+       fileManager.fileExists(atPath: legacyLogURL.path) {
+      try? fileManager.moveItem(at: legacyLogURL, to: logURL)
+    }
+    if !fileManager.fileExists(atPath: logURL.path) {
+      fileManager.createFile(
+        atPath: logURL.path,
+        contents: nil,
+        attributes: [.protectionKey: FileProtectionType.none]
+      )
+    } else {
+      try? fileManager.setAttributes(
+        [.protectionKey: FileProtectionType.none],
+        ofItemAtPath: logURL.path
+      )
+    }
   }
 
   @objc static func write(_ message: String) {
     NSLog("CarPlay diagnostic: %@", message)
     let line = "\(formatter.string(from: Date())) \(message)\n"
     queue.async {
-      let fileManager = FileManager.default
-      if !fileManager.fileExists(atPath: logURL.path) {
-        fileManager.createFile(atPath: logURL.path, contents: nil)
-      }
+      prepareLogFile()
       guard let handle = FileHandle(forWritingAtPath: logURL.path) else { return }
       defer { try? handle.close() }
       handle.seekToEndOfFile()
@@ -38,6 +60,7 @@ import UIKit
 
   @objc static func read() -> String {
     queue.sync {
+      prepareLogFile()
       guard let data = FileManager.default.contents(atPath: logURL.path),
             let contents = String(data: data, encoding: .utf8),
             !contents.isEmpty else {
@@ -50,6 +73,7 @@ import UIKit
   @objc static func clear() {
     queue.sync {
       try? FileManager.default.removeItem(at: logURL)
+      prepareLogFile()
     }
   }
 

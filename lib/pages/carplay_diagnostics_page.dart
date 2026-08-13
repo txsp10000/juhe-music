@@ -103,33 +103,48 @@ class _CarPlayDiagnosticsPageState extends State<CarPlayDiagnosticsPage> {
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(18, 6, 18, 18),
-                  child: GlassPanel(
-                    accent: accent,
-                    radius: 12,
-                    padding: const EdgeInsets.all(14),
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: SingleChildScrollView(
-                            child: SelectableText(
-                              _contents,
-                              style: const TextStyle(
-                                color: AppDesignTokens.warmWhite,
-                                fontSize: 12,
-                                height: 1.5,
-                                fontFamily: 'monospace',
-                                letterSpacing: 0,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        '文件 > 我的 iPhone > 音乐 > CarPlay-Diagnostics.txt',
+                        style: AppDesignTokens.caption(
+                          color:
+                              AppDesignTokens.warmWhite.withValues(alpha: 0.78),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: GlassPanel(
+                          accent: accent,
+                          radius: 12,
+                          padding: const EdgeInsets.all(14),
+                          child: Stack(
+                            children: [
+                              Positioned.fill(
+                                child: SingleChildScrollView(
+                                  child: SelectableText(
+                                    _contents,
+                                    style: const TextStyle(
+                                      color: AppDesignTokens.warmWhite,
+                                      fontSize: 12,
+                                      height: 1.5,
+                                      fontFamily: 'monospace',
+                                      letterSpacing: 0,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
+                              if (_loading)
+                                const Align(
+                                  alignment: Alignment.topCenter,
+                                  child: LinearProgressIndicator(minHeight: 2),
+                                ),
+                            ],
                           ),
                         ),
-                        if (_loading)
-                          const Align(
-                            alignment: Alignment.topCenter,
-                            child: LinearProgressIndicator(minHeight: 2),
-                          ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
