@@ -71,6 +71,7 @@ private enum CarPlayBridgeError: LocalizedError {
 
 final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   private weak var interfaceController: CPInterfaceController?
+  private var rootTemplate: CPListTemplate?
   private var searchResults: [[String: Any]] = []
   private var searchGeneration = 0
 
@@ -80,7 +81,6 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
   ) {
     self.interfaceController = interfaceController
     installRootTemplate(on: interfaceController)
-    refreshLibrary()
   }
 
   func templateApplicationScene(
@@ -88,28 +88,42 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     didDisconnectInterfaceController interfaceController: CPInterfaceController
   ) {
     self.interfaceController = nil
+    rootTemplate = nil
     searchResults = []
     searchGeneration += 1
   }
 
   private func installRootTemplate(on interfaceController: CPInterfaceController) {
-    let library = makeLibraryTemplate()
-    let modes = makeModesTemplate()
-    let search = makeSearchLauncherTemplate()
-    let nowPlaying = makeNowPlayingLauncherTemplate()
-
-    let root = CPTabBarTemplate(
-      templates: [library, modes, search, nowPlaying]
+    let root = CPListTemplate(
+      title: "音乐",
+      sections: makeRootSections()
     )
-    interfaceController.setRootTemplate(root, animated: false)
+    rootTemplate = root
+    interfaceController.setRootTemplate(root, animated: false) { [weak self, weak root] success, error in
+      if let error {
+        NSLog("CarPlay: failed to install root template: %@", error.localizedDescription)
+        return
+      }
+      guard success, let self, let root, self.rootTemplate === root else { return }
+      self.refreshLibrary()
+    }
   }
 
-  private func makeSearchLauncherTemplate() -> CPListTemplate {
-    let item = CPListItem(
+  private func makeRootSections(counts: [String: Int] = [:]) -> [CPListSection] {
+    let modes = CPListItem(
+      text: "听歌场景",
+      detailText: "按场景发现音乐"
+    )
+    modes.handler = { [weak self] _, completion in
+      self?.openModes()
+      completion()
+    }
+
+    let search = CPListItem(
       text: "搜索歌曲",
       detailText: "按歌曲名或歌手搜索"
     )
-    item.handler = { [weak self] _, completion in
+    search.handler = { [weak self] _, completion in
       guard let self else {
         completion()
         return
@@ -120,41 +134,18 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
       completion()
     }
 
-    let template = CPListTemplate(
-      title: "搜索",
-      sections: [CPListSection(items: [item])]
-    )
-    template.tabTitle = "搜索"
-    template.tabImage = UIImage(systemName: "magnifyingglass")
-    return template
-  }
-
-  private func makeNowPlayingLauncherTemplate() -> CPListTemplate {
-    let item = CPListItem(
+    let nowPlaying = CPListItem(
       text: "打开正在播放",
       detailText: "查看歌曲与播放控制"
     )
-    item.handler = { [weak self] _, completion in
+    nowPlaying.handler = { [weak self] _, completion in
       self?.showNowPlaying()
       completion()
     }
 
-    let template = CPListTemplate(
-      title: "正在播放",
-      sections: [CPListSection(items: [item])]
-    )
-    template.tabTitle = "正在播放"
-    template.tabImage = UIImage(systemName: "play.circle")
-    return template
-  }
-
-  private func makeLibraryTemplate(
-    counts: [String: Int] = [:]
-  ) -> CPListTemplate {
-    let template = CPListTemplate(
-      title: "音乐库",
-      sections: [
-        CPListSection(items: [
+    return [
+      CPListSection(
+        items: [
           collectionItem(
             title: "最近播放",
             detail: countText(counts["recent"]),
@@ -170,12 +161,16 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
             detail: countText(counts["queue"]),
             source: "queue"
           ),
-        ]),
-      ]
-    )
-    template.tabTitle = "音乐库"
-    template.tabImage = UIImage(systemName: "music.note.list")
-    return template
+        ],
+        header: "音乐库",
+        sectionIndexTitle: nil
+      ),
+      CPListSection(
+        items: [modes, search, nowPlaying],
+        header: "发现",
+        sectionIndexTitle: nil
+      ),
+    ]
   }
 
   private func collectionItem(
@@ -191,14 +186,13 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     return item
   }
 
-  private func makeModesTemplate() -> CPListTemplate {
+  private func openModes() {
     let loading = CPListItem(text: "正在加载听歌场景…", detailText: nil)
     let template = CPListTemplate(
       title: "听歌场景",
       sections: [CPListSection(items: [loading])]
     )
-    template.tabTitle = "听歌场景"
-    template.tabImage = UIImage(systemName: "sparkles")
+    interfaceController?.pushTemplate(template, animated: true)
 
     CarPlayBridge.shared.invoke("getModes") { [weak template] result, error in
       DispatchQueue.main.async {
@@ -224,7 +218,6 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         template.updateSections([CPListSection(items: items)])
       }
     }
-    return template
   }
 
   private func refreshLibrary() {
@@ -236,19 +229,12 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         "queue": (library["queue"] as? [Any])?.count ?? 0,
       ]
       DispatchQueue.main.async {
-        guard let root = self.interfaceController?.rootTemplate as? CPTabBarTemplate else {
+        guard let root = self.rootTemplate,
+              let installedRoot = self.interfaceController?.rootTemplate,
+              installedRoot === root else {
           return
         }
-        var templates = root.templates
-        guard !templates.isEmpty else { return }
-        let selectedIndex = templates.firstIndex {
-          $0 === root.selectedTemplate
-        } ?? 0
-        templates[0] = self.makeLibraryTemplate(counts: counts)
-        root.updateTemplates(templates)
-        if #available(iOS 17.0, *) {
-          root.selectTemplate(at: selectedIndex)
-        }
+        root.updateSections(self.makeRootSections(counts: counts))
       }
     }
   }
