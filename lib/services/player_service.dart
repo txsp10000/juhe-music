@@ -12,6 +12,7 @@ import 'audio_cache_service.dart';
 import 'cover_cache_service.dart';
 import 'theme_service.dart';
 import 'playback_history_service.dart';
+import 'app_environment.dart';
 
 enum PlaybackQueueSource { regular, favorites, listeningMode }
 
@@ -151,10 +152,21 @@ class PlayerService {
   double _volumeBeforeDucking = 100.0;
   int? _openedGeneration;
   int? _failedGeneration;
+  int? _cachedPlaybackGeneration;
+  int? _cachedRecoveryGeneration;
+  String? _cachedPlaybackPath;
+  bool _cachedPlayRequested = true;
+  int? _progressiveGeneration;
+  Future<AudioCacheResult>? _progressiveCacheFuture;
+  AudioCacheCancellationToken? _progressiveCacheCancellation;
+  int? _progressiveFallbackGeneration;
+  bool _progressivePlayRequested = true;
+  Duration? _progressiveResumePosition;
   Uint8List? _pendingThemeCover;
   int? _pendingThemeGeneration;
   bool _suppressCompletion = false;
   int _seekGeneration = 0;
+  Future<void> _mediaOperationTail = Future<void>.value();
 
   static Future<void> init() async {
     final instance = PlayerService();
@@ -193,7 +205,7 @@ class PlayerService {
           builder: () => _AudioPlayerTask(),
           config: const AudioServiceConfig(
             androidNotificationChannelId: 'com.music.channel',
-            androidNotificationChannelName: '三点音乐',
+            androidNotificationChannelName: '音乐',
             androidNotificationOngoing: false,
             androidStopForegroundOnPause: true,
             androidShowNotificationBadge: false,
@@ -241,7 +253,18 @@ class PlayerService {
     _errorSub = player.stream.error.listen((_) {
       final generation = _openedGeneration;
       if (generation != null) {
-        unawaited(_handlePlaybackFailure(generation, '播放失败，请重试'));
+        if (_cachedPlaybackGeneration == generation &&
+            _cachedPlaybackPath != null) {
+          unawaited(_recoverFromCachedPlayback(generation));
+        } else if (_cachedRecoveryGeneration == generation) {
+          return;
+        } else if (_progressiveGeneration == generation) {
+          unawaited(_fallbackFromProgressiveStream(generation));
+        } else if (_progressiveFallbackGeneration == generation) {
+          return;
+        } else {
+          unawaited(_handlePlaybackFailure(generation, '播放失败，请重试'));
+        }
       }
     });
   }
@@ -297,33 +320,57 @@ class PlayerService {
     await _androidAudioSession?.setActive(false);
   }
 
+  Future<bool> _activatePlaybackSession() async {
+    if (Platform.isIOS) {
+      try {
+        return await const MethodChannel('com.music/nowplaying')
+                .invokeMethod<bool>('setPlaybackSessionActive', true) ??
+            false;
+      } catch (_) {
+        return false;
+      }
+    }
+    return _activateAndroidAudioSession();
+  }
+
+  Future<void> _deactivatePlaybackSession() async {
+    if (Platform.isIOS) {
+      try {
+        await const MethodChannel('com.music/nowplaying')
+            .invokeMethod<void>('setPlaybackSessionActive', false);
+      } catch (_) {}
+      return;
+    }
+    await _deactivateAndroidAudioSession();
+  }
+
   void _onComplete() {
     if (_isSeeking || _suppressCompletion) return;
     if (_currentIndex < queue.length - 1) {
-      playAt(_currentIndex + 1);
+      unawaited(playAt(_currentIndex + 1));
     } else if (queue.isNotEmpty) {
       if (_activeMode != null) {
         unawaited(_loadMoreModeSongsAndPlay());
       } else {
-        playAt(0);
+        unawaited(playAt(0));
       }
     }
   }
 
-  void prev() {
-    if (queue.isEmpty) return;
+  Future<bool> prev() async {
+    if (queue.isEmpty) return false;
     final newIdx = _currentIndex > 0 ? _currentIndex - 1 : queue.length - 1;
-    playAt(newIdx);
+    return playAt(newIdx);
   }
 
-  void next() {
-    if (queue.isEmpty) return;
+  Future<bool> next() async {
+    if (queue.isEmpty) return false;
     if (_currentIndex < queue.length - 1) {
-      playAt(_currentIndex + 1);
+      return playAt(_currentIndex + 1);
     } else if (_activeMode != null) {
-      unawaited(_loadMoreModeSongsAndPlay());
+      return _loadMoreModeSongsAndPlay();
     } else {
-      playAt(0);
+      return playAt(0);
     }
   }
 
@@ -342,18 +389,28 @@ class PlayerService {
 
   void clearMode() => _activeMode = null;
 
-  Future<void> _loadMoreModeSongsAndPlay() async {
-    await loadMoreModeSongs(playNext: true);
+  Future<bool> _loadMoreModeSongsAndPlay() async {
+    final previousIndex = _currentIndex;
+    final addedCount = await loadMoreModeSongs();
+    if (addedCount <= 0 ||
+        _currentIndex != previousIndex ||
+        previousIndex >= queue.length - 1) {
+      return false;
+    }
+    return playAt(previousIndex + 1);
   }
 
-  Future<void> loadMoreModeSongs({bool playNext = false}) async {
+  Future<int> loadMoreModeSongs({
+    bool playNext = false,
+    bool throwOnError = false,
+  }) async {
     final mode = _activeMode;
-    if (mode == null || _loadingModeSongs) return;
+    if (mode == null || _loadingModeSongs) return 0;
     _loadingModeSongs = true;
     final previousLength = queue.length;
     try {
       final songs = await MusicApi.getModeTracks(sceneModeId: mode.sceneModeId);
-      if (!identical(_activeMode, mode) || songs.isEmpty) return;
+      if (!identical(_activeMode, mode) || songs.isEmpty) return 0;
       // Mode feeds may repeat items across requests. Keep the queue
       // stable while still allowing each scroll to contribute new songs.
       final existingIds = queue.map((song) => song.id).toSet();
@@ -363,8 +420,11 @@ class PlayerService {
           _currentIndex < queue.length - 1) {
         await playAt(_currentIndex + 1);
       }
+      return queue.length - previousLength;
     } catch (_) {
       // Keep the current song playable; a later next/completion retries.
+      if (throwOnError) rethrow;
+      return 0;
     } finally {
       _loadingModeSongs = false;
     }
@@ -378,6 +438,9 @@ class PlayerService {
     queue.removeAt(index);
 
     if (queue.isEmpty) {
+      _playGeneration++;
+      _cancelProgressiveCache();
+      _clearCachedPlaybackState();
       _activeMode = null;
       _queueSource = PlaybackQueueSource.regular;
       _currentIndex = -1;
@@ -385,13 +448,8 @@ class PlayerService {
       _position = Duration.zero;
       _duration = Duration.zero;
       _openedGeneration = null;
-      _suppressCompletion = true;
-      try {
-        await _player?.stop();
-      } finally {
-        _suppressCompletion = false;
-      }
-      await _deactivateAndroidAudioSession();
+      await _stopPlayerSerialized();
+      await _deactivatePlaybackSession();
       _notifyPlayStateChanged(false);
       _notifyDownloadProgress(null);
       return;
@@ -405,43 +463,58 @@ class PlayerService {
     }
   }
 
-  Future<void> togglePlayPause() async {
+  Future<bool> togglePlayPause() async {
     if (isPlaying) {
       await pause();
+      return true;
     } else {
-      await play();
+      return play();
     }
   }
 
-  Future<void> play() async {
+  Future<bool> play() async {
     if (_failedGeneration == _playGeneration &&
         _currentIndex >= 0 &&
         _currentIndex < queue.length) {
-      await playAt(_currentIndex);
-      return;
+      return playAt(_currentIndex);
     }
     _resumeAfterAndroidInterruption = false;
-    if (!await _activateAndroidAudioSession()) return;
+    if (_player == null || currentSong == null) return false;
+    if (!await _activatePlaybackSession()) return false;
+    if (_progressiveGeneration == _playGeneration ||
+        _progressiveFallbackGeneration == _playGeneration) {
+      _progressivePlayRequested = true;
+    }
+    if (_cachedPlaybackGeneration == _playGeneration ||
+        _cachedRecoveryGeneration == _playGeneration) {
+      _cachedPlayRequested = true;
+    }
     await _player?.play();
+    return true;
   }
 
   Future<void> pause() async {
     _resumeAfterAndroidInterruption = false;
+    if (_progressiveGeneration == _playGeneration ||
+        _progressiveFallbackGeneration == _playGeneration) {
+      _progressivePlayRequested = false;
+    }
+    if (_cachedPlaybackGeneration == _playGeneration ||
+        _cachedRecoveryGeneration == _playGeneration) {
+      _cachedPlayRequested = false;
+    }
     await _player?.pause();
-    await _deactivateAndroidAudioSession();
+    await _deactivatePlaybackSession();
   }
 
   Future<void> stop() async {
     _resumeAfterAndroidInterruption = false;
     _openedGeneration = null;
     _playGeneration++;
-    _suppressCompletion = true;
-    try {
-      await _player?.stop();
-    } finally {
-      _suppressCompletion = false;
-    }
-    await _deactivateAndroidAudioSession();
+    _cancelProgressiveCache();
+    _clearCachedPlaybackState();
+    await _stopPlayerSerialized();
+    await _deactivatePlaybackSession();
     _notifyDownloadProgress(null);
   }
 
@@ -450,6 +523,10 @@ class PlayerService {
   Future<void> seek(Duration position) async {
     final player = _player;
     if (player == null) return;
+    if (_progressiveGeneration == _playGeneration ||
+        _progressiveFallbackGeneration == _playGeneration) {
+      _progressiveResumePosition = position;
+    }
     final seekGeneration = ++_seekGeneration;
     _isSeeking = true;
     await player.seek(position);
@@ -470,30 +547,36 @@ class PlayerService {
     await seek(bounded);
   }
 
-  Future<void> playAt(int index, {bool play = true}) async {
-    if (index < 0 || index >= queue.length) return;
+  Future<bool> playAt(int index, {bool play = true}) async {
+    if (index < 0 || index >= queue.length) return false;
     if (_player == null) {
       try {
         await PlayerService.init();
       } catch (_) {
         _notifyPlaybackError('播放器初始化失败，请重新打开应用');
-        return;
+        return false;
       }
     }
     final player = _player;
     if (player == null) {
       _notifyPlaybackError('播放器初始化失败，请重新打开应用');
-      return;
+      return false;
     }
     _currentIndex = index;
     final song = queue[index];
     unawaited(PlaybackHistoryService.record(song));
     final currentGen = ++_playGeneration;
+    _cancelProgressiveCache();
+    _clearCachedPlaybackState();
     ThemeService.invalidateCover();
     _pendingThemeCover = null;
     _pendingThemeGeneration = null;
     _openedGeneration = null;
     _failedGeneration = null;
+    _progressiveGeneration = null;
+    _progressiveCacheFuture = null;
+    _progressiveFallbackGeneration = null;
+    _progressiveResumePosition = null;
     _notifyDownloadProgress(null);
     _position = Duration.zero;
     _duration = Duration.zero;
@@ -503,23 +586,17 @@ class PlayerService {
       id: song.id,
       title: song.name,
       artist: song.singer,
-      album: song.album.isNotEmpty ? song.album : '三点音乐',
+      album: song.album.isNotEmpty ? song.album : '音乐',
       artUri: song.cover.startsWith('file:') ? Uri.tryParse(song.cover) : null,
     );
     try {
       await _audioHandler?.updateMediaItem(_currentMediaItem!);
     } catch (_) {}
 
-    _suppressCompletion = true;
-    try {
-      await player.stop();
-    } catch (_) {
-    } finally {
-      _suppressCompletion = false;
-    }
+    await _stopPlayerSerialized();
     final coverCache = CoverCacheService();
     final localCover = await coverCache.getLocalPath(picId);
-    if (currentGen != _playGeneration) return;
+    if (currentGen != _playGeneration) return false;
     if (localCover != null) {
       song.cover = Uri.file(localCover).toString();
       _currentMediaItem =
@@ -533,7 +610,10 @@ class PlayerService {
     _notifySongChange(song);
 
     unawaited(_hydrateSongDetails(song, currentGen));
-    unawaited(_prepareAndPlayAudio(song, currentGen, play: play));
+    await _prepareAndPlayAudio(song, currentGen, play: play);
+    return currentGen == _playGeneration &&
+        _openedGeneration == currentGen &&
+        _failedGeneration != currentGen;
   }
 
   Future<void> _hydrateSongDetails(Song song, int generation) async {
@@ -638,18 +718,26 @@ class PlayerService {
     final player = _player;
     if (player == null) return;
     var quality = 0;
-    final cachedPath = await AudioCacheService().findBestCachedFile(song.id);
+    final cachedFile = await AudioCacheService().findBestCachedFile(song.id);
     if (generation != _playGeneration) return;
-    if (cachedPath != null) {
-      _currentPlayingBr = _extractBrFromPath(cachedPath);
-      await _openMedia(
-        Media(Uri.file(cachedPath).toString()),
+    if (cachedFile != null) {
+      _currentPlayingBr = _extractBrFromPath(cachedFile.path);
+      _cachedPlaybackGeneration = generation;
+      _cachedPlaybackPath = cachedFile.path;
+      _cachedPlayRequested = play;
+      final opened = await _openMedia(
+        Media(Uri.file(cachedFile.path).toString()),
         generation,
         play: play,
         resumePosition: resumePosition,
+        decryptionKey: cachedFile.decryptionKey,
+        reportFailure: false,
       );
+      if (generation != _playGeneration) return;
+      if (!opened) await _recoverFromCachedPlayback(generation);
       return;
     }
+    _clearCachedPlaybackState();
     StreamSelection? selection;
     try {
       selection = await MusicApi.resolveStream(song.id);
@@ -663,69 +751,277 @@ class PlayerService {
       return;
     }
 
+    final key = selection?.aesKeyHex.trim() ?? '';
+    if (key.isEmpty) {
+      await _handlePlaybackFailure(generation, '歌曲解密密钥无效，请重试');
+      return;
+    }
+
     _currentPlayingBr = quality;
-    _notifyDownloadProgress(0.0);
-    final cacheResult = await AudioCacheService().download(
+    final cacheCancellation = AudioCacheCancellationToken();
+    final cacheFuture = AudioCacheService().download(
       song.id,
       downloadUrl,
       br: quality,
       backupUrl: selection?.backupUrl,
-      aesKeyHex: selection?.aesKeyHex,
+      aesKeyHex: key,
+      cancellationToken: cacheCancellation,
       onProgress: (progress) {
-        if (generation == _playGeneration) {
+        if (generation == _playGeneration &&
+            _progressiveFallbackGeneration == generation) {
           _notifyDownloadProgress(progress);
         }
       },
       onPreparing: () {
-        if (generation == _playGeneration) {
+        if (generation == _playGeneration &&
+            _progressiveFallbackGeneration == generation) {
           _notifyDownloadProgress(-1.0);
         }
       },
     );
-    if (generation != _playGeneration) return;
-    final localPath = cacheResult.path;
-    if (localPath == null) {
-      final message = switch (cacheResult.failureStage) {
-        AudioCacheFailureStage.decrypt => '歌曲解密失败，请重试',
-        AudioCacheFailureStage.cacheWrite => '歌曲缓存失败，请检查存储空间',
-        AudioCacheFailureStage.setup => '歌曲缓存初始化失败，请重试',
-        _ => '歌曲下载失败，请检查网络后重试',
-      };
-      await _handlePlaybackFailure(generation, message);
-      return;
-    }
-    _notifyDownloadProgress(null);
-    _currentPlayingBr = _extractBrFromPath(localPath);
-    await _openMedia(
-      Media(Uri.file(localPath).toString()),
+    _progressiveGeneration = generation;
+    _progressiveCacheFuture = cacheFuture;
+    _progressiveCacheCancellation = cacheCancellation;
+    _progressivePlayRequested = play;
+    _progressiveResumePosition = resumePosition;
+    unawaited(_finishProgressiveCache(cacheFuture, generation));
+
+    final opened = await _openProgressiveMedia(
+      Media(
+        downloadUrl,
+        httpHeaders: const {'User-Agent': 'Mozilla/5.0'},
+      ),
+      key,
       generation,
       play: play,
       resumePosition: resumePosition,
     );
+    if (generation != _playGeneration) return;
+    if (!opened) await _fallbackFromProgressiveStream(generation);
   }
+
+  Future<void> _finishProgressiveCache(
+    Future<AudioCacheResult> future,
+    int generation,
+  ) async {
+    await future;
+    if (generation == _playGeneration && _progressiveGeneration == generation) {
+      _notifyDownloadProgress(null);
+      _progressiveCacheCancellation = null;
+    }
+  }
+
+  Future<bool> _openProgressiveMedia(
+    Media media,
+    String aesKeyHex,
+    int generation, {
+    required bool play,
+    Duration resumePosition = Duration.zero,
+  }) async {
+    return _openMedia(
+      media,
+      generation,
+      play: play,
+      resumePosition: resumePosition,
+      decryptionKey: aesKeyHex,
+      reportFailure: false,
+    );
+  }
+
+  Future<void> _fallbackFromProgressiveStream(int generation) async {
+    if (generation != _playGeneration ||
+        _progressiveGeneration != generation ||
+        _progressiveFallbackGeneration == generation) {
+      return;
+    }
+    _progressiveFallbackGeneration = generation;
+    _progressiveGeneration = null;
+    final cacheFuture = _progressiveCacheFuture;
+    _progressiveResumePosition = _position;
+    _notifyDownloadProgress(0.0);
+    try {
+      try {
+        await _player?.pause();
+      } catch (_) {}
+      final cacheResult = cacheFuture == null
+          ? const AudioCacheResult.failure(AudioCacheFailureStage.download)
+          : await cacheFuture;
+      if (generation != _playGeneration) return;
+      if (cacheResult.cancelled) {
+        await _handlePlaybackFailure(generation, '缓存已清理，流式播放失败，请重试');
+        return;
+      }
+      final localPath = cacheResult.path;
+      if (localPath == null) {
+        final message = switch (cacheResult.failureStage) {
+          AudioCacheFailureStage.cacheWrite => '歌曲缓存失败，请检查存储空间',
+          AudioCacheFailureStage.setup => '歌曲缓存初始化失败，请重试',
+          _ => '流式播放失败，请检查网络后重试',
+        };
+        await _handlePlaybackFailure(generation, message);
+        return;
+      }
+      _notifyDownloadProgress(null);
+      _currentPlayingBr = _extractBrFromPath(localPath);
+      final resumePosition = _progressiveResumePosition ?? _position;
+      await _openMedia(
+        Media(Uri.file(localPath).toString()),
+        generation,
+        play: _progressivePlayRequested,
+        resumePosition: resumePosition,
+        decryptionKey: cacheResult.decryptionKey,
+      );
+      if (generation == _playGeneration) {
+        _progressiveCacheFuture = null;
+        _progressiveCacheCancellation = null;
+        _progressiveResumePosition = null;
+      }
+    } finally {
+      if (_progressiveFallbackGeneration == generation) {
+        _progressiveFallbackGeneration = null;
+      }
+    }
+  }
+
+  Future<void> _recoverFromCachedPlayback(int generation) async {
+    final path = _cachedPlaybackPath;
+    final song = currentSong;
+    if (generation != _playGeneration ||
+        _cachedPlaybackGeneration != generation ||
+        _cachedRecoveryGeneration == generation ||
+        path == null ||
+        song == null) {
+      return;
+    }
+    _cachedRecoveryGeneration = generation;
+    _cachedPlaybackGeneration = null;
+    _cachedPlaybackPath = null;
+    final resumePosition = _position;
+    _openedGeneration = null;
+    try {
+      await _stopPlayerSerialized();
+      if (generation != _playGeneration) return;
+      if (isTvApp) {
+        await _handlePlaybackFailure(
+          generation,
+          '本地歌曲缓存无法播放，请在主页点击“清理缓存”后重试',
+        );
+        return;
+      }
+      final deleted = await AudioCacheService().deleteCachedFile(path);
+      if (!deleted) {
+        await _handlePlaybackFailure(
+          generation,
+          '本地歌曲缓存损坏且无法删除，请清理缓存后重试',
+        );
+        return;
+      }
+      await _prepareAndPlayAudio(
+        song,
+        generation,
+        play: _cachedPlayRequested,
+        resumePosition: resumePosition,
+      );
+    } finally {
+      if (_cachedRecoveryGeneration == generation) {
+        _cachedRecoveryGeneration = null;
+      }
+    }
+  }
+
+  String _lavfOptions({String? decryptionKey}) => [
+        'seg_max_retry=5',
+        'strict=experimental',
+        'allowed_extensions=ALL',
+        'protocol_whitelist=[udp,rtp,tcp,tls,data,file,http,https,crypto]',
+        if (decryptionKey != null && decryptionKey.isNotEmpty)
+          'decryption_key=$decryptionKey',
+      ].join(',');
 
   Future<bool> _openMedia(
     Media media,
     int generation, {
     required bool play,
     Duration resumePosition = Duration.zero,
+    String? decryptionKey,
+    bool reportFailure = true,
   }) async {
-    final player = _player;
-    if (player == null || generation != _playGeneration) return false;
-    if (play && !await _activateAndroidAudioSession()) {
-      await _handlePlaybackFailure(generation, '无法取得音频播放权限');
-      return false;
-    }
-    _openedGeneration = generation;
-    try {
-      await player.open(media, play: play);
+    return _withMediaOperation(() async {
+      final player = _player;
+      if (player == null || generation != _playGeneration) return false;
+      if (play && !await _activatePlaybackSession()) {
+        await _handlePlaybackFailure(generation, '无法取得音频播放权限');
+        return false;
+      }
       if (generation != _playGeneration) return false;
-      if (resumePosition > Duration.zero) await player.seek(resumePosition);
-      return true;
-    } catch (_) {
-      await _handlePlaybackFailure(generation, '播放失败，请重试');
-      return false;
-    }
+      try {
+        final nativePlayer = player.platform;
+        if (nativePlayer is NativePlayer) {
+          if (decryptionKey != null) {
+            await nativePlayer.setProperty('cache', 'yes');
+            await nativePlayer.setProperty('cache-on-disk', 'no');
+            await nativePlayer.setProperty('cache-pause', 'yes');
+            await nativePlayer.setProperty('cache-pause-initial', 'yes');
+            await nativePlayer.setProperty('cache-pause-wait', '8');
+            await nativePlayer.setProperty('demuxer-readahead-secs', '8');
+          }
+          await nativePlayer.setProperty(
+            'demuxer-lavf-o',
+            _lavfOptions(decryptionKey: decryptionKey),
+          );
+        }
+        if (generation != _playGeneration) return false;
+        _openedGeneration = generation;
+        await player.open(media, play: play);
+        if (generation != _playGeneration) return false;
+        if (resumePosition > Duration.zero) await player.seek(resumePosition);
+        return true;
+      } catch (_) {
+        if (reportFailure) {
+          await _handlePlaybackFailure(generation, '播放失败，请重试');
+        }
+        return false;
+      }
+    });
+  }
+
+  Future<T> _withMediaOperation<T>(Future<T> Function() operation) {
+    final completer = Completer<T>();
+    _mediaOperationTail = _mediaOperationTail.then((_) async {
+      try {
+        completer.complete(await operation());
+      } catch (error, stackTrace) {
+        completer.completeError(error, stackTrace);
+      }
+    });
+    return completer.future;
+  }
+
+  Future<void> _stopPlayerSerialized() {
+    return _withMediaOperation(() async {
+      _suppressCompletion = true;
+      try {
+        await _player?.stop();
+      } catch (_) {
+      } finally {
+        _suppressCompletion = false;
+      }
+    });
+  }
+
+  void _cancelProgressiveCache() {
+    _progressiveCacheCancellation?.cancel();
+    _progressiveCacheCancellation = null;
+    _progressiveCacheFuture = null;
+    _progressiveGeneration = null;
+    _progressiveFallbackGeneration = null;
+    _progressiveResumePosition = null;
+  }
+
+  void _clearCachedPlaybackState() {
+    _cachedPlaybackGeneration = null;
+    _cachedRecoveryGeneration = null;
+    _cachedPlaybackPath = null;
   }
 
   Future<void> _handlePlaybackFailure(int generation, String message) async {
@@ -738,15 +1034,15 @@ class PlayerService {
     try {
       await _player?.pause();
     } catch (_) {}
-    await _deactivateAndroidAudioSession();
+    await _deactivatePlaybackSession();
     _notifyPlaybackError(message);
   }
 
-  /// Extract br quality value from cached file path (e.g. songId_320.mp3 -> 320)
+  /// Extracts the quality value from the encrypted cache filename.
   int _extractBrFromPath(String path) {
     final name = path.split('/').last.split('\\').last;
-    // Format: songId_br.ext
-    final match = RegExp(r'_(\d+)\.[a-z0-9]+$').firstMatch(name);
+    final match = RegExp(r'_(\d+)\.encrypted\.m4a$', caseSensitive: false)
+        .firstMatch(name);
     if (match != null) {
       return int.tryParse(match.group(1)!) ?? 999;
     }
@@ -759,19 +1055,15 @@ class PlayerService {
     final song = currentSong;
     if (song == null) return;
     final currentGen = ++_playGeneration;
+    _cancelProgressiveCache();
+    _clearCachedPlaybackState();
     final wasPlaying = isPlaying;
     final resumePosition = position;
     _openedGeneration = null;
     _failedGeneration = null;
     final player = _player;
     if (player == null) return;
-    _suppressCompletion = true;
-    try {
-      await player.stop();
-    } catch (_) {
-    } finally {
-      _suppressCompletion = false;
-    }
+    await _stopPlayerSerialized();
     if (currentGen != _playGeneration) return;
     _notifyDownloadProgress(-1.0);
     await _prepareAndPlayAudio(
@@ -783,6 +1075,8 @@ class PlayerService {
   }
 
   void dispose() {
+    _cancelProgressiveCache();
+    _clearCachedPlaybackState();
     _positionSub?.cancel();
     _durationSub?.cancel();
     _playingSub?.cancel();
@@ -790,7 +1084,7 @@ class PlayerService {
     _errorSub?.cancel();
     _interruptionSub?.cancel();
     _becomingNoisySub?.cancel();
-    unawaited(_deactivateAndroidAudioSession());
+    unawaited(_deactivatePlaybackSession());
     _player?.dispose();
     _player = null;
     _audioHandler = null;
@@ -820,12 +1114,12 @@ class _AudioPlayerTask extends BaseAudioHandler {
             final wasPlaying = args['wasPlaying'] as bool? ?? ps._isPlaying;
             _resumeAfterInterruption = reason == 'interruption' && wasPlaying;
             _pauseReason = reason;
-            await ps._player?.pause();
+            await ps.pause();
           } else if (event == 'resume') {
             if (reason == 'interruption' && _resumeAfterInterruption) {
               _resumeAfterInterruption = false;
               _pauseReason = null;
-              await ps._player?.play();
+              await ps.play();
             }
           }
           break;
@@ -906,7 +1200,9 @@ class _AudioPlayerTask extends BaseAudioHandler {
   }
 
   @override
-  Future<void> play() async => PlayerService().play();
+  Future<void> play() async {
+    await PlayerService().play();
+  }
 
   @override
   Future<void> pause() async => PlayerService().pause();

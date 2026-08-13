@@ -28,7 +28,7 @@ class TvNowPlayingPage extends StatefulWidget {
 
 enum _TvPlayerMenu { relatedSearch }
 
-class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
+class _TvNowPlayingPageState extends State<TvNowPlayingPage> with RouteAware {
   final _player = PlayerService();
   final _queueFocusNode = FocusNode();
   final _previousFocusNode = FocusNode();
@@ -50,6 +50,8 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
   _TvPlayerMenu? _activeMenu;
   List<LyricLine> _parsedLrc = [];
   int _modeLoadGeneration = 0;
+  bool _cacheRefreshInFlight = false;
+  bool _routeObserverSubscribed = false;
 
   @override
   void initState() {
@@ -62,6 +64,7 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
     FavoritesService.version.addListener(_refreshFavoriteState);
     TvRoutes.homeRouteVersion.addListener(_onHomeRouteRequest);
     _refreshFavoriteState();
+    _refreshCacheSize();
     _syncLyrics();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -77,7 +80,25 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_routeObserverSubscribed) return;
+    final route = ModalRoute.of(context);
+    if (route == null) return;
+    TvRoutes.routeObserver.subscribe(this, route);
+    _routeObserverSubscribed = true;
+  }
+
+  @override
+  void didPopNext() {
+    _refreshCacheSize();
+  }
+
+  @override
   void dispose() {
+    if (_routeObserverSubscribed) {
+      TvRoutes.routeObserver.unsubscribe(this);
+    }
     _player.removeProgressListener(_onProgress);
     _player.removeSongChangeListener(_onSongChange);
     _player.removePlayStateListener(_onPlayState);
@@ -108,7 +129,6 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
   void _onSongChange(Song song) {
     _parsedLrc = _parseLrc(song.lyric);
     _refreshFavoriteState();
-    _refreshCacheSize();
     if (mounted) setState(() {});
   }
 
@@ -124,7 +144,8 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
   }
 
   void _onDownloadProgress(double? progress) {
-    if (mounted) setState(() => _downloadProgress = progress);
+    if (!mounted) return;
+    setState(() => _downloadProgress = progress);
   }
 
   void _onPlaybackError(String message) {
@@ -225,8 +246,16 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
   }
 
   Future<void> _refreshCacheSize() async {
-    final bytes = await AudioCacheService().getCacheSizeBytes();
-    if (mounted) setState(() => _audioCacheBytes = bytes);
+    if (_cacheRefreshInFlight) return;
+    _cacheRefreshInFlight = true;
+    try {
+      final bytes = await AudioCacheService().getCacheSizeBytes();
+      if (mounted && bytes != _audioCacheBytes) {
+        setState(() => _audioCacheBytes = bytes);
+      }
+    } finally {
+      _cacheRefreshInFlight = false;
+    }
   }
 
   String _formatCacheSize(int bytes) {
@@ -269,10 +298,8 @@ class _TvNowPlayingPageState extends State<TvNowPlayingPage> {
     setState(() => _cacheBusy = true);
     await AudioCacheService().clearCache();
     if (!mounted) return;
-    setState(() {
-      _cacheBusy = false;
-      _audioCacheBytes = 0;
-    });
+    setState(() => _cacheBusy = false);
+    await _refreshCacheSize();
   }
 
   void _openMenu(_TvPlayerMenu menu) {

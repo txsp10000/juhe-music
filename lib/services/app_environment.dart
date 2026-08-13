@@ -1,5 +1,5 @@
 import 'package:flutter/services.dart';
 
 /// Flutter supplies [appFlavor] when the app is built with `--flavor`.
-/// TV intentionally uses online-only playback and never writes media caches.
+/// True when running the Android TV flavor.
 const bool isTvApp = appFlavor == 'tv';

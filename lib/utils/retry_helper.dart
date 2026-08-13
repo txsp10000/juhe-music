@@ -8,6 +8,7 @@ class RetryHelper {
     Future<T> Function() action, {
     int attempts = defaultAttempts,
     Duration delay = defaultDelay,
+    bool Function(Object error)? shouldRetry,
   }) async {
     Object? lastError;
     for (var attempt = 1; attempt <= attempts; attempt++) {
@@ -15,6 +16,7 @@ class RetryHelper {
         return await action();
       } catch (e) {
         lastError = e;
+        if (shouldRetry != null && !shouldRetry(e)) rethrow;
         if (attempt < attempts) {
           await Future.delayed(delay);
         }

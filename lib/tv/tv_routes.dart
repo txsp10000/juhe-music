@@ -7,6 +7,8 @@ import 'pages/tv_search_page.dart';
 import 'pages/tv_search_results_page.dart';
 
 abstract final class TvRoutes {
+  static final RouteObserver<ModalRoute<dynamic>> routeObserver =
+      RouteObserver<ModalRoute<dynamic>>();
   static final ValueNotifier<int> homeRouteVersion = ValueNotifier(0);
   static bool _focusHomeQueueOnNextBuild = false;
   static bool _openHomeQueueOnNextBuild = false;

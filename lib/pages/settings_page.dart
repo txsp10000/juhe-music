@@ -1,7 +1,4 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'carplay_diagnostics_page.dart';
 import '../services/theme_service.dart';
 import '../theme/app_design_tokens.dart';
 import '../widgets/glass_panel.dart';
@@ -91,26 +88,6 @@ class _SettingsPageState extends State<SettingsPage> {
                           style: AppDesignTokens.body(
                               size: 14, color: AppDesignTokens.quietGrey)),
                     ),
-                    if (Platform.isIOS) ...[
-                      const SizedBox(height: 12),
-                      GlassPanel(
-                        accent: _accent,
-                        radius: 12,
-                        padding: EdgeInsets.zero,
-                        child: ListTile(
-                          leading: const Icon(Icons.directions_car_rounded),
-                          title: const Text('CarPlay 诊断'),
-                          subtitle: const Text('查看车载连接与界面加载记录'),
-                          trailing: const Icon(Icons.chevron_right_rounded),
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute<void>(
-                              builder: (_) => const CarPlayDiagnosticsPage(),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),

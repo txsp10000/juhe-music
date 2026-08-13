@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:music/services/audio_cache_service.dart';
 import 'package:music/services/cover_cache_service.dart';
 import 'package:music/services/lyric_cache_service.dart';
 
@@ -46,6 +47,43 @@ void main() {
     expect(await file.exists(), isTrue);
     expect(await file.readAsString(), lyric);
     expect(await File('${file.path}.tmp').exists(), isFalse);
+  });
+
+  test('audio cache path always uses the encrypted M4A format', () async {
+    final path = await AudioCacheService().getFilePath('strict_song', 260);
+
+    expect(path, endsWith('strict_song_260.encrypted.m4a'));
+  });
+
+  test('unsupported and keyless audio files are never cache hits', () async {
+    final cacheDir = Directory('${documents.path}/audio_cache');
+    await cacheDir.create(recursive: true);
+    final unsupportedMp3 = File('${cacheDir.path}/strict_lookup_320.mp3');
+    final unsupportedM4a = File('${cacheDir.path}/strict_lookup_320.m4a');
+    final keyless = File('${cacheDir.path}/strict_lookup_320.encrypted.m4a');
+    await unsupportedMp3.writeAsBytes([1, 2, 3]);
+    await unsupportedM4a.writeAsBytes([1, 2, 3]);
+    await keyless.writeAsBytes([1, 2, 3]);
+
+    expect(
+        await AudioCacheService().findBestCachedFile('strict_lookup'), isNull);
+    expect(
+      await AudioCacheService()
+          .findCachedFile('strict_lookup', requestedBr: 320),
+      isNull,
+    );
+
+    await File('${keyless.path}.key').writeAsString('0011223344556677');
+    final cached =
+        await AudioCacheService().findBestCachedFile('strict_lookup');
+
+    expect(cached, isNotNull);
+    String normalizedPath(String path) =>
+        File(path).absolute.path.replaceAll('\\', '/').toLowerCase();
+    expect(normalizedPath(cached!.path), normalizedPath(keyless.path));
+    expect(cached.decryptionKey, '0011223344556677');
+    expect(await unsupportedMp3.exists(), isTrue);
+    expect(await unsupportedM4a.exists(), isTrue);
   });
 
   test('cover bytes are returned from the completed local cache file',

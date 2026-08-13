@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -9,6 +10,7 @@ import '../utils/lyric_parser.dart';
 import 'favorites_service.dart';
 import 'playback_history_service.dart';
 import 'player_service.dart';
+import 'theme_service.dart';
 
 class CarPlayService {
   static const _channel = MethodChannel('com.music/carplay');
@@ -19,6 +21,7 @@ class CarPlayService {
   static String _cachedFavoriteSongId = '';
   static int _cachedFavoriteVersion = -1;
   static bool _cachedFavorite = false;
+  static Future<void> _favoriteOperationTail = Future<void>.value();
 
   static void initialize() {
     if (_initialized || !Platform.isIOS) return;
@@ -63,31 +66,24 @@ class CarPlayService {
       case 'getNowPlaying':
         return await _encodeNowPlaying();
       case 'toggleFavorite':
-        final song = PlayerService().currentSong;
-        if (song == null) return false;
-        final wasFavorite = await FavoritesService.isFavorite(song);
-        if (wasFavorite) {
-          await FavoritesService.remove(song);
-        } else {
-          await FavoritesService.save(song);
-        }
-        _cachedFavoriteSongId = song.id;
-        _cachedFavoriteVersion = FavoritesService.version.value;
-        _cachedFavorite = !wasFavorite;
-        return _cachedFavorite;
+        return _serializeFavoriteToggle();
       case 'loadMoreQueue':
         final player = PlayerService();
+        var addedCount = 0;
         if (player.activeMode != null) {
-          await player.loadMoreModeSongs();
+          addedCount = await player.loadMoreModeSongs(throwOnError: true);
         }
         return {
           'songs': player.queue.map(_encodeSong).toList(),
           'canLoadMore': player.activeMode != null,
+          'addedCount': addedCount,
         };
       case 'playSong':
         final source = _stringArgument(call.arguments, 'source');
-        final index = _intArgument(call.arguments, 'index');
+        final songId = _stringArgument(call.arguments, 'songId');
+        final songSource = _stringArgument(call.arguments, 'songSource');
         final songs = await _songsForSource(source);
+        final index = findCarPlaySongIndex(songs, songId, songSource);
         await _playSongs(songs, index, source: source);
         return true;
       case 'playMode':
@@ -100,7 +96,12 @@ class CarPlayService {
         final player = PlayerService();
         await PlayerService.init();
         player.replaceQueue(songs, mode: mode);
-        await player.playAt(0);
+        if (!await player.playAt(0)) {
+          throw PlatformException(
+            code: 'playback_failed',
+            message: '场景歌曲暂时无法播放，请稍后重试。',
+          );
+        }
         return true;
       case 'search':
         final query = _stringArgument(call.arguments, 'query').trim();
@@ -117,13 +118,28 @@ class CarPlayService {
         await _playSongs(songs, _intArgument(arguments, 'index'));
         return true;
       case 'previous':
-        PlayerService().prev();
+        if (!await PlayerService().prev()) {
+          throw PlatformException(
+            code: 'playback_failed',
+            message: '无法切换到上一首歌曲。',
+          );
+        }
         return true;
       case 'next':
-        PlayerService().next();
+        if (!await PlayerService().next()) {
+          throw PlatformException(
+            code: 'playback_failed',
+            message: '无法切换到下一首歌曲。',
+          );
+        }
         return true;
       case 'togglePlayPause':
-        await PlayerService().togglePlayPause();
+        if (!await PlayerService().togglePlayPause()) {
+          throw PlatformException(
+            code: 'playback_failed',
+            message: '当前没有可播放的歌曲。',
+          );
+        }
         return true;
       default:
         throw PlatformException(
@@ -170,7 +186,39 @@ class CarPlayService {
             : PlaybackQueueSource.regular,
       );
     }
-    await player.playAt(index);
+    if (!await player.playAt(index)) {
+      throw PlatformException(
+        code: 'playback_failed',
+        message: '歌曲暂时无法播放，请稍后重试。',
+      );
+    }
+  }
+
+  static Future<bool> _serializeFavoriteToggle() {
+    final completer = Completer<bool>();
+    _favoriteOperationTail =
+        _favoriteOperationTail.catchError((_) {}).then((_) async {
+      try {
+        final song = PlayerService().currentSong;
+        if (song == null) {
+          completer.complete(false);
+          return;
+        }
+        final wasFavorite = await FavoritesService.isFavorite(song);
+        if (wasFavorite) {
+          await FavoritesService.remove(song);
+        } else {
+          await FavoritesService.save(song);
+        }
+        _cachedFavoriteSongId = song.id;
+        _cachedFavoriteVersion = FavoritesService.version.value;
+        _cachedFavorite = !wasFavorite;
+        completer.complete(_cachedFavorite);
+      } catch (error, stackTrace) {
+        completer.completeError(error, stackTrace);
+      }
+    });
+    return completer.future;
   }
 
   static Map<String, Object> _encodeSong(Song song) => {
@@ -194,11 +242,12 @@ class CarPlayService {
         'positionMs': 0,
         'durationMs': 0,
         'playing': false,
+        'themeColor': ThemeService.bgHint.value.toARGB32(),
       };
     }
 
     final positionMs = player.livePosition.inMilliseconds;
-    const carPlayVisualDelayMs = 450;
+    const carPlayVisualDelayMs = 500;
     final lyricPositionMs =
         (positionMs - carPlayVisualDelayMs).clamp(0, positionMs);
     if (_cachedLyricSongId != song.id || _cachedLyricContent != song.lyric) {
@@ -223,6 +272,10 @@ class CarPlayService {
     }
 
     final current = currentIndex >= 0 ? lyrics[currentIndex] : null;
+    final nextIndex = currentIndex + 1;
+    final nextStartMs = nextIndex >= 0 && nextIndex < lyrics.length
+        ? lyrics[nextIndex].startMs
+        : null;
     return {
       'hasSong': true,
       'id': song.id,
@@ -234,6 +287,11 @@ class CarPlayService {
       'durationMs': player.liveDuration.inMilliseconds,
       'playing': player.isPlaying,
       'favorite': _cachedFavorite,
+      'themeColor': ThemeService.bgHint.value.toARGB32(),
+      'nextLyricChangeInMs': carPlayLyricChangeDelayMs(
+        positionMs: positionMs,
+        nextLyricStartMs: nextStartMs,
+      ),
       'previousLyric': currentIndex > 0 ? lyrics[currentIndex - 1].text : '',
       'currentLyric': current == null
           ? null
@@ -241,13 +299,6 @@ class CarPlayService {
               'startMs': current.startMs,
               'durationMs': current.durationMs,
               'text': current.text,
-              'syllables': current.syllables
-                  .map((syllable) => {
-                        'startMs': syllable.startMs,
-                        'durationMs': syllable.durationMs,
-                        'text': syllable.text,
-                      })
-                  .toList(),
             },
       'nextLyric': currentIndex + 1 < lyrics.length
           ? lyrics[currentIndex + 1].text
@@ -267,4 +318,21 @@ class CarPlayService {
     final value = values[key];
     return value is int ? value : int.tryParse(value?.toString() ?? '') ?? -1;
   }
+}
+
+int findCarPlaySongIndex(List<Song> songs, String songId, String songSource) {
+  return songs.indexWhere(
+    (song) =>
+        song.id == songId && (songSource.isEmpty || song.source == songSource),
+  );
+}
+
+int? carPlayLyricChangeDelayMs({
+  required int positionMs,
+  required int? nextLyricStartMs,
+  int visualDelayMs = 500,
+}) {
+  if (nextLyricStartMs == null) return null;
+  return (nextLyricStartMs + visualDelayMs - positionMs)
+      .clamp(0, nextLyricStartMs + visualDelayMs);
 }

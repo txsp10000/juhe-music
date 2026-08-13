@@ -211,9 +211,8 @@ class MusicApi {
                 .map(StreamQuality.fromJson)
                 .where((q) => q.downloadUrl.isNotEmpty)
                 .toList());
-      } catch (_) {
+      } finally {
         _streamRequests.remove(trackId);
-        rethrow;
       }
     });
   }

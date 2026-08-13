@@ -15,10 +15,7 @@ Future<void> _bootstrapBackgroundServices() async {
   try {
     if (!isTvApp) await AudioCacheService().cleanupIncomplete();
     await PlayerService.init();
-  } catch (e, st) {
-    debugPrint('Background init failed: $e');
-    debugPrintStack(stackTrace: st);
-  }
+  } catch (_) {}
 }
 
 Future<void> main() async {
@@ -112,7 +109,7 @@ class MusicApp extends StatelessWidget {
 
     if (isTv) {
       return MaterialApp(
-        title: '三点音乐',
+        title: '音乐',
         debugShowCheckedModeBanner: false,
         theme: theme.copyWith(
           pageTransitionsTheme: const PageTransitionsTheme(
@@ -123,12 +120,13 @@ class MusicApp extends StatelessWidget {
         ),
         routes: TvRoutes.builders,
         onGenerateRoute: TvRoutes.onGenerateRoute,
+        navigatorObservers: [TvRoutes.routeObserver],
         initialRoute: TvRoutes.home,
       );
     }
 
     return MaterialApp(
-      title: '三点音乐',
+      title: '音乐',
       debugShowCheckedModeBanner: false,
       theme: Platform.isWindows ? desktopTheme : theme,
       home: Platform.isWindows ? const DesktopMusicPage() : const MainPage(),
