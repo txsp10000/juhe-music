@@ -85,6 +85,6 @@ import UIKit
     let manifest = info["UIApplicationSceneManifest"] as? [String: Any]
     let configurations = manifest?["UISceneConfigurations"] as? [String: Any]
     let roles = configurations?.keys.sorted().joined(separator: ", ") ?? "none"
-    write("APP_LAUNCH version=\(version)(\(build)) revision=\(revision) logic=karaokeNowPlaying-v4 iOS=\(UIDevice.current.systemVersion) roles=\(roles)")
+    write("APP_LAUNCH version=\(version)(\(build)) revision=\(revision) logic=carPlayPlayback-v5 iOS=\(UIDevice.current.systemVersion) roles=\(roles)")
   }
 }

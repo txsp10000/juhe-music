@@ -161,6 +161,7 @@ private final class CarPlayHomeViewController: UIViewController {
   private var headingHeightConstraint: NSLayoutConstraint?
   private var nowPlayingHeightConstraint: NSLayoutConstraint?
   private var lastLayoutSize = CGSize.zero
+  private var nowPlayingTimer: Timer?
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -173,7 +174,14 @@ private final class CarPlayHomeViewController: UIViewController {
   override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
     refreshStatus()
+    startNowPlayingUpdates()
     CarPlayDiagnosticLog.write("PRIVATE_UI home_view_did_appear")
+  }
+
+  override func viewDidDisappear(_ animated: Bool) {
+    super.viewDidDisappear(animated)
+    nowPlayingTimer?.invalidate()
+    nowPlayingTimer = nil
   }
 
   override func viewDidLayoutSubviews() {
@@ -251,7 +259,7 @@ private final class CarPlayHomeViewController: UIViewController {
           if let error {
             self?.showError(error.localizedDescription)
           } else {
-            self?.nowPlayingBar.refresh()
+            self?.refreshNowPlaying()
           }
         }
       }
@@ -260,7 +268,18 @@ private final class CarPlayHomeViewController: UIViewController {
       guard let self, self.presentedViewController == nil else { return }
       let controller = CarPlayNowPlayingViewController()
       controller.modalPresentationStyle = .fullScreen
-      self.present(controller, animated: true)
+      self.present(controller, animated: false)
+    }
+    nowPlayingBar.onFavorite = { [weak self] in
+      CarPlayBridge.shared.invoke("toggleFavorite") { result, error in
+        DispatchQueue.main.async {
+          if let error {
+            self?.showError(error.localizedDescription)
+          } else if let favorite = result as? Bool {
+            self?.nowPlayingBar.setFavorite(favorite)
+          }
+        }
+      }
     }
 
     let content = UIStackView(arrangedSubviews: [heading, grid, nowPlayingBar])
@@ -301,7 +320,24 @@ private final class CarPlayHomeViewController: UIViewController {
           partial + ((library?[key] as? [Any])?.count ?? 0)
         }
         self.statusLabel.text = count > 0 ? "音乐库已连接" : "选择一个分类开始播放"
-        self.nowPlayingBar.refresh()
+        self.refreshNowPlaying()
+      }
+    }
+  }
+
+  private func startNowPlayingUpdates() {
+    nowPlayingTimer?.invalidate()
+    refreshNowPlaying()
+    nowPlayingTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { [weak self] _ in
+      self?.refreshNowPlaying()
+    }
+  }
+
+  private func refreshNowPlaying() {
+    CarPlayBridge.shared.invoke("getNowPlaying") { [weak self] result, _ in
+      DispatchQueue.main.async {
+        guard let state = result as? [String: Any] else { return }
+        self?.nowPlayingBar.apply(state)
       }
     }
   }
@@ -411,15 +447,19 @@ private final class CarPlayCollectionButton: UIControl {
 private final class CarPlayNowPlayingBar: UIView, UIGestureRecognizerDelegate {
   var onControl: ((String) -> Void)?
   var onOpen: (() -> Void)?
+  var onFavorite: (() -> Void)?
 
   private let titleLabel = UILabel()
   private let artistLabel = UILabel()
+  private let favoriteButton = UIButton(type: .system)
   private let playButton = UIButton(type: .system)
   private var labelsLeadingConstraint: NSLayoutConstraint!
   private var labelsTrailingConstraint: NSLayoutConstraint!
   private var controlsTrailingConstraint: NSLayoutConstraint!
   private var controlsWidthConstraint: NSLayoutConstraint!
   private var controlsHeightConstraint: NSLayoutConstraint!
+  private var favoriteWidthConstraint: NSLayoutConstraint!
+  private var favoriteHeightConstraint: NSLayoutConstraint!
   private var controls: UIStackView!
   private var lastSize = CGSize.zero
 
@@ -437,6 +477,10 @@ private final class CarPlayNowPlayingBar: UIView, UIGestureRecognizerDelegate {
     artistLabel.textColor = UIColor.white.withAlphaComponent(0.56)
     artistLabel.font = .systemFont(ofSize: 9)
     artistLabel.lineBreakMode = .byTruncatingTail
+
+    favoriteButton.setImage(UIImage(systemName: "heart"), for: .normal)
+    favoriteButton.tintColor = .white
+    favoriteButton.addTarget(self, action: #selector(favoriteTapped), for: .touchUpInside)
 
     let labels = UIStackView(arrangedSubviews: [titleLabel, artistLabel])
     labels.axis = .vertical
@@ -456,19 +500,25 @@ private final class CarPlayNowPlayingBar: UIView, UIGestureRecognizerDelegate {
     tap.delegate = self
     addGestureRecognizer(tap)
 
-    [labels, controls].forEach {
+    [labels, favoriteButton, controls].forEach {
       $0.translatesAutoresizingMaskIntoConstraints = false
       addSubview($0)
     }
     labelsLeadingConstraint = labels.leadingAnchor.constraint(equalTo: leadingAnchor)
-    labelsTrailingConstraint = labels.trailingAnchor.constraint(lessThanOrEqualTo: controls.leadingAnchor)
+    labelsTrailingConstraint = labels.trailingAnchor.constraint(lessThanOrEqualTo: favoriteButton.leadingAnchor)
     controlsTrailingConstraint = controls.trailingAnchor.constraint(equalTo: trailingAnchor)
     controlsWidthConstraint = controls.widthAnchor.constraint(equalToConstant: 108)
     controlsHeightConstraint = controls.heightAnchor.constraint(equalToConstant: 36)
+    favoriteWidthConstraint = favoriteButton.widthAnchor.constraint(equalToConstant: 36)
+    favoriteHeightConstraint = favoriteButton.heightAnchor.constraint(equalToConstant: 36)
     NSLayoutConstraint.activate([
       labelsLeadingConstraint,
       labels.centerYAnchor.constraint(equalTo: centerYAnchor),
-      labelsTrailingConstraint, controlsTrailingConstraint,
+      labelsTrailingConstraint,
+      favoriteButton.trailingAnchor.constraint(equalTo: controls.leadingAnchor, constant: -4),
+      favoriteButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+      favoriteWidthConstraint, favoriteHeightConstraint,
+      controlsTrailingConstraint,
       controls.centerYAnchor.constraint(equalTo: centerYAnchor),
       controlsWidthConstraint, controlsHeightConstraint,
     ])
@@ -489,6 +539,8 @@ private final class CarPlayNowPlayingBar: UIView, UIGestureRecognizerDelegate {
     controlsTrailingConstraint.constant = -horizontalInset
     controlsWidthConstraint.constant = min(max(bounds.width * 0.22, 90), 240)
     controlsHeightConstraint.constant = min(max(bounds.height * 0.7, 30), 72)
+    favoriteWidthConstraint.constant = controlsHeightConstraint.constant
+    favoriteHeightConstraint.constant = controlsHeightConstraint.constant
     controls.spacing = min(max(bounds.height * 0.15, 5), 16)
     titleLabel.font = .systemFont(ofSize: 14 * scale, weight: .semibold)
     artistLabel.font = .systemFont(ofSize: 9 * scale)
@@ -502,6 +554,28 @@ private final class CarPlayNowPlayingBar: UIView, UIGestureRecognizerDelegate {
     playButton.setImage(UIImage(systemName: rate > 0 ? "pause.fill" : "play.fill"), for: .normal)
   }
 
+  func apply(_ state: [String: Any]) {
+    guard state["hasSong"] as? Bool == true else {
+      titleLabel.text = "暂无播放"
+      artistLabel.text = "选择歌曲开始播放"
+      playButton.setImage(UIImage(systemName: "play.fill"), for: .normal)
+      setFavorite(false)
+      return
+    }
+    titleLabel.text = state["name"] as? String ?? "暂无播放"
+    artistLabel.text = state["singer"] as? String ?? ""
+    let playing = state["playing"] as? Bool ?? false
+    playButton.setImage(UIImage(systemName: playing ? "pause.fill" : "play.fill"), for: .normal)
+    setFavorite(state["favorite"] as? Bool ?? false)
+  }
+
+  func setFavorite(_ favorite: Bool) {
+    favoriteButton.setImage(UIImage(systemName: favorite ? "heart.fill" : "heart"), for: .normal)
+    favoriteButton.tintColor = favorite
+      ? UIColor(red: 0.96, green: 0.31, blue: 0.40, alpha: 1)
+      : .white
+  }
+
   private func controlButton(symbol: String, action: Selector) -> UIButton {
     let button = UIButton(type: .system)
     button.setImage(UIImage(systemName: symbol), for: .normal)
@@ -513,6 +587,7 @@ private final class CarPlayNowPlayingBar: UIView, UIGestureRecognizerDelegate {
   @objc private func previousTapped() { onControl?("previous") }
   @objc private func playTapped() { onControl?("togglePlayPause") }
   @objc private func nextTapped() { onControl?("next") }
+  @objc private func favoriteTapped() { onFavorite?() }
   @objc private func openTapped() { onOpen?() }
 
   func gestureRecognizer(
@@ -591,13 +666,13 @@ private final class CarPlayKaraokeView: UIView {
 }
 
 private final class CarPlayNowPlayingViewController: UIViewController {
-  private let backgroundImageView = UIImageView()
-  private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
-  private let dimView = UIView()
+  private static let visualDelayMs = 450
   private let backButton = UIButton(type: .system)
   private let artworkView = UIImageView()
+  private let playbackPanel = UIView()
   private let titleLabel = UILabel()
   private let artistLabel = UILabel()
+  private let favoriteButton = UIButton(type: .system)
   private let previousLyricLabel = UILabel()
   private let karaokeView = CarPlayKaraokeView()
   private let nextLyricLabel = UILabel()
@@ -645,73 +720,63 @@ private final class CarPlayNowPlayingViewController: UIViewController {
 
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
-    backgroundImageView.frame = view.bounds
-    blurView.frame = view.bounds
-    dimView.frame = view.bounds
-
     let safe = view.safeAreaLayoutGuide.layoutFrame
     guard safe.width > 0, safe.height > 0 else { return }
     let insetX = min(max(safe.width * 0.025, 8), 32)
     let insetY = min(max(safe.height * 0.025, 3), 14)
     let gap = min(max(safe.width * 0.018, 8), 28)
-    let headerHeight = min(max(safe.height * 0.16, 34), 70)
-    let controlsHeight = min(max(safe.height * 0.25, 54), 110)
-    let contentTop = safe.minY + insetY + headerHeight
-    let contentBottom = safe.maxY - insetY - controlsHeight
-    let contentHeight = max(contentBottom - contentTop, 40)
-    let artworkSide = min(contentHeight, max(safe.width * 0.22, 64))
-
-    backButton.frame = CGRect(
-      x: safe.minX + insetX,
-      y: safe.minY + insetY,
-      width: headerHeight,
-      height: headerHeight - insetY
-    )
-    let infoX = backButton.frame.maxX + gap * 0.5
-    let infoWidth = max(safe.maxX - insetX - infoX, 40)
-    titleLabel.frame = CGRect(x: infoX, y: safe.minY + insetY, width: infoWidth, height: headerHeight * 0.56)
-    artistLabel.frame = CGRect(x: infoX, y: titleLabel.frame.maxY, width: infoWidth, height: headerHeight * 0.3)
-
+    let contentHeight = max(safe.height - insetY * 2, 80)
+    let artworkSide = min(contentHeight, max(safe.width * 0.34, 84))
     artworkView.frame = CGRect(
       x: safe.minX + insetX,
-      y: contentTop + max((contentHeight - artworkSide) / 2, 0),
+      y: safe.minY + insetY + max((contentHeight - artworkSide) / 2, 0),
       width: artworkSide,
       height: artworkSide
     )
     artworkView.layer.cornerRadius = min(max(artworkSide * 0.06, 5), 14)
+    let backSide = min(max(artworkSide * 0.18, 34), 58)
+    backButton.frame = CGRect(x: artworkView.frame.minX + 5, y: artworkView.frame.minY + 5, width: backSide, height: backSide)
+    backButton.backgroundColor = UIColor.black.withAlphaComponent(0.42)
+    backButton.layer.cornerRadius = 8
 
-    let lyricX = artworkView.frame.maxX + gap
-    let lyricWidth = max(safe.maxX - insetX - lyricX, 40)
-    let smallLyricHeight = contentHeight * 0.22
-    previousLyricLabel.frame = CGRect(x: lyricX, y: contentTop, width: lyricWidth, height: smallLyricHeight)
-    karaokeView.frame = CGRect(
-      x: lyricX,
-      y: previousLyricLabel.frame.maxY,
-      width: lyricWidth,
-      height: contentHeight - smallLyricHeight * 2
-    )
-    nextLyricLabel.frame = CGRect(
-      x: lyricX,
-      y: karaokeView.frame.maxY,
-      width: lyricWidth,
-      height: smallLyricHeight
-    )
+    let panelX = artworkView.frame.maxX + gap
+    let panelWidth = max(safe.maxX - insetX - panelX, 80)
+    playbackPanel.frame = CGRect(x: panelX, y: safe.minY + insetY, width: panelWidth, height: contentHeight)
+    playbackPanel.layer.cornerRadius = 8
+    let panelInset = min(max(contentHeight * 0.06, 8), 22)
+    let innerX = panelX + panelInset
+    let innerWidth = max(panelWidth - panelInset * 2, 40)
+    let infoHeight = contentHeight * 0.19
+    let favoriteSide = min(max(infoHeight * 0.72, 30), 56)
+    titleLabel.frame = CGRect(x: innerX, y: playbackPanel.frame.minY + panelInset * 0.45, width: innerWidth - favoriteSide - 8, height: infoHeight * 0.58)
+    artistLabel.frame = CGRect(x: innerX, y: titleLabel.frame.maxY, width: titleLabel.frame.width, height: infoHeight * 0.34)
+    favoriteButton.frame = CGRect(x: playbackPanel.frame.maxX - panelInset - favoriteSide, y: playbackPanel.frame.minY + panelInset * 0.55, width: favoriteSide, height: favoriteSide)
 
-    let controlTop = contentBottom + min(max(safe.height * 0.025, 4), 12)
-    let timeHeight = min(max(controlsHeight * 0.2, 12), 24)
-    elapsedLabel.frame = CGRect(x: safe.minX + insetX, y: controlTop, width: 62, height: timeHeight)
-    durationLabel.frame = CGRect(x: safe.maxX - insetX - 62, y: controlTop, width: 62, height: timeHeight)
+    let controlsHeight = contentHeight * 0.24
+    let progressHeight = min(max(contentHeight * 0.09, 14), 28)
+    let lyricsTop = playbackPanel.frame.minY + panelInset * 0.45 + infoHeight
+    let lyricsBottom = playbackPanel.frame.maxY - panelInset - controlsHeight - progressHeight
+    let lyricsHeight = max(lyricsBottom - lyricsTop, 34)
+    let sideLineHeight = lyricsHeight * 0.22
+    previousLyricLabel.frame = CGRect(x: innerX, y: lyricsTop, width: innerWidth, height: sideLineHeight)
+    karaokeView.frame = CGRect(x: innerX, y: previousLyricLabel.frame.maxY, width: innerWidth, height: lyricsHeight - sideLineHeight * 2)
+    nextLyricLabel.frame = CGRect(x: innerX, y: karaokeView.frame.maxY, width: innerWidth, height: sideLineHeight)
+
+    let progressY = lyricsBottom + max(progressHeight * 0.08, 1)
+    let timeWidth = min(max(innerWidth * 0.12, 38), 66)
+    elapsedLabel.frame = CGRect(x: innerX, y: progressY, width: timeWidth, height: progressHeight)
+    durationLabel.frame = CGRect(x: playbackPanel.frame.maxX - panelInset - timeWidth, y: progressY, width: timeWidth, height: progressHeight)
     progressView.frame = CGRect(
       x: elapsedLabel.frame.maxX + 6,
-      y: controlTop + timeHeight * 0.5,
+      y: progressY + progressHeight * 0.5,
       width: max(durationLabel.frame.minX - elapsedLabel.frame.maxX - 12, 20),
       height: 4
     )
-    let buttonSide = min(max(controlsHeight * 0.58, 34), 66)
-    let buttonGap = min(max(safe.width * 0.025, 12), 34)
+    let buttonSide = min(max(controlsHeight * 0.72, 32), 64)
+    let buttonGap = min(max(innerWidth * 0.06, 10), 30)
     let buttonsWidth = buttonSide * 3 + buttonGap * 2
-    let buttonsX = safe.midX - buttonsWidth / 2
-    let buttonsY = controlTop + timeHeight + max((controlsHeight - timeHeight - buttonSide) / 2, 0)
+    let buttonsX = playbackPanel.frame.midX - buttonsWidth / 2
+    let buttonsY = playbackPanel.frame.maxY - panelInset - buttonSide
     previousButton.frame = CGRect(x: buttonsX, y: buttonsY, width: buttonSide, height: buttonSide)
     playButton.frame = CGRect(x: previousButton.frame.maxX + buttonGap, y: buttonsY, width: buttonSide, height: buttonSide)
     nextButton.frame = CGRect(x: playButton.frame.maxX + buttonGap, y: buttonsY, width: buttonSide, height: buttonSide)
@@ -729,9 +794,7 @@ private final class CarPlayNowPlayingViewController: UIViewController {
 
   private func buildView() {
     view.backgroundColor = UIColor(red: 0.035, green: 0.043, blue: 0.055, alpha: 1)
-    backgroundImageView.contentMode = .scaleAspectFill
-    blurView.alpha = 0.88
-    dimView.backgroundColor = UIColor.black.withAlphaComponent(0.34)
+    playbackPanel.backgroundColor = UIColor.white.withAlphaComponent(0.075)
     artworkView.contentMode = .scaleAspectFill
     artworkView.clipsToBounds = true
     artworkView.backgroundColor = UIColor.white.withAlphaComponent(0.08)
@@ -739,6 +802,9 @@ private final class CarPlayNowPlayingViewController: UIViewController {
     backButton.setImage(UIImage(systemName: "chevron.left"), for: .normal)
     backButton.tintColor = .white
     backButton.addTarget(self, action: #selector(close), for: .touchUpInside)
+    favoriteButton.setImage(UIImage(systemName: "heart"), for: .normal)
+    favoriteButton.tintColor = .white
+    favoriteButton.addTarget(self, action: #selector(favoriteTapped), for: .touchUpInside)
     configureLabel(titleLabel, color: .white, alignment: .left)
     configureLabel(artistLabel, color: UIColor.white.withAlphaComponent(0.58), alignment: .left)
     configureLabel(previousLyricLabel, color: UIColor.white.withAlphaComponent(0.30), alignment: .center)
@@ -755,7 +821,7 @@ private final class CarPlayNowPlayingViewController: UIViewController {
     configureControl(playButton, symbol: "play.fill", action: #selector(playTapped))
     configureControl(nextButton, symbol: "forward.fill", action: #selector(nextTapped))
 
-    [backgroundImageView, blurView, dimView, artworkView, backButton, titleLabel, artistLabel,
+    [artworkView, playbackPanel, backButton, titleLabel, artistLabel, favoriteButton,
      previousLyricLabel, karaokeView, nextLyricLabel, progressView, elapsedLabel, durationLabel,
      previousButton, playButton, nextButton].forEach { view.addSubview($0) }
     showEmptyState()
@@ -808,6 +874,7 @@ private final class CarPlayNowPlayingViewController: UIViewController {
     snapshotPlaying = state["playing"] as? Bool ?? false
     snapshotDate = Date()
     playButton.setImage(UIImage(systemName: snapshotPlaying ? "pause.fill" : "play.fill"), for: .normal)
+    setFavorite(state["favorite"] as? Bool ?? false)
 
     if let rawLine = state["currentLyric"] as? [String: Any] {
       let rawSyllables = rawLine["syllables"] as? [[String: Any]] ?? []
@@ -838,6 +905,7 @@ private final class CarPlayNowPlayingViewController: UIViewController {
     snapshotPositionMs = 0
     snapshotDurationMs = 0
     snapshotPlaying = false
+    setFavorite(false)
     karaokeView.update(text: "歌词将在这里显示", progress: 0, fontSize: 20)
     updatePlaybackFrame()
   }
@@ -847,7 +915,6 @@ private final class CarPlayNowPlayingViewController: UIViewController {
       as? MPMediaItemArtwork else {
       if displayedArtwork == nil {
         artworkView.image = nil
-        backgroundImageView.image = nil
       }
       return
     }
@@ -855,7 +922,6 @@ private final class CarPlayNowPlayingViewController: UIViewController {
     displayedArtwork = artwork
     let image = artwork.image(at: CGSize(width: 720, height: 720))
     artworkView.image = image
-    backgroundImageView.image = image
   }
 
   @objc private func updatePlaybackFrame() {
@@ -871,7 +937,7 @@ private final class CarPlayNowPlayingViewController: UIViewController {
     if let line = currentLine {
       karaokeView.update(
         text: line.text,
-        progress: lyricProgress(line, at: positionMs),
+        progress: lyricProgress(line, at: max(positionMs - Self.visualDelayMs, 0)),
         fontSize: lyricFontSize
       )
     } else {
@@ -911,7 +977,22 @@ private final class CarPlayNowPlayingViewController: UIViewController {
     }
   }
 
-  @objc private func close() { dismiss(animated: true) }
+  private func setFavorite(_ favorite: Bool) {
+    favoriteButton.setImage(UIImage(systemName: favorite ? "heart.fill" : "heart"), for: .normal)
+    favoriteButton.tintColor = favorite
+      ? UIColor(red: 0.96, green: 0.31, blue: 0.40, alpha: 1)
+      : .white
+  }
+
+  @objc private func close() { dismiss(animated: false) }
+  @objc private func favoriteTapped() {
+    CarPlayBridge.shared.invoke("toggleFavorite") { [weak self] result, _ in
+      DispatchQueue.main.async {
+        if let favorite = result as? Bool { self?.setFavorite(favorite) }
+        self?.refreshSnapshot()
+      }
+    }
+  }
   @objc private func previousTapped() { perform("previous") }
   @objc private func playTapped() { perform("togglePlayPause") }
   @objc private func nextTapped() { perform("next") }
@@ -1034,6 +1115,8 @@ private final class CarPlaySongListViewController: CarPlayBaseListViewController
   private let source: String
   private var songs: [[String: Any]] = []
   private var message = "正在载入音乐…"
+  private var loadingMore = false
+  private var canLoadMore = true
 
   init(title: String, source: String) {
     self.source = source
@@ -1082,6 +1165,33 @@ private final class CarPlaySongListViewController: CarPlayBaseListViewController
       detail: song["singer"] as? String ?? "未知歌手"
     )
     return cell
+  }
+
+  func tableView(
+    _ tableView: UITableView,
+    willDisplay cell: UITableViewCell,
+    forRowAt indexPath: IndexPath
+  ) {
+    guard source == "queue",
+          canLoadMore,
+          !loadingMore,
+          !songs.isEmpty,
+          indexPath.row >= songs.count - 2 else { return }
+    loadingMore = true
+    CarPlayDiagnosticLog.write("PRIVATE_UI queue_load_more start count=\(songs.count)")
+    CarPlayBridge.shared.invoke("loadMoreQueue") { [weak self] result, error in
+      DispatchQueue.main.async {
+        guard let self else { return }
+        self.loadingMore = false
+        guard error == nil, let payload = result as? [String: Any] else { return }
+        self.canLoadMore = payload["canLoadMore"] as? Bool ?? false
+        let updatedSongs = payload["songs"] as? [[String: Any]] ?? []
+        guard updatedSongs.count != self.songs.count else { return }
+        self.songs = updatedSongs
+        self.tableView.reloadData()
+        CarPlayDiagnosticLog.write("PRIVATE_UI queue_load_more complete count=\(updatedSongs.count)")
+      }
+    }
   }
 
   func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {

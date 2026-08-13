@@ -13,6 +13,12 @@ import 'player_service.dart';
 class CarPlayService {
   static const _channel = MethodChannel('com.music/carplay');
   static bool _initialized = false;
+  static String _cachedLyricSongId = '';
+  static String _cachedLyricContent = '';
+  static List<LyricLine> _cachedLyrics = const [];
+  static String _cachedFavoriteSongId = '';
+  static int _cachedFavoriteVersion = -1;
+  static bool _cachedFavorite = false;
 
   static void initialize() {
     if (_initialized || !Platform.isIOS) return;
@@ -55,7 +61,29 @@ class CarPlayService {
         final source = _stringArgument(call.arguments, 'source');
         return (await _songsForSource(source)).map(_encodeSong).toList();
       case 'getNowPlaying':
-        return _encodeNowPlaying();
+        return await _encodeNowPlaying();
+      case 'toggleFavorite':
+        final song = PlayerService().currentSong;
+        if (song == null) return false;
+        final wasFavorite = await FavoritesService.isFavorite(song);
+        if (wasFavorite) {
+          await FavoritesService.remove(song);
+        } else {
+          await FavoritesService.save(song);
+        }
+        _cachedFavoriteSongId = song.id;
+        _cachedFavoriteVersion = FavoritesService.version.value;
+        _cachedFavorite = !wasFavorite;
+        return _cachedFavorite;
+      case 'loadMoreQueue':
+        final player = PlayerService();
+        if (player.activeMode != null) {
+          await player.loadMoreModeSongs();
+        }
+        return {
+          'songs': player.queue.map(_encodeSong).toList(),
+          'canLoadMore': player.activeMode != null,
+        };
       case 'playSong':
         final source = _stringArgument(call.arguments, 'source');
         final index = _intArgument(call.arguments, 'index');
@@ -157,7 +185,7 @@ class CarPlayService {
         'cover': song.cover,
       };
 
-  static Map<String, Object?> _encodeNowPlaying() {
+  static Future<Map<String, Object?>> _encodeNowPlaying() async {
     final player = PlayerService();
     final song = player.currentSong;
     if (song == null) {
@@ -170,10 +198,24 @@ class CarPlayService {
     }
 
     final positionMs = player.livePosition.inMilliseconds;
-    final lyrics = parseLyrics(song.lyric);
+    const carPlayVisualDelayMs = 450;
+    final lyricPositionMs =
+        (positionMs - carPlayVisualDelayMs).clamp(0, positionMs);
+    if (_cachedLyricSongId != song.id || _cachedLyricContent != song.lyric) {
+      _cachedLyricSongId = song.id;
+      _cachedLyricContent = song.lyric;
+      _cachedLyrics = parseLyrics(song.lyric);
+    }
+    if (_cachedFavoriteSongId != song.id ||
+        _cachedFavoriteVersion != FavoritesService.version.value) {
+      _cachedFavoriteSongId = song.id;
+      _cachedFavoriteVersion = FavoritesService.version.value;
+      _cachedFavorite = await FavoritesService.isFavorite(song);
+    }
+    final lyrics = _cachedLyrics;
     var currentIndex = -1;
     for (var index = 0; index < lyrics.length; index++) {
-      if (lyrics[index].startMs <= positionMs) {
+      if (lyrics[index].startMs <= lyricPositionMs) {
         currentIndex = index;
       } else {
         break;
@@ -191,6 +233,7 @@ class CarPlayService {
       'positionMs': positionMs,
       'durationMs': player.liveDuration.inMilliseconds,
       'playing': player.isPlaying,
+      'favorite': _cachedFavorite,
       'previousLyric': currentIndex > 0 ? lyrics[currentIndex - 1].text : '',
       'currentLyric': current == null
           ? null
