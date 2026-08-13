@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import UIKit
 
 @objc final class CarPlayDiagnosticLog: NSObject {
@@ -85,6 +86,15 @@ import UIKit
     let manifest = info["UIApplicationSceneManifest"] as? [String: Any]
     let configurations = manifest?["UISceneConfigurations"] as? [String: Any]
     let roles = configurations?.keys.sorted().joined(separator: ", ") ?? "none"
-    write("APP_LAUNCH version=\(version)(\(build)) revision=\(revision) logic=templateDidAppear-v1 iOS=\(UIDevice.current.systemVersion) roles=\(roles)")
+    let carPlayEntitlement = runtimeEntitlement("com.apple.developer.carplay-audio")
+    write("APP_LAUNCH version=\(version)(\(build)) revision=\(revision) logic=templateDidAppear-v2 iOS=\(UIDevice.current.systemVersion) carplayEntitlement=\(carPlayEntitlement) roles=\(roles)")
+  }
+
+  private static func runtimeEntitlement(_ name: String) -> String {
+    guard let task = SecTaskCreateFromSelf(nil) else { return "task-unavailable" }
+    guard let value = SecTaskCopyValueForEntitlement(task, name as CFString, nil) else {
+      return "missing"
+    }
+    return String(describing: value)
   }
 }

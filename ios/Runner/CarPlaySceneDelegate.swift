@@ -79,6 +79,7 @@ private enum CarPlayBridgeError: LocalizedError {
   private var searchGeneration = 0
   private var rootDidAppear = false
   private var libraryRefreshStarted = false
+  private var rootRetryScheduled = false
 
   override init() {
     super.init()
@@ -118,6 +119,7 @@ private enum CarPlayBridgeError: LocalizedError {
     rootTemplate = nil
     rootDidAppear = false
     libraryRefreshStarted = false
+    rootRetryScheduled = false
     searchResults = []
     searchGeneration += 1
   }
@@ -139,6 +141,31 @@ private enum CarPlayBridgeError: LocalizedError {
       CarPlayDiagnosticLog.write("SET_ROOT completion success=\(success)")
     }
     CarPlayDiagnosticLog.write("SET_ROOT dispatched installed=\(interfaceController.rootTemplate === root)")
+    scheduleRootRetry(on: interfaceController)
+  }
+
+  private func scheduleRootRetry(on interfaceController: CPInterfaceController) {
+    guard !rootRetryScheduled else { return }
+    rootRetryScheduled = true
+    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self, weak interfaceController] in
+      guard let self, let interfaceController, !self.rootDidAppear else { return }
+      CarPlayDiagnosticLog.write("SET_ROOT retry begin reason=no_template_appearance")
+      let retryRoot = CPListTemplate(
+        title: "音乐",
+        sections: [CPListSection(items: [
+          CPListItem(text: "音乐已连接", detailText: "请选择音乐开始播放"),
+        ])]
+      )
+      self.rootTemplate = retryRoot
+      interfaceController.setRootTemplate(retryRoot, animated: false) { success, error in
+        if let error {
+          CarPlayDiagnosticLog.write("SET_ROOT retry failed error=\(error.localizedDescription)")
+        } else {
+          CarPlayDiagnosticLog.write("SET_ROOT retry completion success=\(success)")
+        }
+      }
+      CarPlayDiagnosticLog.write("SET_ROOT retry dispatched installed=\(interfaceController.rootTemplate === retryRoot)")
+    }
   }
 
   private func makeRootSections(counts: [String: Int] = [:]) -> [CPListSection] {
