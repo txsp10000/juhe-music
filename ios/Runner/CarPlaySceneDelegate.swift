@@ -1,5 +1,5 @@
-import CarPlay
 import Flutter
+import MediaPlayer
 import UIKit
 
 final class CarPlayBridge {
@@ -37,7 +37,7 @@ final class CarPlayBridge {
   func invoke(
     _ method: String,
     arguments: Any? = nil,
-    completion: @escaping (Any?, Error?) -> Void
+    completion: @escaping (Any?, Error?) -> Void = { _, _ in }
   ) {
     guard let channel else {
       CarPlayDiagnosticLog.write("BRIDGE queue method=\(method)")
@@ -53,7 +53,14 @@ final class CarPlayBridge {
     CarPlayDiagnosticLog.write("BRIDGE invoke method=\(method)")
     channel.invokeMethod(method, arguments: arguments) { result in
       if let error = result as? FlutterError {
-        completion(nil, CarPlayBridgeError.flutter(error.message))
+        completion(
+          nil,
+          NSError(
+            domain: "com.music.carplay",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: error.message ?? "操作失败"]
+          )
+        )
       } else {
         completion(result, nil)
       }
@@ -61,457 +68,562 @@ final class CarPlayBridge {
   }
 }
 
-private enum CarPlayBridgeError: LocalizedError {
-  case flutter(String?)
-
-  var errorDescription: String? {
-    switch self {
-    case .flutter(let message):
-      return message ?? "暂时无法完成此操作"
-    }
-  }
-}
-
-@objc final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
-  private var interfaceController: CPInterfaceController?
-  private var rootTemplate: CPListTemplate?
-  private var searchResults: [[String: Any]] = []
-  private var searchGeneration = 0
-  private var rootDidAppear = false
-  private var libraryRefreshStarted = false
-  private var rootRetryScheduled = false
+@objc(CarPlaySceneDelegate)
+final class CarPlaySceneDelegate: UIResponder, UIWindowSceneDelegate {
+  var window: UIWindow?
 
   override init() {
     super.init()
-    CarPlayDiagnosticLog.write("SCENE_DELEGATE initialized")
+    CarPlayDiagnosticLog.write("PRIVATE_SCENE delegate_initialized")
   }
 
-  func sceneWillEnterForeground(_ scene: UIScene) {
-    CarPlayDiagnosticLog.write("SCENE willEnterForeground")
+  func scene(
+    _ scene: UIScene,
+    willConnectTo session: UISceneSession,
+    options connectionOptions: UIScene.ConnectionOptions
+  ) {
+    CarPlayDiagnosticLog.write(
+      "PRIVATE_SCENE willConnect role=\(session.role.rawValue) type=\(String(describing: type(of: scene)))"
+    )
+    guard let windowScene = scene as? UIWindowScene else {
+      CarPlayDiagnosticLog.write("PRIVATE_SCENE failed reason=not_window_scene")
+      return
+    }
+
+    let window = UIWindow(windowScene: windowScene)
+    window.backgroundColor = UIColor(red: 0.035, green: 0.043, blue: 0.055, alpha: 1)
+    window.rootViewController = CarPlayHomeViewController()
+    self.window = window
+    window.makeKeyAndVisible()
+    CarPlayDiagnosticLog.write("PRIVATE_SCENE window_visible bounds=\(window.bounds)")
   }
 
   func sceneDidBecomeActive(_ scene: UIScene) {
-    CarPlayDiagnosticLog.write("SCENE didBecomeActive root=\(interfaceController?.rootTemplate != nil)")
-    guard rootTemplate == nil, let interfaceController else { return }
-    CarPlayDiagnosticLog.write("SET_ROOT scheduling after_scene_active")
-    DispatchQueue.main.async { [weak self, weak interfaceController] in
-      guard let self, let interfaceController, self.rootTemplate == nil else { return }
-      self.installRootTemplate(on: interfaceController)
-    }
+    CarPlayDiagnosticLog.write("PRIVATE_SCENE didBecomeActive visible=\(window?.isHidden == false)")
   }
 
-  func templateApplicationScene(
-    _ templateApplicationScene: CPTemplateApplicationScene,
-    didConnect interfaceController: CPInterfaceController
-  ) {
-    CarPlayDiagnosticLog.write("DID_CONNECT interfaceController received")
-    self.interfaceController = interfaceController
-    interfaceController.delegate = self
+  func sceneDidDisconnect(_ scene: UIScene) {
+    CarPlayDiagnosticLog.write("PRIVATE_SCENE didDisconnect")
+    window = nil
   }
+}
 
-  func templateApplicationScene(
-    _ templateApplicationScene: CPTemplateApplicationScene,
-    didDisconnectInterfaceController interfaceController: CPInterfaceController
-  ) {
-    CarPlayDiagnosticLog.write("DID_DISCONNECT")
-    interfaceController.delegate = nil
-    self.interfaceController = nil
-    rootTemplate = nil
-    rootDidAppear = false
-    libraryRefreshStarted = false
-    rootRetryScheduled = false
-    searchResults = []
-    searchGeneration += 1
-  }
+private struct CarPlayCollection {
+  let title: String
+  let subtitle: String
+  let source: String
+  let symbol: String
+  let tint: UIColor
+}
 
-  private func installRootTemplate(on interfaceController: CPInterfaceController) {
-    let root = CPListTemplate(
-      title: "音乐",
-      sections: [CPListSection(items: [
-        CPListItem(text: "CarPlay 已连接", detailText: "正在载入音乐库"),
-      ])]
-    )
-    rootTemplate = root
-    CarPlayDiagnosticLog.write("SET_ROOT begin after_scene_active type=CPListTemplate sections=1 items=1")
-    interfaceController.setRootTemplate(root, animated: true) { success, error in
-      if let error {
-        CarPlayDiagnosticLog.write("SET_ROOT completion failed error=\(error.localizedDescription)")
-        return
-      }
-      CarPlayDiagnosticLog.write("SET_ROOT completion success=\(success)")
-    }
-    CarPlayDiagnosticLog.write("SET_ROOT dispatched installed=\(interfaceController.rootTemplate === root)")
-    scheduleRootRetry(on: interfaceController)
-  }
-
-  private func scheduleRootRetry(on interfaceController: CPInterfaceController) {
-    guard !rootRetryScheduled else { return }
-    rootRetryScheduled = true
-    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self, weak interfaceController] in
-      guard let self, let interfaceController, !self.rootDidAppear else { return }
-      CarPlayDiagnosticLog.write("SET_ROOT retry begin reason=no_template_appearance")
-      let retryRoot = CPListTemplate(
-        title: "音乐",
-        sections: [CPListSection(items: [
-          CPListItem(text: "音乐已连接", detailText: "请选择音乐开始播放"),
-        ])]
-      )
-      self.rootTemplate = retryRoot
-      interfaceController.setRootTemplate(retryRoot, animated: false) { success, error in
-        if let error {
-          CarPlayDiagnosticLog.write("SET_ROOT retry failed error=\(error.localizedDescription)")
-        } else {
-          CarPlayDiagnosticLog.write("SET_ROOT retry completion success=\(success)")
-        }
-      }
-      CarPlayDiagnosticLog.write("SET_ROOT retry dispatched installed=\(interfaceController.rootTemplate === retryRoot)")
-    }
-  }
-
-  private func makeRootSections(counts: [String: Int] = [:]) -> [CPListSection] {
-    let modes = CPListItem(
-      text: "听歌场景",
-      detailText: "按场景发现音乐"
-    )
-    modes.handler = { [weak self] _, completion in
-      self?.openModes()
-      completion()
-    }
-
-    let search = CPListItem(
-      text: "搜索歌曲",
-      detailText: "按歌曲名或歌手搜索"
-    )
-    search.handler = { [weak self] _, completion in
-      guard let self else {
-        completion()
-        return
-      }
-      let search = CPSearchTemplate()
-      search.delegate = self
-      self.interfaceController?.pushTemplate(search, animated: true)
-      completion()
-    }
-
-    let nowPlaying = CPListItem(
-      text: "打开正在播放",
-      detailText: "查看歌曲与播放控制"
-    )
-    nowPlaying.handler = { [weak self] _, completion in
-      self?.showNowPlaying()
-      completion()
-    }
-
-    return [CPListSection(items: [
-      collectionItem(
-        title: "最近播放",
-        detail: countText(counts["recent"]),
-        source: "recent"
-      ),
-      collectionItem(
-        title: "我的收藏",
-        detail: countText(counts["favorites"]),
-        source: "favorites"
-      ),
-      collectionItem(
-        title: "当前队列",
-        detail: countText(counts["queue"]),
-        source: "queue"
-      ),
-      modes,
-      search,
-      nowPlaying,
-    ])]
-  }
-
-  private func startLibraryRefreshAfterRootAppears() {
-    guard rootDidAppear, !libraryRefreshStarted else { return }
-    guard let root = rootTemplate,
-          let installedRoot = interfaceController?.rootTemplate,
-          installedRoot === root else {
-      CarPlayDiagnosticLog.write("REFRESH_LIBRARY skipped root_not_attached")
-      return
-    }
-    libraryRefreshStarted = true
-    CarPlayDiagnosticLog.write("REFRESH_LIBRARY begin after_root_appeared")
-    root.updateSections(makeRootSections())
-    CarPlayDiagnosticLog.write("REFRESH_LIBRARY static_sections_applied")
-    refreshLibrary()
-  }
-
-  private func collectionItem(
-    title: String,
-    detail: String,
-    source: String
-  ) -> CPListItem {
-    let item = CPListItem(text: title, detailText: detail)
-    item.handler = { [weak self] _, completion in
-      self?.openCollection(title: title, source: source, completion: completion)
-        ?? completion()
-    }
-    return item
-  }
-
-  private func openModes() {
-    let loading = CPListItem(text: "正在加载听歌场景…", detailText: nil)
-    let template = CPListTemplate(
+private final class CarPlayHomeViewController: UIViewController {
+  private let collections = [
+    CarPlayCollection(
+      title: "最近播放",
+      subtitle: "继续最近听过的音乐",
+      source: "recent",
+      symbol: "clock.fill",
+      tint: UIColor(red: 0.20, green: 0.72, blue: 0.96, alpha: 1)
+    ),
+    CarPlayCollection(
+      title: "我的收藏",
+      subtitle: "已收藏的歌曲",
+      source: "favorites",
+      symbol: "heart.fill",
+      tint: UIColor(red: 0.96, green: 0.31, blue: 0.40, alpha: 1)
+    ),
+    CarPlayCollection(
+      title: "当前队列",
+      subtitle: "查看正在播放的队列",
+      source: "queue",
+      symbol: "text.line.first.and.arrowtriangle.forward",
+      tint: UIColor(red: 0.31, green: 0.79, blue: 0.55, alpha: 1)
+    ),
+    CarPlayCollection(
       title: "听歌场景",
-      sections: [CPListSection(items: [loading])]
-    )
-    interfaceController?.pushTemplate(template, animated: true)
+      subtitle: "按心情发现音乐",
+      source: "modes",
+      symbol: "sparkles",
+      tint: UIColor(red: 0.93, green: 0.66, blue: 0.25, alpha: 1)
+    ),
+  ]
 
-    CarPlayBridge.shared.invoke("getModes") { [weak template] result, error in
-      DispatchQueue.main.async {
-        guard let template else { return }
-        guard error == nil, let modes = result as? [[String: Any]] else {
-          template.updateSections([
-            CPListSection(items: [
-              CPListItem(text: "听歌场景暂时不可用", detailText: "请稍后重试"),
-            ]),
-          ])
-          return
-        }
-        let items = modes.prefix(CPListTemplate.maximumItemCount).map { [weak self] mode -> CPListItem in
-          let name = mode["name"] as? String ?? "听歌场景"
-          let sceneModeId = mode["sceneModeId"] as? Int ?? -1
-          let item = CPListItem(text: name, detailText: "点按后开始播放")
-          item.handler = { _, completion in
-            self?.playMode(name: name, sceneModeId: sceneModeId, completion: completion)
-              ?? completion()
+  private let titleLabel = UILabel()
+  private let statusLabel = UILabel()
+  private let grid = UIStackView()
+  private let nowPlayingBar = CarPlayNowPlayingBar()
+
+  override func viewDidLoad() {
+    super.viewDidLoad()
+    view.backgroundColor = UIColor(red: 0.035, green: 0.043, blue: 0.055, alpha: 1)
+    buildLayout()
+    refreshStatus()
+    CarPlayDiagnosticLog.write("PRIVATE_UI home_view_did_load")
+  }
+
+  override func viewDidAppear(_ animated: Bool) {
+    super.viewDidAppear(animated)
+    refreshStatus()
+    CarPlayDiagnosticLog.write("PRIVATE_UI home_view_did_appear")
+  }
+
+  private func buildLayout() {
+    titleLabel.text = "音乐"
+    titleLabel.font = .systemFont(ofSize: 34, weight: .bold)
+    titleLabel.textColor = .white
+
+    statusLabel.text = "正在连接音乐库"
+    statusLabel.font = .systemFont(ofSize: 15, weight: .medium)
+    statusLabel.textColor = UIColor.white.withAlphaComponent(0.62)
+
+    let heading = UIStackView(arrangedSubviews: [titleLabel, statusLabel])
+    heading.axis = .vertical
+    heading.spacing = 3
+
+    grid.axis = .vertical
+    grid.spacing = 12
+    for pairStart in stride(from: 0, to: collections.count, by: 2) {
+      let row = UIStackView()
+      row.axis = .horizontal
+      row.spacing = 12
+      row.distribution = .fillEqually
+      for index in pairStart..<min(pairStart + 2, collections.count) {
+        let button = CarPlayCollectionButton(collection: collections[index])
+        button.tag = index
+        button.addTarget(self, action: #selector(openCollection(_:)), for: .touchUpInside)
+        row.addArrangedSubview(button)
+      }
+      grid.addArrangedSubview(row)
+    }
+
+    nowPlayingBar.onControl = { action in
+      CarPlayBridge.shared.invoke(action) { [weak self] _, error in
+        DispatchQueue.main.async {
+          if let error {
+            self?.showError(error.localizedDescription)
+          } else {
+            self?.nowPlayingBar.refresh()
           }
-          return item
         }
-        template.updateSections([CPListSection(items: items)])
       }
     }
+
+    [heading, grid, nowPlayingBar].forEach {
+      $0.translatesAutoresizingMaskIntoConstraints = false
+      view.addSubview($0)
+    }
+
+    NSLayoutConstraint.activate([
+      heading.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 18),
+      heading.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 28),
+      heading.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -28),
+
+      grid.topAnchor.constraint(equalTo: heading.bottomAnchor, constant: 18),
+      grid.leadingAnchor.constraint(equalTo: heading.leadingAnchor),
+      grid.trailingAnchor.constraint(equalTo: heading.trailingAnchor),
+
+      nowPlayingBar.leadingAnchor.constraint(equalTo: heading.leadingAnchor),
+      nowPlayingBar.trailingAnchor.constraint(equalTo: heading.trailingAnchor),
+      nowPlayingBar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -14),
+      nowPlayingBar.heightAnchor.constraint(equalToConstant: 78),
+      grid.bottomAnchor.constraint(lessThanOrEqualTo: nowPlayingBar.topAnchor, constant: -16),
+    ])
   }
 
-  private func refreshLibrary() {
-    CarPlayBridge.shared.invoke("getLibrary") { [weak self] result, _ in
-      guard let self, let library = result as? [String: Any] else { return }
-      let counts = [
-        "recent": (library["recent"] as? [Any])?.count ?? 0,
-        "favorites": (library["favorites"] as? [Any])?.count ?? 0,
-        "queue": (library["queue"] as? [Any])?.count ?? 0,
-      ]
+  private func refreshStatus() {
+    CarPlayBridge.shared.invoke("getLibrary") { [weak self] result, error in
       DispatchQueue.main.async {
-        guard let root = self.rootTemplate,
-              let installedRoot = self.interfaceController?.rootTemplate,
-              installedRoot === root else {
-          return
-        }
-        root.updateSections(self.makeRootSections(counts: counts))
-      }
-    }
-  }
-
-  private func openCollection(
-    title: String,
-    source: String,
-    completion: @escaping () -> Void
-  ) {
-    let loading = CPListTemplate(
-      title: title,
-      sections: [
-        CPListSection(items: [
-          CPListItem(text: "正在加载…", detailText: nil),
-        ]),
-      ]
-    )
-    interfaceController?.pushTemplate(loading, animated: true)
-    completion()
-
-    CarPlayBridge.shared.invoke("getSongs", arguments: ["source": source]) {
-      [weak self, weak loading] result, error in
-      DispatchQueue.main.async {
-        guard let self, let loading else { return }
-        guard error == nil, let songs = result as? [[String: Any]] else {
-          loading.updateSections([
-            CPListSection(items: [
-              CPListItem(text: "加载失败", detailText: "请返回后重试"),
-            ]),
-          ])
-          return
-        }
-        guard !songs.isEmpty else {
-          loading.updateSections([
-            CPListSection(items: [
-              CPListItem(text: "这里还没有歌曲", detailText: nil),
-            ]),
-          ])
-          return
-        }
-        loading.updateSections([
-          CPListSection(items: self.songItems(songs, source: source)),
-        ])
-      }
-    }
-  }
-
-  private func songItems(
-    _ songs: [[String: Any]],
-    source: String
-  ) -> [CPListItem] {
-    songs.prefix(CPListTemplate.maximumItemCount).enumerated().map { index, song in
-      let name = song["name"] as? String ?? "未知歌曲"
-      let singer = song["singer"] as? String ?? "未知歌手"
-      let album = song["album"] as? String ?? ""
-      let detail = album.isEmpty ? singer : "\(singer) · \(album)"
-      let item = CPListItem(text: name, detailText: detail)
-      item.handler = { [weak self] _, completion in
-        self?.playSong(source: source, index: index, completion: completion)
-          ?? completion()
-      }
-      return item
-    }
-  }
-
-  private func playSong(
-    source: String,
-    index: Int,
-    completion: @escaping () -> Void
-  ) {
-    CarPlayBridge.shared.invoke(
-      "playSong",
-      arguments: ["source": source, "index": index]
-    ) { [weak self] _, error in
-      DispatchQueue.main.async {
-        completion()
+        guard let self else { return }
         if let error {
-          self?.showError(error.localizedDescription)
-        } else {
-          self?.showNowPlaying()
-          self?.refreshLibrary()
+          self.statusLabel.text = "音乐库暂不可用：\(error.localizedDescription)"
+          return
         }
+        let library = result as? [String: Any]
+        let count = ["recent", "favorites", "queue"].reduce(0) { partial, key in
+          partial + ((library?[key] as? [Any])?.count ?? 0)
+        }
+        self.statusLabel.text = count > 0 ? "音乐库已连接" : "选择一个分类开始播放"
+        self.nowPlayingBar.refresh()
       }
     }
   }
 
-  private func playMode(
-    name: String,
-    sceneModeId: Int,
-    completion: @escaping () -> Void
-  ) {
-    CarPlayBridge.shared.invoke(
-      "playMode",
-      arguments: ["sceneModeId": sceneModeId]
-    ) { [weak self] result, error in
-      DispatchQueue.main.async {
-        completion()
-        if let error {
-          self?.showError(error.localizedDescription)
-        } else if (result as? Bool) == true {
-          self?.showNowPlaying()
-          self?.refreshLibrary()
-        } else {
-          self?.showError("“\(name)”暂时没有可播放歌曲")
-        }
-      }
+  @objc private func openCollection(_ sender: UIButton) {
+    guard collections.indices.contains(sender.tag) else { return }
+    let collection = collections[sender.tag]
+    let controller: UIViewController
+    if collection.source == "modes" {
+      controller = CarPlayModeListViewController()
+    } else {
+      controller = CarPlaySongListViewController(
+        title: collection.title,
+        source: collection.source
+      )
     }
-  }
-
-  private func showNowPlaying() {
-    interfaceController?.pushTemplate(CPNowPlayingTemplate.shared, animated: true)
+    controller.modalPresentationStyle = .fullScreen
+    present(controller, animated: true)
   }
 
   private func showError(_ message: String) {
-    let action = CPAlertAction(title: "知道了", style: .default) { _ in }
-    let alert = CPAlertTemplate(titleVariants: [message], actions: [action])
-    interfaceController?.presentTemplate(alert, animated: true)
-  }
-
-  private func countText(_ count: Int?) -> String {
-    guard let count else { return "正在同步…" }
-    return count == 0 ? "暂无歌曲" : "\(count) 首歌曲"
+    let alert = UIAlertController(title: "无法完成操作", message: message, preferredStyle: .alert)
+    alert.addAction(UIAlertAction(title: "知道了", style: .default))
+    present(alert, animated: true)
   }
 }
 
-extension CarPlaySceneDelegate: CPInterfaceControllerDelegate {
-  func templateWillAppear(_ aTemplate: CPTemplate, animated: Bool) {
-    CarPlayDiagnosticLog.write(
-      "TEMPLATE willAppear type=\(String(describing: type(of: aTemplate))) animated=\(animated)"
-    )
-  }
+private final class CarPlayCollectionButton: UIControl {
+  init(collection: CarPlayCollection) {
+    super.init(frame: .zero)
+    backgroundColor = UIColor.white.withAlphaComponent(0.075)
+    layer.cornerRadius = 8
 
-  func templateDidAppear(_ aTemplate: CPTemplate, animated: Bool) {
-    let isRoot = aTemplate === rootTemplate
-    CarPlayDiagnosticLog.write(
-      "TEMPLATE didAppear type=\(String(describing: type(of: aTemplate))) root=\(isRoot)"
-    )
-    guard isRoot else { return }
-    rootDidAppear = true
-    startLibraryRefreshAfterRootAppears()
-  }
+    let icon = UIImageView(image: UIImage(systemName: collection.symbol))
+    icon.tintColor = collection.tint
+    icon.contentMode = .scaleAspectFit
 
-  func templateWillDisappear(_ aTemplate: CPTemplate, animated: Bool) {
-    CarPlayDiagnosticLog.write(
-      "TEMPLATE willDisappear type=\(String(describing: type(of: aTemplate)))"
-    )
-  }
+    let title = UILabel()
+    title.text = collection.title
+    title.textColor = .white
+    title.font = .systemFont(ofSize: 21, weight: .semibold)
 
-  func templateDidDisappear(_ aTemplate: CPTemplate, animated: Bool) {
-    CarPlayDiagnosticLog.write(
-      "TEMPLATE didDisappear type=\(String(describing: type(of: aTemplate)))"
-    )
-  }
-}
+    let subtitle = UILabel()
+    subtitle.text = collection.subtitle
+    subtitle.textColor = UIColor.white.withAlphaComponent(0.55)
+    subtitle.font = .systemFont(ofSize: 13, weight: .regular)
 
-extension CarPlaySceneDelegate: CPSearchTemplateDelegate {
-  func searchTemplate(
-    _ searchTemplate: CPSearchTemplate,
-    updatedSearchText searchText: String,
-    completionHandler: @escaping ([CPListItem]) -> Void
-  ) {
-    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-    searchGeneration += 1
-    let generation = searchGeneration
-    guard !query.isEmpty else {
-      searchResults = []
-      completionHandler([])
-      return
+    let labels = UIStackView(arrangedSubviews: [title, subtitle])
+    labels.axis = .vertical
+    labels.spacing = 3
+
+    [icon, labels].forEach {
+      $0.isUserInteractionEnabled = false
+      $0.translatesAutoresizingMaskIntoConstraints = false
+      addSubview($0)
     }
-    CarPlayBridge.shared.invoke("search", arguments: ["query": query]) {
-      [weak self] result, _ in
+
+    NSLayoutConstraint.activate([
+      heightAnchor.constraint(equalToConstant: 78),
+      icon.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
+      icon.centerYAnchor.constraint(equalTo: centerYAnchor),
+      icon.widthAnchor.constraint(equalToConstant: 30),
+      icon.heightAnchor.constraint(equalToConstant: 30),
+      labels.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 14),
+      labels.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+      labels.centerYAnchor.constraint(equalTo: centerYAnchor),
+    ])
+  }
+
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override var isHighlighted: Bool {
+    didSet { alpha = isHighlighted ? 0.62 : 1 }
+  }
+}
+
+private final class CarPlayNowPlayingBar: UIView {
+  var onControl: ((String) -> Void)?
+
+  private let titleLabel = UILabel()
+  private let artistLabel = UILabel()
+  private let playButton = UIButton(type: .system)
+
+  override init(frame: CGRect) {
+    super.init(frame: frame)
+    backgroundColor = UIColor.white.withAlphaComponent(0.09)
+    layer.cornerRadius = 8
+
+    titleLabel.text = "暂无播放"
+    titleLabel.textColor = .white
+    titleLabel.font = .systemFont(ofSize: 18, weight: .semibold)
+    titleLabel.lineBreakMode = .byTruncatingTail
+
+    artistLabel.text = "选择歌曲开始播放"
+    artistLabel.textColor = UIColor.white.withAlphaComponent(0.56)
+    artistLabel.font = .systemFont(ofSize: 13)
+    artistLabel.lineBreakMode = .byTruncatingTail
+
+    let labels = UIStackView(arrangedSubviews: [titleLabel, artistLabel])
+    labels.axis = .vertical
+    labels.spacing = 3
+
+    let previous = controlButton(symbol: "backward.fill", action: #selector(previousTapped))
+    playButton.setImage(UIImage(systemName: "play.fill"), for: .normal)
+    playButton.tintColor = .white
+    playButton.addTarget(self, action: #selector(playTapped), for: .touchUpInside)
+    let next = controlButton(symbol: "forward.fill", action: #selector(nextTapped))
+    let controls = UIStackView(arrangedSubviews: [previous, playButton, next])
+    controls.axis = .horizontal
+    controls.spacing = 16
+    controls.distribution = .fillEqually
+
+    [labels, controls].forEach {
+      $0.translatesAutoresizingMaskIntoConstraints = false
+      addSubview($0)
+    }
+    NSLayoutConstraint.activate([
+      labels.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
+      labels.centerYAnchor.constraint(equalTo: centerYAnchor),
+      labels.trailingAnchor.constraint(lessThanOrEqualTo: controls.leadingAnchor, constant: -12),
+      controls.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
+      controls.centerYAnchor.constraint(equalTo: centerYAnchor),
+      controls.widthAnchor.constraint(equalToConstant: 150),
+      controls.heightAnchor.constraint(equalToConstant: 48),
+    ])
+  }
+
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  func refresh() {
+    let info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+    titleLabel.text = info[MPMediaItemPropertyTitle] as? String ?? "暂无播放"
+    artistLabel.text = info[MPMediaItemPropertyArtist] as? String ?? "选择歌曲开始播放"
+    let rate = (info[MPNowPlayingInfoPropertyPlaybackRate] as? NSNumber)?.doubleValue ?? 0
+    playButton.setImage(UIImage(systemName: rate > 0 ? "pause.fill" : "play.fill"), for: .normal)
+  }
+
+  private func controlButton(symbol: String, action: Selector) -> UIButton {
+    let button = UIButton(type: .system)
+    button.setImage(UIImage(systemName: symbol), for: .normal)
+    button.tintColor = .white
+    button.addTarget(self, action: action, for: .touchUpInside)
+    return button
+  }
+
+  @objc private func previousTapped() { onControl?("previous") }
+  @objc private func playTapped() { onControl?("togglePlayPause") }
+  @objc private func nextTapped() { onControl?("next") }
+}
+
+private class CarPlayBaseListViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
+  let tableView = UITableView(frame: .zero, style: .plain)
+  private let heading: String
+
+  init(title: String) {
+    heading = title
+    super.init(nibName: nil, bundle: nil)
+  }
+
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func viewDidLoad() {
+    super.viewDidLoad()
+    view.backgroundColor = UIColor(red: 0.035, green: 0.043, blue: 0.055, alpha: 1)
+
+    let back = UIButton(type: .system)
+    back.setImage(UIImage(systemName: "chevron.left"), for: .normal)
+    back.tintColor = .white
+    back.addTarget(self, action: #selector(close), for: .touchUpInside)
+
+    let title = UILabel()
+    title.text = heading
+    title.textColor = .white
+    title.font = .systemFont(ofSize: 28, weight: .bold)
+
+    let header = UIStackView(arrangedSubviews: [back, title])
+    header.axis = .horizontal
+    header.spacing = 14
+    back.widthAnchor.constraint(equalToConstant: 44).isActive = true
+
+    tableView.backgroundColor = .clear
+    tableView.separatorColor = UIColor.white.withAlphaComponent(0.12)
+    tableView.dataSource = self
+    tableView.delegate = self
+    tableView.rowHeight = 66
+    tableView.tableFooterView = UIView()
+
+    [header, tableView].forEach {
+      $0.translatesAutoresizingMaskIntoConstraints = false
+      view.addSubview($0)
+    }
+    NSLayoutConstraint.activate([
+      header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
+      header.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 18),
+      header.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -18),
+      header.heightAnchor.constraint(equalToConstant: 48),
+      tableView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 10),
+      tableView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 20),
+      tableView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -20),
+      tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+    ])
+  }
+
+  @objc private func close() { dismiss(animated: true) }
+
+  func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { 0 }
+
+  func tableView(
+    _ tableView: UITableView,
+    cellForRowAt indexPath: IndexPath
+  ) -> UITableViewCell {
+    UITableViewCell(style: .subtitle, reuseIdentifier: nil)
+  }
+
+  func configureCell(_ cell: UITableViewCell, title: String, detail: String) {
+    cell.backgroundColor = .clear
+    cell.textLabel?.text = title
+    cell.textLabel?.textColor = .white
+    cell.textLabel?.font = .systemFont(ofSize: 18, weight: .semibold)
+    cell.detailTextLabel?.text = detail
+    cell.detailTextLabel?.textColor = UIColor.white.withAlphaComponent(0.52)
+    cell.detailTextLabel?.font = .systemFont(ofSize: 13)
+    cell.accessoryType = .disclosureIndicator
+    cell.tintColor = UIColor.white.withAlphaComponent(0.45)
+  }
+}
+
+private final class CarPlaySongListViewController: CarPlayBaseListViewController {
+  private let source: String
+  private var songs: [[String: Any]] = []
+  private var message = "正在载入音乐…"
+
+  init(title: String, source: String) {
+    self.source = source
+    super.init(title: title)
+  }
+
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func viewDidLoad() {
+    super.viewDidLoad()
+    CarPlayBridge.shared.invoke("getSongs", arguments: ["source": source]) { [weak self] result, error in
       DispatchQueue.main.async {
-        guard let self, generation == self.searchGeneration,
-              let songs = result as? [[String: Any]] else {
-          completionHandler([])
-          return
+        guard let self else { return }
+        if let error {
+          self.message = "加载失败：\(error.localizedDescription)"
+        } else {
+          self.songs = result as? [[String: Any]] ?? []
+          self.message = self.songs.isEmpty ? "这里还没有歌曲" : ""
         }
-        self.searchResults = Array(songs.prefix(CPListTemplate.maximumItemCount))
-        let items = self.searchResults.enumerated().map { index, song in
-          let name = song["name"] as? String ?? "未知歌曲"
-          let singer = song["singer"] as? String ?? "未知歌手"
-          let item = CPListItem(text: name, detailText: singer)
-          item.userInfo = index
-          return item
-        }
-        completionHandler(items)
+        self.tableView.reloadData()
       }
     }
   }
 
-  func searchTemplate(
-    _ searchTemplate: CPSearchTemplate,
-    selectedResult item: CPListItem,
-    completionHandler: @escaping () -> Void
-  ) {
-    guard let index = item.userInfo as? Int, searchResults.indices.contains(index) else {
-      completionHandler()
-      return
+  override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+    max(1, songs.count)
+  }
+
+  override func tableView(
+    _ tableView: UITableView,
+    cellForRowAt indexPath: IndexPath
+  ) -> UITableViewCell {
+    let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
+    guard songs.indices.contains(indexPath.row) else {
+      configureCell(cell, title: message, detail: "")
+      cell.accessoryType = .none
+      cell.selectionStyle = .none
+      return cell
     }
+    let song = songs[indexPath.row]
+    configureCell(
+      cell,
+      title: song["name"] as? String ?? "未知歌曲",
+      detail: song["singer"] as? String ?? "未知歌手"
+    )
+    return cell
+  }
+
+  func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+    tableView.deselectRow(at: indexPath, animated: true)
+    guard songs.indices.contains(indexPath.row) else { return }
     CarPlayBridge.shared.invoke(
-      "playSearchResults",
-      arguments: ["songs": searchResults, "index": index]
+      "playSong",
+      arguments: ["source": source, "index": indexPath.row]
     ) { [weak self] _, error in
       DispatchQueue.main.async {
-        completionHandler()
         if let error {
-          self?.showError(error.localizedDescription)
+          let alert = UIAlertController(
+            title: "播放失败",
+            message: error.localizedDescription,
+            preferredStyle: .alert
+          )
+          alert.addAction(UIAlertAction(title: "知道了", style: .default))
+          self?.present(alert, animated: true)
         } else {
-          self?.showNowPlaying()
-          self?.refreshLibrary()
+          self?.dismiss(animated: true)
         }
+      }
+    }
+  }
+}
+
+private final class CarPlayModeListViewController: CarPlayBaseListViewController {
+  private var modes: [[String: Any]] = []
+  private var message = "正在载入听歌场景…"
+
+  init() {
+    super.init(title: "听歌场景")
+  }
+
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func viewDidLoad() {
+    super.viewDidLoad()
+    CarPlayBridge.shared.invoke("getModes") { [weak self] result, error in
+      DispatchQueue.main.async {
+        guard let self else { return }
+        if let error {
+          self.message = "加载失败：\(error.localizedDescription)"
+        } else {
+          self.modes = result as? [[String: Any]] ?? []
+          self.message = self.modes.isEmpty ? "暂无可用场景" : ""
+        }
+        self.tableView.reloadData()
+      }
+    }
+  }
+
+  override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+    max(1, modes.count)
+  }
+
+  override func tableView(
+    _ tableView: UITableView,
+    cellForRowAt indexPath: IndexPath
+  ) -> UITableViewCell {
+    let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
+    guard modes.indices.contains(indexPath.row) else {
+      configureCell(cell, title: message, detail: "")
+      cell.accessoryType = .none
+      cell.selectionStyle = .none
+      return cell
+    }
+    configureCell(
+      cell,
+      title: modes[indexPath.row]["name"] as? String ?? "听歌场景",
+      detail: "点按后开始播放"
+    )
+    return cell
+  }
+
+  func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+    tableView.deselectRow(at: indexPath, animated: true)
+    guard modes.indices.contains(indexPath.row),
+          let sceneModeId = modes[indexPath.row]["sceneModeId"] as? Int else { return }
+    CarPlayBridge.shared.invoke("playMode", arguments: ["sceneModeId": sceneModeId]) {
+      [weak self] result, error in
+      DispatchQueue.main.async {
+        guard error == nil, (result as? Bool) == true else {
+          let alert = UIAlertController(
+            title: "播放失败",
+            message: error?.localizedDescription ?? "这个场景暂时没有可播放歌曲",
+            preferredStyle: .alert
+          )
+          alert.addAction(UIAlertAction(title: "知道了", style: .default))
+          self?.present(alert, animated: true)
+          return
+        }
+        self?.dismiss(animated: true)
       }
     }
   }

@@ -61,7 +61,7 @@ jobs:
           flutter build ios --release --no-codesign \
             --build-number "$GITHUB_RUN_NUMBER" 2>&1 | tee ios-build.log
 
-      - name: Sign app with CarPlay entitlement
+      - name: Sign TrollStore CarPlay app
         run: |
           set -euo pipefail
           app_path=$(find build/ios -type d -name Runner.app -path '*iphoneos*' -print -quit)
@@ -89,10 +89,10 @@ jobs:
           codesign -d --entitlements :- "$app_path" \
             > build/ios/ipa/embedded-entitlements.plist
           carplay_enabled=$(/usr/libexec/PlistBuddy \
-            -c 'Print :com.apple.developer.carplay-audio' \
+            -c 'Print :SBStarkCapable' \
             build/ios/ipa/embedded-entitlements.plist)
           if [ "$carplay_enabled" != "true" ]; then
-            echo "CarPlay audio entitlement is missing from Runner.app" >&2
+            echo "TrollStore CarPlay entitlement is missing from Runner.app" >&2
             exit 1
           fi
 
@@ -106,16 +106,16 @@ jobs:
           fi
           mkdir -p build/ios/ipa/Payload
           ditto "$app_path" build/ios/ipa/Payload/Runner.app
-          ipa_name="JuheMusic-iOS-CarPlay-${GITHUB_RUN_NUMBER}.ipa"
+          ipa_name="JuheMusic-iOS-CarPlay-TrollStore-${GITHUB_RUN_NUMBER}.ipa"
           (cd build/ios/ipa && zip -qry "$ipa_name" Payload)
           rm -rf build/ios/ipa/Payload
 
       - name: Upload iOS build
         uses: actions/upload-artifact@v4
         with:
-          name: JuheMusic-iOS-CarPlay-${{ github.run_number }}
+          name: JuheMusic-iOS-CarPlay-TrollStore-${{ github.run_number }}
           path: |
-            build/ios/ipa/JuheMusic-iOS-CarPlay-${{ github.run_number }}.ipa
+            build/ios/ipa/JuheMusic-iOS-CarPlay-TrollStore-${{ github.run_number }}.ipa
             build/ios/ipa/embedded-entitlements.plist
           if-no-files-found: error
           retention-days: 30

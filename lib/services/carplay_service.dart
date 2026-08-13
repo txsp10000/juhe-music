@@ -85,6 +85,15 @@ class CarPlayService {
             .toList();
         await _playSongs(songs, _intArgument(arguments, 'index'));
         return true;
+      case 'previous':
+        PlayerService().prev();
+        return true;
+      case 'next':
+        PlayerService().next();
+        return true;
+      case 'togglePlayPause':
+        await PlayerService().togglePlayPause();
+        return true;
       default:
         throw PlatformException(
           code: 'not_implemented',
