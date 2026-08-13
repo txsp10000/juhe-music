@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../api/music_api.dart';
 import '../models/listening_mode.dart';
 import '../models/song.dart';
+import '../utils/lyric_parser.dart';
 import 'favorites_service.dart';
 import 'playback_history_service.dart';
 import 'player_service.dart';
@@ -53,6 +54,8 @@ class CarPlayService {
       case 'getSongs':
         final source = _stringArgument(call.arguments, 'source');
         return (await _songsForSource(source)).map(_encodeSong).toList();
+      case 'getNowPlaying':
+        return _encodeNowPlaying();
       case 'playSong':
         final source = _stringArgument(call.arguments, 'source');
         final index = _intArgument(call.arguments, 'index');
@@ -153,6 +156,63 @@ class CarPlayService {
         'duration': song.duration,
         'cover': song.cover,
       };
+
+  static Map<String, Object?> _encodeNowPlaying() {
+    final player = PlayerService();
+    final song = player.currentSong;
+    if (song == null) {
+      return {
+        'hasSong': false,
+        'positionMs': 0,
+        'durationMs': 0,
+        'playing': false,
+      };
+    }
+
+    final positionMs = player.livePosition.inMilliseconds;
+    final lyrics = parseLyrics(song.lyric);
+    var currentIndex = -1;
+    for (var index = 0; index < lyrics.length; index++) {
+      if (lyrics[index].startMs <= positionMs) {
+        currentIndex = index;
+      } else {
+        break;
+      }
+    }
+
+    final current = currentIndex >= 0 ? lyrics[currentIndex] : null;
+    return {
+      'hasSong': true,
+      'id': song.id,
+      'name': song.name,
+      'singer': song.singer,
+      'album': song.album,
+      'cover': song.cover,
+      'positionMs': positionMs,
+      'durationMs': player.liveDuration.inMilliseconds,
+      'playing': player.isPlaying,
+      'previousLyric': currentIndex > 0 ? lyrics[currentIndex - 1].text : '',
+      'currentLyric': current == null
+          ? null
+          : {
+              'startMs': current.startMs,
+              'durationMs': current.durationMs,
+              'text': current.text,
+              'syllables': current.syllables
+                  .map((syllable) => {
+                        'startMs': syllable.startMs,
+                        'durationMs': syllable.durationMs,
+                        'text': syllable.text,
+                      })
+                  .toList(),
+            },
+      'nextLyric': currentIndex + 1 < lyrics.length
+          ? lyrics[currentIndex + 1].text
+          : currentIndex < 0 && lyrics.isNotEmpty
+              ? lyrics.first.text
+              : '',
+    };
+  }
 
   static String _stringArgument(Object? arguments, String key) {
     final values = Map<Object?, Object?>.from(arguments as Map);

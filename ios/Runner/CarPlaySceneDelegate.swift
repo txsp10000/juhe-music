@@ -256,6 +256,12 @@ private final class CarPlayHomeViewController: UIViewController {
         }
       }
     }
+    nowPlayingBar.onOpen = { [weak self] in
+      guard let self, self.presentedViewController == nil else { return }
+      let controller = CarPlayNowPlayingViewController()
+      controller.modalPresentationStyle = .fullScreen
+      self.present(controller, animated: true)
+    }
 
     let content = UIStackView(arrangedSubviews: [heading, grid, nowPlayingBar])
     content.axis = .vertical
@@ -402,8 +408,9 @@ private final class CarPlayCollectionButton: UIControl {
   }
 }
 
-private final class CarPlayNowPlayingBar: UIView {
+private final class CarPlayNowPlayingBar: UIView, UIGestureRecognizerDelegate {
   var onControl: ((String) -> Void)?
+  var onOpen: (() -> Void)?
 
   private let titleLabel = UILabel()
   private let artistLabel = UILabel()
@@ -444,6 +451,10 @@ private final class CarPlayNowPlayingBar: UIView {
     controls.axis = .horizontal
     controls.spacing = 8
     controls.distribution = .fillEqually
+
+    let tap = UITapGestureRecognizer(target: self, action: #selector(openTapped))
+    tap.delegate = self
+    addGestureRecognizer(tap)
 
     [labels, controls].forEach {
       $0.translatesAutoresizingMaskIntoConstraints = false
@@ -502,6 +513,408 @@ private final class CarPlayNowPlayingBar: UIView {
   @objc private func previousTapped() { onControl?("previous") }
   @objc private func playTapped() { onControl?("togglePlayPause") }
   @objc private func nextTapped() { onControl?("next") }
+  @objc private func openTapped() { onOpen?() }
+
+  func gestureRecognizer(
+    _ gestureRecognizer: UIGestureRecognizer,
+    shouldReceive touch: UITouch
+  ) -> Bool {
+    var touchedView: UIView? = touch.view
+    while let view = touchedView, view !== self {
+      if view is UIControl { return false }
+      touchedView = view.superview
+    }
+    return true
+  }
+}
+
+private struct CarPlayLyricSyllable {
+  let startMs: Int
+  let durationMs: Int
+  let text: String
+}
+
+private struct CarPlayLyricLine {
+  let startMs: Int
+  let durationMs: Int
+  let text: String
+  let syllables: [CarPlayLyricSyllable]
+}
+
+private final class CarPlayKaraokeView: UIView {
+  private let inactiveLabel = UILabel()
+  private let activeLabel = UILabel()
+  private let activeContainer = UIView()
+  private var progress: CGFloat = 0
+
+  override init(frame: CGRect) {
+    super.init(frame: frame)
+    clipsToBounds = true
+    activeContainer.clipsToBounds = true
+    [inactiveLabel, activeLabel].forEach { label in
+      label.textAlignment = .center
+      label.numberOfLines = 2
+      label.lineBreakMode = .byTruncatingTail
+    }
+    inactiveLabel.textColor = UIColor.white.withAlphaComponent(0.32)
+    activeLabel.textColor = .white
+    addSubview(inactiveLabel)
+    addSubview(activeContainer)
+    activeContainer.addSubview(activeLabel)
+  }
+
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    inactiveLabel.frame = bounds
+    activeContainer.frame = CGRect(
+      x: 0,
+      y: 0,
+      width: bounds.width * progress,
+      height: bounds.height
+    )
+    activeLabel.frame = bounds
+  }
+
+  func update(text: String, progress: Double, fontSize: CGFloat) {
+    inactiveLabel.text = text
+    activeLabel.text = text
+    let font = UIFont.systemFont(ofSize: fontSize, weight: .bold)
+    inactiveLabel.font = font
+    activeLabel.font = font
+    self.progress = CGFloat(min(max(progress, 0), 1))
+    setNeedsLayout()
+  }
+}
+
+private final class CarPlayNowPlayingViewController: UIViewController {
+  private let backgroundImageView = UIImageView()
+  private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
+  private let dimView = UIView()
+  private let backButton = UIButton(type: .system)
+  private let artworkView = UIImageView()
+  private let titleLabel = UILabel()
+  private let artistLabel = UILabel()
+  private let previousLyricLabel = UILabel()
+  private let karaokeView = CarPlayKaraokeView()
+  private let nextLyricLabel = UILabel()
+  private let progressView = UIProgressView(progressViewStyle: .default)
+  private let elapsedLabel = UILabel()
+  private let durationLabel = UILabel()
+  private let previousButton = UIButton(type: .system)
+  private let playButton = UIButton(type: .system)
+  private let nextButton = UIButton(type: .system)
+  private var pollTimer: Timer?
+  private var displayLink: CADisplayLink?
+  private var snapshotPositionMs = 0
+  private var snapshotDurationMs = 0
+  private var snapshotDate = Date()
+  private var snapshotPlaying = false
+  private var currentLine: CarPlayLyricLine?
+  private var currentSongId = ""
+  private var displayedArtwork: MPMediaItemArtwork?
+  private var requestInFlight = false
+
+  override func viewDidLoad() {
+    super.viewDidLoad()
+    buildView()
+    CarPlayDiagnosticLog.write("PRIVATE_UI now_playing_view_did_load")
+  }
+
+  override func viewWillAppear(_ animated: Bool) {
+    super.viewWillAppear(animated)
+    refreshSnapshot()
+    pollTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { [weak self] _ in
+      self?.refreshSnapshot()
+    }
+    let displayLink = CADisplayLink(target: self, selector: #selector(updatePlaybackFrame))
+    displayLink.add(to: .main, forMode: .common)
+    self.displayLink = displayLink
+  }
+
+  override func viewDidDisappear(_ animated: Bool) {
+    super.viewDidDisappear(animated)
+    pollTimer?.invalidate()
+    pollTimer = nil
+    displayLink?.invalidate()
+    displayLink = nil
+  }
+
+  override func viewDidLayoutSubviews() {
+    super.viewDidLayoutSubviews()
+    backgroundImageView.frame = view.bounds
+    blurView.frame = view.bounds
+    dimView.frame = view.bounds
+
+    let safe = view.safeAreaLayoutGuide.layoutFrame
+    guard safe.width > 0, safe.height > 0 else { return }
+    let insetX = min(max(safe.width * 0.025, 8), 32)
+    let insetY = min(max(safe.height * 0.025, 3), 14)
+    let gap = min(max(safe.width * 0.018, 8), 28)
+    let headerHeight = min(max(safe.height * 0.16, 34), 70)
+    let controlsHeight = min(max(safe.height * 0.25, 54), 110)
+    let contentTop = safe.minY + insetY + headerHeight
+    let contentBottom = safe.maxY - insetY - controlsHeight
+    let contentHeight = max(contentBottom - contentTop, 40)
+    let artworkSide = min(contentHeight, max(safe.width * 0.22, 64))
+
+    backButton.frame = CGRect(
+      x: safe.minX + insetX,
+      y: safe.minY + insetY,
+      width: headerHeight,
+      height: headerHeight - insetY
+    )
+    let infoX = backButton.frame.maxX + gap * 0.5
+    let infoWidth = max(safe.maxX - insetX - infoX, 40)
+    titleLabel.frame = CGRect(x: infoX, y: safe.minY + insetY, width: infoWidth, height: headerHeight * 0.56)
+    artistLabel.frame = CGRect(x: infoX, y: titleLabel.frame.maxY, width: infoWidth, height: headerHeight * 0.3)
+
+    artworkView.frame = CGRect(
+      x: safe.minX + insetX,
+      y: contentTop + max((contentHeight - artworkSide) / 2, 0),
+      width: artworkSide,
+      height: artworkSide
+    )
+    artworkView.layer.cornerRadius = min(max(artworkSide * 0.06, 5), 14)
+
+    let lyricX = artworkView.frame.maxX + gap
+    let lyricWidth = max(safe.maxX - insetX - lyricX, 40)
+    let smallLyricHeight = contentHeight * 0.22
+    previousLyricLabel.frame = CGRect(x: lyricX, y: contentTop, width: lyricWidth, height: smallLyricHeight)
+    karaokeView.frame = CGRect(
+      x: lyricX,
+      y: previousLyricLabel.frame.maxY,
+      width: lyricWidth,
+      height: contentHeight - smallLyricHeight * 2
+    )
+    nextLyricLabel.frame = CGRect(
+      x: lyricX,
+      y: karaokeView.frame.maxY,
+      width: lyricWidth,
+      height: smallLyricHeight
+    )
+
+    let controlTop = contentBottom + min(max(safe.height * 0.025, 4), 12)
+    let timeHeight = min(max(controlsHeight * 0.2, 12), 24)
+    elapsedLabel.frame = CGRect(x: safe.minX + insetX, y: controlTop, width: 62, height: timeHeight)
+    durationLabel.frame = CGRect(x: safe.maxX - insetX - 62, y: controlTop, width: 62, height: timeHeight)
+    progressView.frame = CGRect(
+      x: elapsedLabel.frame.maxX + 6,
+      y: controlTop + timeHeight * 0.5,
+      width: max(durationLabel.frame.minX - elapsedLabel.frame.maxX - 12, 20),
+      height: 4
+    )
+    let buttonSide = min(max(controlsHeight * 0.58, 34), 66)
+    let buttonGap = min(max(safe.width * 0.025, 12), 34)
+    let buttonsWidth = buttonSide * 3 + buttonGap * 2
+    let buttonsX = safe.midX - buttonsWidth / 2
+    let buttonsY = controlTop + timeHeight + max((controlsHeight - timeHeight - buttonSide) / 2, 0)
+    previousButton.frame = CGRect(x: buttonsX, y: buttonsY, width: buttonSide, height: buttonSide)
+    playButton.frame = CGRect(x: previousButton.frame.maxX + buttonGap, y: buttonsY, width: buttonSide, height: buttonSide)
+    nextButton.frame = CGRect(x: playButton.frame.maxX + buttonGap, y: buttonsY, width: buttonSide, height: buttonSide)
+
+    let heightScale = min(max(safe.height / 240, 0.72), 2)
+    titleLabel.font = .systemFont(ofSize: 17 * heightScale, weight: .bold)
+    artistLabel.font = .systemFont(ofSize: 10 * heightScale, weight: .medium)
+    previousLyricLabel.font = .systemFont(ofSize: 10 * heightScale, weight: .medium)
+    nextLyricLabel.font = previousLyricLabel.font
+    elapsedLabel.font = .monospacedDigitSystemFont(ofSize: 8 * heightScale, weight: .medium)
+    durationLabel.font = elapsedLabel.font
+    updatePlaybackFrame()
+    CarPlayDiagnosticLog.write("PRIVATE_UI now_playing_layout safe=\(safe.size) artwork=\(artworkSide)")
+  }
+
+  private func buildView() {
+    view.backgroundColor = UIColor(red: 0.035, green: 0.043, blue: 0.055, alpha: 1)
+    backgroundImageView.contentMode = .scaleAspectFill
+    blurView.alpha = 0.88
+    dimView.backgroundColor = UIColor.black.withAlphaComponent(0.34)
+    artworkView.contentMode = .scaleAspectFill
+    artworkView.clipsToBounds = true
+    artworkView.backgroundColor = UIColor.white.withAlphaComponent(0.08)
+
+    backButton.setImage(UIImage(systemName: "chevron.left"), for: .normal)
+    backButton.tintColor = .white
+    backButton.addTarget(self, action: #selector(close), for: .touchUpInside)
+    configureLabel(titleLabel, color: .white, alignment: .left)
+    configureLabel(artistLabel, color: UIColor.white.withAlphaComponent(0.58), alignment: .left)
+    configureLabel(previousLyricLabel, color: UIColor.white.withAlphaComponent(0.30), alignment: .center)
+    configureLabel(nextLyricLabel, color: UIColor.white.withAlphaComponent(0.30), alignment: .center)
+    previousLyricLabel.numberOfLines = 1
+    nextLyricLabel.numberOfLines = 1
+
+    elapsedLabel.textColor = UIColor.white.withAlphaComponent(0.56)
+    durationLabel.textColor = UIColor.white.withAlphaComponent(0.56)
+    durationLabel.textAlignment = .right
+    progressView.trackTintColor = UIColor.white.withAlphaComponent(0.18)
+    progressView.progressTintColor = .white
+    configureControl(previousButton, symbol: "backward.fill", action: #selector(previousTapped))
+    configureControl(playButton, symbol: "play.fill", action: #selector(playTapped))
+    configureControl(nextButton, symbol: "forward.fill", action: #selector(nextTapped))
+
+    [backgroundImageView, blurView, dimView, artworkView, backButton, titleLabel, artistLabel,
+     previousLyricLabel, karaokeView, nextLyricLabel, progressView, elapsedLabel, durationLabel,
+     previousButton, playButton, nextButton].forEach { view.addSubview($0) }
+    showEmptyState()
+  }
+
+  private func configureLabel(_ label: UILabel, color: UIColor, alignment: NSTextAlignment) {
+    label.textColor = color
+    label.textAlignment = alignment
+    label.lineBreakMode = .byTruncatingTail
+  }
+
+  private func configureControl(_ button: UIButton, symbol: String, action: Selector) {
+    button.setImage(UIImage(systemName: symbol), for: .normal)
+    button.tintColor = .white
+    button.backgroundColor = UIColor.white.withAlphaComponent(0.10)
+    button.layer.cornerRadius = 8
+    button.addTarget(self, action: action, for: .touchUpInside)
+  }
+
+  private func refreshSnapshot() {
+    guard !requestInFlight else { return }
+    requestInFlight = true
+    CarPlayBridge.shared.invoke("getNowPlaying") { [weak self] result, error in
+      DispatchQueue.main.async {
+        guard let self else { return }
+        self.requestInFlight = false
+        guard error == nil, let state = result as? [String: Any] else { return }
+        self.applySnapshot(state)
+      }
+    }
+  }
+
+  private func applySnapshot(_ state: [String: Any]) {
+    guard state["hasSong"] as? Bool == true else {
+      showEmptyState()
+      return
+    }
+    let songId = state["id"] as? String ?? ""
+    if songId != currentSongId {
+      currentSongId = songId
+      displayedArtwork = nil
+    }
+    refreshArtwork()
+    titleLabel.text = state["name"] as? String ?? "正在播放"
+    artistLabel.text = state["singer"] as? String ?? ""
+    previousLyricLabel.text = state["previousLyric"] as? String ?? ""
+    nextLyricLabel.text = state["nextLyric"] as? String ?? ""
+    snapshotPositionMs = (state["positionMs"] as? NSNumber)?.intValue ?? 0
+    snapshotDurationMs = (state["durationMs"] as? NSNumber)?.intValue ?? 0
+    snapshotPlaying = state["playing"] as? Bool ?? false
+    snapshotDate = Date()
+    playButton.setImage(UIImage(systemName: snapshotPlaying ? "pause.fill" : "play.fill"), for: .normal)
+
+    if let rawLine = state["currentLyric"] as? [String: Any] {
+      let rawSyllables = rawLine["syllables"] as? [[String: Any]] ?? []
+      currentLine = CarPlayLyricLine(
+        startMs: (rawLine["startMs"] as? NSNumber)?.intValue ?? 0,
+        durationMs: (rawLine["durationMs"] as? NSNumber)?.intValue ?? 0,
+        text: rawLine["text"] as? String ?? "",
+        syllables: rawSyllables.map { item in
+          CarPlayLyricSyllable(
+            startMs: (item["startMs"] as? NSNumber)?.intValue ?? 0,
+            durationMs: (item["durationMs"] as? NSNumber)?.intValue ?? 0,
+            text: item["text"] as? String ?? ""
+          )
+        }
+      )
+    } else {
+      currentLine = nil
+    }
+    updatePlaybackFrame()
+  }
+
+  private func showEmptyState() {
+    titleLabel.text = "暂无播放"
+    artistLabel.text = "请先选择一首歌曲"
+    previousLyricLabel.text = ""
+    nextLyricLabel.text = ""
+    currentLine = nil
+    snapshotPositionMs = 0
+    snapshotDurationMs = 0
+    snapshotPlaying = false
+    karaokeView.update(text: "歌词将在这里显示", progress: 0, fontSize: 20)
+    updatePlaybackFrame()
+  }
+
+  private func refreshArtwork() {
+    guard let artwork = MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPMediaItemPropertyArtwork]
+      as? MPMediaItemArtwork else {
+      if displayedArtwork == nil {
+        artworkView.image = nil
+        backgroundImageView.image = nil
+      }
+      return
+    }
+    guard artwork !== displayedArtwork else { return }
+    displayedArtwork = artwork
+    let image = artwork.image(at: CGSize(width: 720, height: 720))
+    artworkView.image = image
+    backgroundImageView.image = image
+  }
+
+  @objc private func updatePlaybackFrame() {
+    let elapsedSinceSnapshot = snapshotPlaying ? Date().timeIntervalSince(snapshotDate) * 1000 : 0
+    let positionMs = min(snapshotPositionMs + Int(elapsedSinceSnapshot), max(snapshotDurationMs, snapshotPositionMs))
+    let progress = snapshotDurationMs > 0 ? Float(positionMs) / Float(snapshotDurationMs) : 0
+    progressView.setProgress(min(max(progress, 0), 1), animated: false)
+    elapsedLabel.text = formatTime(positionMs)
+    durationLabel.text = formatTime(snapshotDurationMs)
+
+    let safeHeight = view.safeAreaLayoutGuide.layoutFrame.height
+    let lyricFontSize = 18 * min(max(safeHeight / 240, 0.72), 2)
+    if let line = currentLine {
+      karaokeView.update(
+        text: line.text,
+        progress: lyricProgress(line, at: positionMs),
+        fontSize: lyricFontSize
+      )
+    } else {
+      karaokeView.update(text: "纯音乐，请欣赏", progress: 0, fontSize: lyricFontSize)
+    }
+  }
+
+  private func lyricProgress(_ line: CarPlayLyricLine, at positionMs: Int) -> Double {
+    guard !line.syllables.isEmpty, positionMs >= line.startMs else { return 0 }
+    if line.syllables.count == 1, line.syllables[0].durationMs == 0 { return 1 }
+    let weights = line.syllables.map { max($0.text.count, 0) }
+    let totalWeight = weights.reduce(0, +)
+    guard totalWeight > 0 else { return 0 }
+    var completedWeight = 0
+    for (index, syllable) in line.syllables.enumerated() {
+      if positionMs < syllable.startMs {
+        return Double(completedWeight) / Double(totalWeight)
+      }
+      let endMs = syllable.startMs + syllable.durationMs
+      if syllable.durationMs > 0, positionMs < endMs {
+        let local = Double(positionMs - syllable.startMs) / Double(syllable.durationMs)
+        return min(max((Double(completedWeight) + Double(weights[index]) * local) / Double(totalWeight), 0), 1)
+      }
+      completedWeight += weights[index]
+    }
+    return 1
+  }
+
+  private func formatTime(_ milliseconds: Int) -> String {
+    let seconds = max(milliseconds, 0) / 1000
+    return String(format: "%d:%02d", seconds / 60, seconds % 60)
+  }
+
+  private func perform(_ action: String) {
+    CarPlayBridge.shared.invoke(action) { [weak self] _, _ in
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { self?.refreshSnapshot() }
+    }
+  }
+
+  @objc private func close() { dismiss(animated: true) }
+  @objc private func previousTapped() { perform("previous") }
+  @objc private func playTapped() { perform("togglePlayPause") }
+  @objc private func nextTapped() { perform("next") }
 }
 
 private class CarPlayBaseListViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
