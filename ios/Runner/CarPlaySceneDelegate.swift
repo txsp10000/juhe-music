@@ -121,7 +121,7 @@ final class CarPlaySceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     let window = UIWindow(windowScene: windowScene)
-    window.backgroundColor = UIColor(red: 0.035, green: 0.043, blue: 0.055, alpha: 1)
+    window.backgroundColor = .black
     window.rootViewController = CarPlayHomeViewController()
     self.window = window
     window.makeKeyAndVisible()
@@ -138,22 +138,6 @@ private struct CarPlayCollection {
   let source: String
   let symbol: String
   let tint: UIColor
-}
-
-private struct CarPlayThemePalette {
-  let background: UIColor
-
-  init(argb: UInt32) {
-    let red = CGFloat((argb >> 16) & 0xFF) / 255
-    let green = CGFloat((argb >> 8) & 0xFF) / 255
-    let blue = CGFloat(argb & 0xFF) / 255
-    background = UIColor(
-      red: red * 0.30 + 0.012,
-      green: green * 0.30 + 0.014,
-      blue: blue * 0.30 + 0.018,
-      alpha: 1
-    )
-  }
 }
 
 private final class CarPlayHitButton: UIButton {
@@ -210,13 +194,12 @@ private final class CarPlayHomeViewController: UIViewController {
   private var nowPlayingHeightConstraint: NSLayoutConstraint?
   private var lastLayoutSize = CGSize.zero
   private var nowPlayingTimer: Timer?
-  private var themeARGB: UInt32?
   private var nowPlayingRequestInFlight = false
   private var actionInFlight = false
 
   override func viewDidLoad() {
     super.viewDidLoad()
-    view.backgroundColor = UIColor(red: 0.035, green: 0.043, blue: 0.055, alpha: 1)
+    view.backgroundColor = .black
     buildLayout()
     refreshStatus()
   }
@@ -274,7 +257,7 @@ private final class CarPlayHomeViewController: UIViewController {
 
     statusLabel.text = "正在连接音乐库"
     statusLabel.font = .systemFont(ofSize: 11, weight: .medium)
-    statusLabel.textColor = UIColor.white.withAlphaComponent(0.62)
+    statusLabel.textColor = .white
     statusLabel.textAlignment = .right
     statusLabel.lineBreakMode = .byTruncatingTail
 
@@ -398,19 +381,7 @@ private final class CarPlayHomeViewController: UIViewController {
         self?.nowPlayingRequestInFlight = false
         guard let state = result as? [String: Any] else { return }
         self?.nowPlayingBar.apply(state)
-        self?.applyTheme(from: state)
       }
-    }
-  }
-
-  private func applyTheme(from state: [String: Any]) {
-    guard let value = state["themeColor"] as? NSNumber else { return }
-    let argb = value.uint32Value
-    guard argb != themeARGB else { return }
-    themeARGB = argb
-    let palette = CarPlayThemePalette(argb: argb)
-    UIView.animate(withDuration: 0.4, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
-      self.view.backgroundColor = palette.background
     }
   }
 
@@ -465,7 +436,7 @@ private final class CarPlayCollectionButton: UIControl {
     titleLabel.lineBreakMode = .byTruncatingTail
 
     subtitleLabel.text = collection.subtitle
-    subtitleLabel.textColor = UIColor.white.withAlphaComponent(0.55)
+    subtitleLabel.textColor = .white
     subtitleLabel.lineBreakMode = .byTruncatingTail
 
     let labels = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])
@@ -524,8 +495,8 @@ private final class CarPlayNowPlayingBar: UIView, UIGestureRecognizerDelegate {
 
   private let titleLabel = UILabel()
   private let artistLabel = UILabel()
-  private let favoriteButton = CarPlayHitButton(type: .system)
-  private let playButton = CarPlayHitButton(type: .system)
+  private let favoriteButton = CarPlayHitButton(type: .custom)
+  private let playButton = CarPlayHitButton(type: .custom)
   private var labelsLeadingConstraint: NSLayoutConstraint!
   private var labelsTrailingConstraint: NSLayoutConstraint!
   private var controlsTrailingConstraint: NSLayoutConstraint!
@@ -547,12 +518,13 @@ private final class CarPlayNowPlayingBar: UIView, UIGestureRecognizerDelegate {
     titleLabel.lineBreakMode = .byTruncatingTail
 
     artistLabel.text = "选择歌曲开始播放"
-    artistLabel.textColor = UIColor.white.withAlphaComponent(0.56)
+    artistLabel.textColor = .white
     artistLabel.font = .systemFont(ofSize: 9)
     artistLabel.lineBreakMode = .byTruncatingTail
 
     favoriteButton.setImage(UIImage(systemName: "heart"), for: .normal)
     favoriteButton.tintColor = .white
+    favoriteButton.backgroundColor = .clear
     favoriteButton.addTarget(self, action: #selector(favoriteTapped), for: .touchUpInside)
 
     let labels = UIStackView(arrangedSubviews: [titleLabel, artistLabel])
@@ -562,6 +534,7 @@ private final class CarPlayNowPlayingBar: UIView, UIGestureRecognizerDelegate {
     let previous = controlButton(symbol: "backward.fill", action: #selector(previousTapped))
     playButton.setImage(UIImage(systemName: "play.fill"), for: .normal)
     playButton.tintColor = .white
+    playButton.backgroundColor = .clear
     playButton.addTarget(self, action: #selector(playTapped), for: .touchUpInside)
     let next = controlButton(symbol: "forward.fill", action: #selector(nextTapped))
     controls = UIStackView(arrangedSubviews: [previous, playButton, next])
@@ -656,9 +629,10 @@ private final class CarPlayNowPlayingBar: UIView, UIGestureRecognizerDelegate {
   }
 
   private func controlButton(symbol: String, action: Selector) -> UIButton {
-    let button = CarPlayHitButton(type: .system)
+    let button = CarPlayHitButton(type: .custom)
     button.setImage(UIImage(systemName: symbol), for: .normal)
     button.tintColor = .white
+    button.backgroundColor = .clear
     button.addTarget(self, action: action, for: .touchUpInside)
     return button
   }
@@ -719,21 +693,21 @@ private final class CarPlayKaraokeView: UIView {
 }
 
 private final class CarPlayNowPlayingViewController: UIViewController {
-  private let backButton = CarPlayHitButton(type: .system)
+  private let backButton = CarPlayHitButton(type: .custom)
   private let artworkView = UIImageView()
   private let playbackPanel = UIView()
   private let titleLabel = UILabel()
   private let artistLabel = UILabel()
-  private let favoriteButton = CarPlayHitButton(type: .system)
+  private let favoriteButton = CarPlayHitButton(type: .custom)
   private let previousLyricLabel = UILabel()
   private let karaokeView = CarPlayKaraokeView()
   private let nextLyricLabel = UILabel()
   private let progressView = UIProgressView(progressViewStyle: .default)
   private let elapsedLabel = UILabel()
   private let durationLabel = UILabel()
-  private let previousButton = CarPlayHitButton(type: .system)
-  private let playButton = CarPlayHitButton(type: .system)
-  private let nextButton = CarPlayHitButton(type: .system)
+  private let previousButton = CarPlayHitButton(type: .custom)
+  private let playButton = CarPlayHitButton(type: .custom)
+  private let nextButton = CarPlayHitButton(type: .custom)
   private var pollTimer: Timer?
   private var lyricTransitionTimer: Timer?
   private var snapshotPositionMs = 0
@@ -746,7 +720,6 @@ private final class CarPlayNowPlayingViewController: UIViewController {
   private var displayedArtwork: MPMediaItemArtwork?
   private var requestInFlight = false
   private var actionInFlight = false
-  private var themeARGB: UInt32?
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -851,7 +824,7 @@ private final class CarPlayNowPlayingViewController: UIViewController {
   }
 
   private func buildView() {
-    view.backgroundColor = UIColor(red: 0.035, green: 0.043, blue: 0.055, alpha: 1)
+    view.backgroundColor = .black
     playbackPanel.backgroundColor = .clear
     artworkView.contentMode = .scaleAspectFill
     artworkView.clipsToBounds = true
@@ -859,19 +832,21 @@ private final class CarPlayNowPlayingViewController: UIViewController {
 
     backButton.setImage(UIImage(systemName: "chevron.left"), for: .normal)
     backButton.tintColor = .white
+    backButton.backgroundColor = .clear
     backButton.addTarget(self, action: #selector(close), for: .touchUpInside)
     favoriteButton.setImage(UIImage(systemName: "heart"), for: .normal)
     favoriteButton.tintColor = .white
+    favoriteButton.backgroundColor = .clear
     favoriteButton.addTarget(self, action: #selector(favoriteTapped), for: .touchUpInside)
     configureLabel(titleLabel, color: .white, alignment: .left)
-    configureLabel(artistLabel, color: UIColor.white.withAlphaComponent(0.58), alignment: .left)
-    configureLabel(previousLyricLabel, color: UIColor.white.withAlphaComponent(0.30), alignment: .center)
-    configureLabel(nextLyricLabel, color: UIColor.white.withAlphaComponent(0.30), alignment: .center)
+    configureLabel(artistLabel, color: .white, alignment: .left)
+    configureLabel(previousLyricLabel, color: .white, alignment: .center)
+    configureLabel(nextLyricLabel, color: .white, alignment: .center)
     previousLyricLabel.numberOfLines = 1
     nextLyricLabel.numberOfLines = 1
 
-    elapsedLabel.textColor = UIColor.white.withAlphaComponent(0.56)
-    durationLabel.textColor = UIColor.white.withAlphaComponent(0.56)
+    elapsedLabel.textColor = .white
+    durationLabel.textColor = .white
     durationLabel.textAlignment = .right
     progressView.trackTintColor = UIColor.white.withAlphaComponent(0.18)
     progressView.progressTintColor = .white
@@ -937,7 +912,6 @@ private final class CarPlayNowPlayingViewController: UIViewController {
     snapshotDate = Date()
     playButton.setImage(UIImage(systemName: snapshotPlaying ? "pause.fill" : "play.fill"), for: .normal)
     setFavorite(state["favorite"] as? Bool ?? false)
-    applyTheme(from: state)
 
     if let rawLine = state["currentLyric"] as? [String: Any] {
       currentLyric = rawLine["text"] as? String ?? ""
@@ -982,17 +956,6 @@ private final class CarPlayNowPlayingViewController: UIViewController {
     displayedArtwork = artwork
     let image = artwork.image(at: CGSize(width: 720, height: 720))
     artworkView.image = image
-  }
-
-  private func applyTheme(from state: [String: Any]) {
-    guard let value = state["themeColor"] as? NSNumber else { return }
-    let argb = value.uint32Value
-    guard argb != themeARGB else { return }
-    themeARGB = argb
-    let palette = CarPlayThemePalette(argb: argb)
-    UIView.animate(withDuration: 0.4, delay: 0, options: [.beginFromCurrentState, .allowUserInteraction]) {
-      self.view.backgroundColor = palette.background
-    }
   }
 
   private func scheduleLyricTransition(from state: [String: Any]) {
@@ -1110,12 +1073,12 @@ private class CarPlayBaseListViewController: UIViewController, UITableViewDataSo
 
   override func viewDidLoad() {
     super.viewDidLoad()
-    view.backgroundColor = UIColor(red: 0.035, green: 0.043, blue: 0.055, alpha: 1)
-    applyCurrentTheme()
+    view.backgroundColor = .black
 
-    let back = UIButton(type: .system)
+    let back = UIButton(type: .custom)
     back.setImage(UIImage(systemName: "chevron.left"), for: .normal)
     back.tintColor = .white
+    back.backgroundColor = .clear
     back.addTarget(self, action: #selector(close), for: .touchUpInside)
 
     headingLabel.text = heading
@@ -1176,19 +1139,6 @@ private class CarPlayBaseListViewController: UIViewController, UITableViewDataSo
 
   @objc private func close() { dismiss(animated: true) }
 
-  private func applyCurrentTheme() {
-    CarPlayBridge.shared.invoke("getNowPlaying") { [weak self] result, _ in
-      DispatchQueue.main.async {
-        guard let self,
-              let state = result as? [String: Any],
-              let value = state["themeColor"] as? NSNumber else { return }
-        let palette = CarPlayThemePalette(argb: value.uint32Value)
-        self.view.backgroundColor = palette.background
-        self.tableView.backgroundColor = .clear
-      }
-    }
-  }
-
   func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { 0 }
 
   func tableView(
@@ -1205,7 +1155,7 @@ private class CarPlayBaseListViewController: UIViewController, UITableViewDataSo
     cell.textLabel?.textColor = .white
     cell.textLabel?.font = .systemFont(ofSize: 14 * scale, weight: .semibold)
     cell.detailTextLabel?.text = detail
-    cell.detailTextLabel?.textColor = UIColor.white.withAlphaComponent(0.52)
+    cell.detailTextLabel?.textColor = .white
     cell.detailTextLabel?.font = .systemFont(ofSize: 9 * scale)
     cell.accessoryType = .disclosureIndicator
     cell.tintColor = UIColor.white.withAlphaComponent(0.45)

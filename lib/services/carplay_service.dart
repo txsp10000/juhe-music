@@ -10,7 +10,6 @@ import '../utils/lyric_parser.dart';
 import 'favorites_service.dart';
 import 'playback_history_service.dart';
 import 'player_service.dart';
-import 'theme_service.dart';
 
 class CarPlayService {
   static const _channel = MethodChannel('com.music/carplay');
@@ -242,7 +241,6 @@ class CarPlayService {
         'positionMs': 0,
         'durationMs': 0,
         'playing': false,
-        'themeColor': ThemeService.bgHint.value.toARGB32(),
       };
     }
 
@@ -287,7 +285,6 @@ class CarPlayService {
       'durationMs': player.liveDuration.inMilliseconds,
       'playing': player.isPlaying,
       'favorite': _cachedFavorite,
-      'themeColor': ThemeService.bgHint.value.toARGB32(),
       'nextLyricChangeInMs': carPlayLyricChangeDelayMs(
         positionMs: positionMs,
         nextLyricStartMs: nextStartMs,
