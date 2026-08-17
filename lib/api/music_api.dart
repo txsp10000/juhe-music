@@ -4,7 +4,7 @@ import '../models/song.dart';
 import '../utils/retry_helper.dart';
 
 class MusicApi {
-  static const _base = 'http://pc.w8a.cn:8787';
+  static const _base = 'http://music.w8a.cn:8787';
   static const _requestTimeout = Duration(seconds: 15);
   static final _client = http.Client();
   static final Map<String, Future<TrackDetails>> _trackRequests = {};
